@@ -1,0 +1,52 @@
+# ============================================================================
+# Déploiement Render - An's Learning / Gestion Couturier
+# ============================================================================
+# Documentation : voir DEPLOY_RENDER.md
+# ============================================================================
+
+services:
+  - type: web
+    name: couturier-app
+    env: python
+    region: frankfurt
+
+    # Build
+    buildCommand: pip install -r requirements.txt
+
+    # Commande de démarrage Streamlit (PORT fourni par Render)
+    startCommand: streamlit run app.py --server.port=$PORT --server.address=0.0.0.0 --server.headless=true --server.enableCORS=false --server.enableXsrfProtection=true
+
+    # Variables d'environnement (DB liée automatiquement si créée via ce blueprint)
+    envVars:
+      - key: RENDER
+        value: "true"
+      - key: DATABASE_HOST
+        fromDatabase:
+          name: db-couturier
+          property: host
+      - key: DATABASE_PORT
+        fromDatabase:
+          name: db-couturier
+          property: port
+      - key: DATABASE_NAME
+        fromDatabase:
+          name: db-couturier
+          property: database
+      - key: DATABASE_USER
+        fromDatabase:
+          name: db-couturier
+          property: user
+      - key: DATABASE_PASSWORD
+        fromDatabase:
+          name: db-couturier
+          property: password
+
+    # Plan : starter (payant) ou retirer pour utiliser le plan gratuit
+    # plan: starter
+
+databases:
+  - name: db-couturier
+    databaseName: db_couturier
+    user: couturier_user
+    # plan: starter  # Optionnel : plan payant pour DB persistante
+

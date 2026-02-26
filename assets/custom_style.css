@@ -1,0 +1,435 @@
+/* ============================================================================
+   CHARTE GRAPHIQUE COMPLÈTE - APPLICATION GESTION ATELIER
+   Palette: Violet clair | Bleu turquoise | Beige (60% dominante)
+   Style: Moderne, élégant, professionnel - Tendances 2025
+   ============================================================================ */
+
+/* ----------------------------------------------------------------------------
+   PALETTE DE COULEURS
+   ---------------------------------------------------------------------------- */
+:root {
+    /* Couleurs principales */
+    --violet-clair: #B19CD9;        /* Violet clair - Accents */
+    --bleu-turquoise: #40E0D0;      /* Bleu turquoise - Accents */
+    --beige: #F5F5DC;               /* Beige - 60% dominante */
+    --beige-fonce: #E8E8D3;         /* Beige foncé - Variante */
+    --beige-tres-fonce: #DCDCC8;    /* Beige très foncé - Bordures */
+    
+    /* Couleurs complémentaires */
+    --blanc: #FFFFFF;
+    --noir: #2C2C2C;
+    --gris-clair: #F8F8F8;
+    --gris-moyen: #E0E0E0;
+    --gris-fonce: #6C6C6C;
+    
+    /* Couleurs fonctionnelles */
+    --success: #52BE80;
+    --warning: #F7DC6F;
+    --info: #5DADE2;
+    --error: #E74C3C;
+    
+    /* Dégradés */
+    --gradient-primary: linear-gradient(135deg, var(--violet-clair) 0%, var(--bleu-turquoise) 100%);
+    --gradient-soft: linear-gradient(135deg, var(--beige) 0%, var(--beige-fonce) 100%);
+    --gradient-accent: linear-gradient(135deg, var(--bleu-turquoise) 0%, var(--violet-clair) 100%);
+    
+    /* Ombres */
+    --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.05);
+    --shadow-md: 0 4px 8px rgba(0, 0, 0, 0.1);
+    --shadow-lg: 0 8px 16px rgba(0, 0, 0, 0.15);
+    --shadow-xl: 0 12px 24px rgba(0, 0, 0, 0.2);
+    
+    /* Espacements */
+    --spacing-xs: 0.5rem;
+    --spacing-sm: 1rem;
+    --spacing-md: 1.5rem;
+    --spacing-lg: 2rem;
+    --spacing-xl: 3rem;
+    
+    /* Bordures */
+    --radius-sm: 8px;
+    --radius-md: 12px;
+    --radius-lg: 16px;
+    --radius-xl: 24px;
+    
+    /* Typographie */
+    --font-primary: 'Inter', 'Segoe UI', -apple-system, sans-serif;
+    --font-heading: 'Poppins', 'Inter', sans-serif;
+}
+
+/* ----------------------------------------------------------------------------
+   FOND GLOBAL - BEIGE DOMINANT (60%)
+   ---------------------------------------------------------------------------- */
+.stApp {
+    background: var(--beige) !important;
+    font-family: var(--font-primary);
+}
+
+.main .block-container {
+    background: var(--beige) !important;
+    padding-top: 2rem;
+    padding-bottom: 2rem;
+    max-width: 1200px;
+}
+
+/* ----------------------------------------------------------------------------
+   HEADERS ET TITRES
+   ---------------------------------------------------------------------------- */
+h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-heading);
+    color: var(--noir);
+    font-weight: 600;
+    margin-bottom: var(--spacing-sm);
+}
+
+/* Header de page avec gradient violet-bleu */
+.page-header {
+    background: var(--gradient-primary);
+    padding: var(--spacing-lg);
+    border-radius: var(--radius-lg);
+    margin-bottom: var(--spacing-lg);
+    box-shadow: var(--shadow-md);
+    text-align: center;
+}
+
+.page-header h1 {
+    color: var(--blanc);
+    margin: 0;
+    font-size: 2.5rem;
+    font-weight: 700;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.page-header p {
+    color: rgba(255, 255, 255, 0.95);
+    margin: var(--spacing-xs) 0 0 0;
+    font-size: 1.1rem;
+}
+
+/* ----------------------------------------------------------------------------
+   SIDEBAR - BEIGE FONCÉ
+   ---------------------------------------------------------------------------- */
+[data-testid="stSidebar"] {
+    background: var(--beige-fonce) !important;
+    border-right: 2px solid var(--beige-tres-fonce);
+}
+
+[data-testid="stSidebar"] .sidebar-content {
+    padding: var(--spacing-md);
+}
+
+/* ----------------------------------------------------------------------------
+   BOUTONS
+   ---------------------------------------------------------------------------- */
+.stButton > button {
+    background: var(--gradient-primary) !important;
+    color: var(--blanc) !important;
+    border: none !important;
+    border-radius: var(--radius-md) !important;
+    padding: 0.75rem 1.5rem !important;
+    font-weight: 500 !important;
+    font-size: 1rem !important;
+    transition: all 0.3s ease !important;
+    box-shadow: var(--shadow-sm) !important;
+}
+
+.stButton > button:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md) !important;
+    opacity: 0.9;
+}
+
+.stButton > button:active {
+    transform: translateY(0);
+}
+
+/* Bouton primaire */
+button[kind="primary"] {
+    background: var(--gradient-accent) !important;
+}
+
+/* ----------------------------------------------------------------------------
+   CARTES ET ENCADRÉS
+   ---------------------------------------------------------------------------- */
+.card {
+    background: var(--blanc);
+    border-radius: var(--radius-md);
+    padding: var(--spacing-md);
+    margin-bottom: var(--spacing-md);
+    box-shadow: var(--shadow-sm);
+    border: 1px solid var(--beige-tres-fonce);
+    transition: all 0.3s ease;
+}
+
+.card:hover {
+    box-shadow: var(--shadow-md);
+    transform: translateY(-2px);
+}
+
+/* Cartes KPI */
+.kpi-card {
+    background: var(--blanc);
+    border-radius: var(--radius-md);
+    padding: var(--spacing-md);
+    text-align: center;
+    box-shadow: var(--shadow-sm);
+    border-left: 4px solid var(--violet-clair);
+    transition: all 0.3s ease;
+}
+
+.kpi-card:hover {
+    box-shadow: var(--shadow-md);
+    border-left-color: var(--bleu-turquoise);
+}
+
+/* ----------------------------------------------------------------------------
+   FORMULAIRES
+   ---------------------------------------------------------------------------- */
+.stTextInput > div > div > input,
+.stNumberInput > div > div > input,
+.stSelectbox > div > div > select,
+.stTextArea > div > div > textarea {
+    background: var(--blanc) !important;
+    border: 2px solid var(--beige-tres-fonce) !important;
+    border-radius: var(--radius-sm) !important;
+    padding: 0.75rem !important;
+    transition: all 0.3s ease !important;
+}
+
+.stTextInput > div > div > input:focus,
+.stNumberInput > div > div > input:focus,
+.stSelectbox > div > div > select:focus,
+.stTextArea > div > div > textarea:focus {
+    border-color: var(--violet-clair) !important;
+    box-shadow: 0 0 0 3px rgba(177, 156, 217, 0.1) !important;
+    outline: none !important;
+}
+
+/* ----------------------------------------------------------------------------
+   TABLEAUX
+   ---------------------------------------------------------------------------- */
+.stDataFrame {
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    box-shadow: var(--shadow-sm);
+}
+
+.stDataFrame table {
+    background: var(--blanc);
+}
+
+.stDataFrame thead {
+    background: var(--gradient-soft);
+}
+
+.stDataFrame th {
+    background: var(--beige-fonce) !important;
+    color: var(--noir) !important;
+    font-weight: 600 !important;
+    padding: var(--spacing-sm) !important;
+}
+
+.stDataFrame td {
+    padding: var(--spacing-sm) !important;
+    border-bottom: 1px solid var(--beige-tres-fonce) !important;
+}
+
+.stDataFrame tr:hover {
+    background: var(--beige) !important;
+}
+
+/* ----------------------------------------------------------------------------
+   ONGLETS (TABS)
+   ---------------------------------------------------------------------------- */
+.stTabs [data-baseweb="tab-list"] {
+    gap: var(--spacing-xs);
+    background: var(--beige-fonce);
+    padding: var(--spacing-xs);
+    border-radius: var(--radius-md);
+    margin-bottom: var(--spacing-md);
+}
+
+.stTabs [data-baseweb="tab"] {
+    background: transparent !important;
+    border-radius: var(--radius-sm) !important;
+    padding: 0.75rem 1.5rem !important;
+    color: var(--noir) !important;
+    font-weight: 500 !important;
+    transition: all 0.3s ease !important;
+    border: none !important;
+}
+
+.stTabs [data-baseweb="tab"]:hover {
+    background: var(--beige) !important;
+}
+
+.stTabs [aria-selected="true"] {
+    background: var(--gradient-primary) !important;
+    color: var(--blanc) !important;
+    box-shadow: var(--shadow-sm) !important;
+}
+
+/* ----------------------------------------------------------------------------
+   MÉTRIQUES
+   ---------------------------------------------------------------------------- */
+[data-testid="stMetricValue"] {
+    font-size: 2.5rem;
+    font-weight: 700;
+    color: var(--noir);
+    font-family: var(--font-heading);
+}
+
+[data-testid="stMetricLabel"] {
+    font-size: 1rem;
+    color: var(--gris-fonce);
+    font-weight: 500;
+}
+
+[data-testid="stMetricDelta"] {
+    font-weight: 600;
+}
+
+/* ----------------------------------------------------------------------------
+   GRAPHIQUES PLOTLY
+   ---------------------------------------------------------------------------- */
+.plotly-graph-div {
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-sm);
+    background: var(--blanc);
+    padding: var(--spacing-sm);
+}
+
+/* ----------------------------------------------------------------------------
+   ALERTES ET MESSAGES
+   ---------------------------------------------------------------------------- */
+.stAlert {
+    border-radius: var(--radius-md);
+    border-left: 4px solid;
+    padding: var(--spacing-md);
+    box-shadow: var(--shadow-sm);
+}
+
+.stSuccess {
+    background: #D5F4E6;
+    border-color: var(--success);
+    color: #0F5132;
+}
+
+.stInfo {
+    background: #E3F2FD;
+    border-color: var(--info);
+    color: #0D47A1;
+}
+
+.stWarning {
+    background: #FFF9E6;
+    border-color: var(--warning);
+    color: #856404;
+}
+
+.stError {
+    background: #FFE5E5;
+    border-color: var(--error);
+    color: #8B2635;
+}
+
+/* ----------------------------------------------------------------------------
+   SÉPARATEURS
+   ---------------------------------------------------------------------------- */
+hr {
+    border: none;
+    border-top: 2px solid var(--beige-tres-fonce);
+    margin: var(--spacing-lg) 0;
+}
+
+/* ----------------------------------------------------------------------------
+   SCROLLBAR PERSONNALISÉE
+   ---------------------------------------------------------------------------- */
+::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+}
+
+::-webkit-scrollbar-track {
+    background: var(--beige-fonce);
+    border-radius: var(--radius-sm);
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--violet-clair);
+    border-radius: var(--radius-sm);
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: var(--bleu-turquoise);
+}
+
+/* ----------------------------------------------------------------------------
+   RESPONSIVE
+   ---------------------------------------------------------------------------- */
+@media (max-width: 768px) {
+    .page-header h1 {
+        font-size: 1.8rem;
+    }
+    
+    .page-header p {
+        font-size: 0.9rem;
+    }
+    
+    [data-testid="stMetricValue"] {
+        font-size: 2rem;
+    }
+}
+
+/* ----------------------------------------------------------------------------
+   ANIMATIONS
+   ---------------------------------------------------------------------------- */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.fade-in {
+    animation: fadeIn 0.5s ease-out;
+}
+
+/* ----------------------------------------------------------------------------
+   UTILITAIRES
+   ---------------------------------------------------------------------------- */
+.text-center {
+    text-align: center;
+}
+
+.text-gradient {
+    background: var(--gradient-primary);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.bg-beige {
+    background: var(--beige);
+}
+
+.bg-white {
+    background: var(--blanc);
+}
+
+.shadow-sm {
+    box-shadow: var(--shadow-sm);
+}
+
+.shadow-md {
+    box-shadow: var(--shadow-md);
+}
+
+.rounded {
+    border-radius: var(--radius-md);
+}
+

@@ -1,0 +1,38 @@
+{
+  "hero": {
+    "badge": "Atelier • Sur-mesure • Premium",
+    "title_template": "Bienvenue chez {app_name}",
+    "subtitle_template": "{app_subtitle}",
+    "features": [
+      "Suivi des commandes et des clients en un seul endroit",
+      "Mesures structurées, historiques et documents centralisés",
+      "Tableaux de bord et comptabilité simplifiés"
+    ]
+  },
+  "company": {
+    "title": "🏢 Informations de l'entreprise",
+    "fields": [
+      {
+        "label": "📌 Nom",
+        "value": "An's Learning"
+      },
+      {
+        "label": "📍 Adresse",
+        "value": "Douala - Kotto"
+      },
+      {
+        "label": "👤 Responsable",
+        "value": "Sango Justin"
+      },
+      {
+        "label": "📞 Téléphone",
+        "value": "698192507"
+      },
+      {
+        "label": "✉️ Email",
+        "value": "andresgroup63@gmail.com"
+      }
+    ]
+  },
+  "support_text": "Besoin d'aide ? Contactez l'administrateur ou votre responsable d'atelier."
+}
