@@ -4,6 +4,16 @@ Ce guide décrit comment déployer l'application Streamlit sur Render.
 
 ---
 
+## ⚠️ Important : Render n'utilise PAS le fichier .env
+
+**Le fichier `.env` est ignoré sur Render.** Les secrets et la configuration doivent être définis via les **variables d'environnement** du tableau de bord Render :
+
+1. **Dashboard Render** → votre Web Service → **Environment**
+2. Cliquez sur **Add Environment Variable**
+3. Ajoutez chaque variable (voir section 3.3 ci-dessous)
+
+---
+
 ## 0. Checklist avant déploiement
 
 Cochez chaque étape avant de déployer :
@@ -143,6 +153,27 @@ Ou via Render Dashboard → base PostgreSQL → **Connect** → **External Conne
 ---
 
 ## 5. Problèmes courants
+
+### "Configuration Render incomplète. Vérifiez les variables d'environnement"
+
+**Cause :** Les variables `DATABASE_*` ne sont pas définies. Render n'utilise pas le fichier `.env`.
+
+**Solution :**
+1. Dashboard Render → votre service **couturier-app** → **Environment**
+2. Ajoutez manuellement ces 5 variables (ou vérifiez qu'elles existent si vous utilisez un Blueprint) :
+
+| Clé | Valeur | Où trouver |
+|-----|--------|------------|
+| `RENDER` | `true` | Fixe |
+| `DATABASE_HOST` | *(ex: dpg-xxx-a.oregon-postgres.render.com)* | Base PostgreSQL → Info → Internal Hostname |
+| `DATABASE_PORT` | `5432` | Base PostgreSQL → Info → Internal Port |
+| `DATABASE_NAME` | `db_couturier` | Nom de la base (ou celui défini à la création) |
+| `DATABASE_USER` | *(ex: couturier_user)* | Base PostgreSQL → Info → User |
+| `DATABASE_PASSWORD` | *(mot de passe)* | Base PostgreSQL → Info → Password |
+
+3. **Redéployez** le service après avoir ajouté les variables (Manual Deploy → Deploy latest commit).
+
+**Si vous utilisez un Blueprint :** Vérifiez que la base `db-couturier` existe et que le service web est bien lié à cette base. Le nom dans `render.yaml` (`fromDatabase.name: db-couturier`) doit correspondre exactement au nom du service base de données sur Render.
 
 ### Erreur de connexion à la base
 

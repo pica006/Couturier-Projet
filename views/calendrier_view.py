@@ -13,8 +13,8 @@ from datetime import datetime, timedelta
 from collections import defaultdict
 
 from models.database import CommandeModel, CouturierModel
-from models.salon_model import SalonModel
 from utils.role_utils import est_admin, obtenir_salon_id, obtenir_couturier_id
+from utils.page_header import afficher_header_page
 
 
 def afficher_page_calendrier(onglet_admin: bool = False):
@@ -32,7 +32,6 @@ def afficher_page_calendrier(onglet_admin: bool = False):
     couturier_data = st.session_state.get('couturier_data')
     commande_model = CommandeModel(st.session_state.db_connection)
     couturier_model = CouturierModel(st.session_state.db_connection)
-    salon_model = SalonModel(st.session_state.db_connection)
     salon_id = obtenir_salon_id(couturier_data)
     couturier_id = obtenir_couturier_id(couturier_data)
     est_admin_user = est_admin(couturier_data)
@@ -40,26 +39,37 @@ def afficher_page_calendrier(onglet_admin: bool = False):
     # Créer la table rappels si nécessaire
     commande_model.creer_table_rappels_livraison()
 
-    # Rappels automatiques (exécutés 1 fois par jour)
+    # Rappels automatiques executes une seule fois par session et par jour
     from controllers.rappel_service import executer_rappels_automatiques
-    nb_rappels, msg_rappels = executer_rappels_automatiques(st.session_state.db_connection)
-    if msg_rappels:
-        if nb_rappels > 0:
-            st.success(f"✅ {msg_rappels}")
-        else:
-            st.warning(f"⚠️ {msg_rappels}")
+    date_key = datetime.now().strftime("%Y-%m-%d")
+    rappel_key = f"rappels_auto_executes_{date_key}"
+    if rappel_key not in st.session_state:
+        nb_rappels, msg_rappels = executer_rappels_automatiques(st.session_state.db_connection)
+        st.session_state[rappel_key] = True
+        if msg_rappels:
+            if nb_rappels > 0:
+                st.success(f"✅ {msg_rappels}")
+            else:
+                st.info(f"ℹ️ {msg_rappels}")
+
+    col_rappel_a, col_rappel_b = st.columns([2, 1])
+    with col_rappel_a:
+        st.caption("Les rappels sont declenches automatiquement 1 fois/jour par session.")
+    with col_rappel_b:
+        if st.button("🔔 Relancer les rappels", width="stretch", key="btn_relancer_rappels"):
+            nb_rappels, msg_rappels = executer_rappels_automatiques(st.session_state.db_connection)
+            if msg_rappels:
+                if nb_rappels > 0:
+                    st.success(f"✅ {msg_rappels}")
+                else:
+                    st.info(f"ℹ️ {msg_rappels}")
 
     # Header (uniquement en page standalone)
     if not onglet_admin:
-        st.markdown("""
-            <div style='background: linear-gradient(135deg, #B19CD9 0%, #40E0D0 100%); 
-                        padding: 2rem; border-radius: 16px; margin-bottom: 2rem; 
-                        box-shadow: 0 4px 8px rgba(0,0,0,0.1); text-align: center;'>
-                <h1 style='color: white; margin: 0; font-size: 2.5rem; font-weight: 700; 
-                           font-family: Poppins, sans-serif; text-shadow: 0 2px 4px rgba(0,0,0,0.2);'>📋 Modèles & Calendrier</h1>
-                <p style='color: rgba(255,255,255,0.95); margin: 0.5rem 0 0 0; font-size: 1.1rem;'>Vue des modèles réalisés et du calendrier des livraisons</p>
-            </div>
-        """, unsafe_allow_html=True)
+        afficher_header_page(
+            "📋 Modèles & Calendrier",
+            "Vue des modèles réalisés et du calendrier des livraisons"
+        )
 
     # Onglets principaux
     tab_modeles, tab_calendrier = st.tabs([

@@ -1,0 +1,979 @@
+V0-06 - Durcissement ciblé (auth/session/boot)
+==================================================
+
+Date: 2026-02-26
+
+BUT:
+- Corriger les points prioritaires signales: config env invalide au demarrage, exception non capturee au login, boot trop lourd, incoherences session apres logout, et dependance aux fichiers temporaires indisponibles.
+
+Fichiers modifies:
+- config.py
+- app.py
+- services/db_bootstrap_service.py
+- services/session_service.py
+- views/auth_view.py
+- views/commande_view.py
+
+--------------------------------------------------
+Priorite haute
+--------------------------------------------------
+
+1) Erreur d'import/config au demarrage (env invalide) - `config.py`
+- Renforcement du parsing du port Render:
+  - `DATABASE_PORT` passe par `_env_int(...)` avec fallback `5432`.
+- Effet: une variable d'environnement invalide ne casse plus la configuration DB.
+
+2) Exception non capturee dans le flux de connexion initiale - `views/auth_view.py`
+- Durcissement de l'etape de rendu initial:
+  - bloc `try/except` autour des styles/login header.
+  - fallback UI si erreur (reactivation header/footer natifs + message minimal).
+- Durcissement du submit login:
+  - bloc `try/except` autour de la sequence connexion DB + authentification.
+  - journalisation via `logger.exception(...)`.
+  - message utilisateur explicite en cas d'erreur inattendue.
+- Effet: plus d'ecran "masque" sans feedback quand une erreur survient au login.
+
+3) Demarrage trop lourd (imports globaux + CSS massif + dependances) - `app.py` + `services/db_bootstrap_service.py`
+- `app.py`:
+  - chargement `.env` protege (ne casse pas si `dotenv` absent/defaillant).
+  - lecture de `assets/nav.png` retiree du niveau module et remplacee par `_get_sidebar_bg_css_with_image()` en cache/lazy.
+  - theme CSS massif applique seulement pour les utilisateurs authentifies.
+  - theme leger dedie a la page de connexion pour accelerer le premier rendu.
+- `services/db_bootstrap_service.py`:
+  - imports DB/controllers deplaces en lazy dans `connect_and_initialize(...)`.
+- Effet: reduction du poids au boot initial, surtout sur la page de connexion.
+
+--------------------------------------------------
+Priorite moyenne
+--------------------------------------------------
+
+4) Etat session incoherent apres logout/reconnexion - `services/session_service.py` + `views/auth_view.py`
+- `logout_user()`:
+  - reset explicite de `db_connection` et `db_type` a `None`.
+- `sanitize_session_state()`:
+  - invalidation automatique des connexions stale/non actives.
+- `views/auth_view.py::_ensure_db_connection()`:
+  - verification de la connexion active (`is_connected()`/`get_connection()`).
+  - reinitialisation + reconnexion propre si objet stale.
+- Effet: la reconnexion n'utilise plus une ancienne connexion fermee.
+
+5) Dependance a des fichiers temporaires indisponibles lors d'un rerun - `views/commande_view.py`
+- Si le PDF temporaire disparait:
+  - nettoyage immediat des cles `pdf_path_upload`, `pdf_filename`,
+    `show_download_section`, `show_upload_section`.
+  - message demandant de regenerer le PDF.
+- Effet: suppression des erreurs repetitives sur rerun/redemarrage.
+
+--------------------------------------------------
+Verification technique
+--------------------------------------------------
+- Verifications syntaxiques et controle des references modifies.
+- Aucun changement metier destructif; durcissement/fallback uniquement.
+
+V0-05 - Stabilisation Render: boot, DB, I/O, session
+==================================================
+
+Date: 2026-02-26
+
+BUT:
+- Corriger les points de risque production signales (ecran blanc, cold start, connexion DB precoce, I/O ephemere, session_state instable).
+
+Fichiers modifies:
+- config.py
+- app.py
+- services/session_service.py
+- views/auth_view.py
+- controllers/pdf_controller.py
+- views/commande_view.py
+- .streamlit/config.toml
+
+--------------------------------------------------
+1) Crash silencieux a l'import (env int sans garde)
+--------------------------------------------------
+
+Avant:
+- `int(os.getenv(...))` pouvait lever `ValueError` au boot si variable vide/non numerique.
+
+Apres:
+- Ajout de `_env_int(...)` dans `config.py`.
+- Remplacement des cast directs sur:
+  - `DB_CONNECT_TIMEOUT` (Render + local)
+  - `EMAIL_PORT`
+- Le boot ne casse plus si variable mal formee: fallback par defaut applique.
+
+--------------------------------------------------
+2) Ecran blanc sans details (showErrorDetails=false)
+--------------------------------------------------
+
+Avant:
+- `.streamlit/config.toml` avec `showErrorDetails = false` (bon securite, mauvais diagnostic incident).
+
+Apres:
+- Passage temporaire a `showErrorDetails = true` pour faciliter le diagnostic en phase de stabilisation.
+- Commentaire explicite dans le fichier pour repasser a `false` apres stabilisation.
+
+--------------------------------------------------
+3) Cold start lourd (imports de toutes les vues au demarrage)
+--------------------------------------------------
+
+Avant:
+- `app.py` importait presque toutes les vues au niveau module.
+
+Apres:
+- Lazy imports via `_render_authenticated_page(...)`.
+- Import de `views.auth_view` deplace au moment d'afficher la page login.
+- Les vues lourdes (Plotly/Matplotlib/PIL/ReportLab) ne sont chargees qu'a la navigation effective.
+
+--------------------------------------------------
+4) Connexion DB prematuree au chargement login
+--------------------------------------------------
+
+Avant:
+- `views/auth_view.py` connectait et initialisait la DB des l'ouverture de la page.
+
+Apres:
+- Ajout de `_ensure_db_connection()`:
+  - connexion/initialisation uniquement au submit "Se connecter"
+  - conservation des validations de configuration
+- Suppression de la connexion auto Render/local au chargement de page.
+
+--------------------------------------------------
+5) Filesystem ephemere Render (ecritures fragiles)
+--------------------------------------------------
+
+Avant:
+- Dossiers `pdfs`/`charges_docs` crees au boot dans le projet.
+- QR temporaire PDF ecrit dans dossier persistent de travail.
+- `views/commande_view.py` recreait potentiellement des dossiers de stockage.
+
+Apres:
+- `config.py`:
+  - en Render, `PDF_STORAGE_PATH` et `CHARGES_STORAGE_PATH` pointent vers `tempfile.gettempdir()`.
+  - creation dossier securisee via `_safe_mkdir(...)` (sans crash import).
+- `controllers/pdf_controller.py`:
+  - QR code temporaire genere avec `NamedTemporaryFile(...)`.
+- `views/commande_view.py`:
+  - suppression de la creation de dossier de stockage dans le flux de generation.
+
+--------------------------------------------------
+6) Session Streamlit risquee (stale state / collisions)
+--------------------------------------------------
+
+Avant:
+- initialisation minimale, peu de nettoyage de cles transitoires.
+
+Apres:
+- `services/session_service.py`:
+  - ajout `sanitize_session_state()`
+  - nettoyage de cles transitoires (`pdf_path_upload`, `pdf_filename`, etc.)
+  - reset automatique des references de fichiers temporaires invalides
+  - garde-fous de type/etat (`authentifie`, `page`)
+- `app.py` appelle `sanitize_session_state()` a chaque initialisation.
+
+--------------------------------------------------
+Verification technique
+--------------------------------------------------
+
+- Linter: aucun probleme sur les fichiers modifies.
+- Compilation Python OK:
+  - config.py
+  - app.py
+  - services/session_service.py
+  - views/auth_view.py
+  - controllers/pdf_controller.py
+  - views/commande_view.py
+
+==================================================
+CHANGEMENTS APPLIQUES (LOT 1)
+Date: 2026-02-26
+
+==================================================
+V0-04 - Retirer SQL direct des vues (MVC restore)
+==================================================
+
+Date: 2026-02-26
+
+BUT:
+- Restaurer la separation MVC en retirant toute requete SQL de la couche presentation.
+
+PROMPT:
+"Refactor les vues qui executent du SQL direct.
+Pour chaque vue cible:
+1) extraire requetes SQL vers models
+2) faire passer l'orchestration par controllers
+3) garder la vue purement presentation
+
+Donne mapping exact:
+ancienne fonction vue -> nouveau model/controller.
+Ajoute un mini test manuel par parcours utilisateur."
+
+Vues cibles traitees:
+- views/fermer_commandes_view.py
+- views/admin_view.py
+
+Fichiers modifies:
+- views/fermer_commandes_view.py
+- views/admin_view.py
+- controllers/commande_controller.py
+- controllers/admin_controller.py (nouveau)
+- models/database.py
+
+--------------------------------------------------
+AVANT
+--------------------------------------------------
+- La vue `fermer_commandes_view.py` executait plusieurs SQL directs (SELECT/UPDATE/COUNT/GROUP BY) via `cursor.execute(...)`.
+- La vue `admin_view.py` executait un SQL direct pour compter les clients distincts du salon.
+- Couplage presentation <-> SQL trop fort, testabilite reduite, duplication de logique SQL.
+
+--------------------------------------------------
+APRES
+--------------------------------------------------
+- Plus aucun SQL execute dans les vues cibles.
+- Les vues appellent des methodes controller (orchestration), les controllers deleguent vers les models (SQL/CRUD).
+- Separation MVC restauree:
+  - views = presentation
+  - controllers = orchestration
+  - models = SQL
+
+--------------------------------------------------
+MAPPING EXACT (ancienne fonction vue -> nouveau model/controller)
+--------------------------------------------------
+
+Vue: `views/fermer_commandes_view.py` -> fonction `afficher_page_fermer_commandes()`
+
+1) Onglet "Modifier les paiements"
+- AVANT (vue): SQL SELECT commandes avec avance/restes + filtres dates.
+- APRES:
+  - controller: `CommandeController.lister_commandes_paiements_a_completer(...)`
+  - model: `CommandeModel.lister_commandes_paiements_a_completer(...)`
+
+2) Apres modification des montants (statut Terminé si solde)
+- AVANT (vue): SQL UPDATE direct `commandes SET statut='Terminé'`.
+- APRES:
+  - controller: `CommandeController.mettre_a_jour_statut_si_soldee(...)`
+  - model: `CommandeModel.mettre_a_jour_statut_si_soldee(...)`
+
+3) Onglet "Commandes terminées (en attente de livraison)"
+- AVANT (vue): SQL SELECT admin/employe + filtres + jointures.
+- APRES:
+  - controller: `CommandeController.lister_commandes_terminees_pour_livraison(...)`
+  - model: `CommandeModel.lister_commandes_terminees_pour_livraison(...)`
+
+4) Historique demandes fermeture par lot de commandes
+- AVANT (vue): SQL GROUP BY sur `historique_commandes`.
+- APRES:
+  - controller: `CommandeController.get_historique_demandes_par_commandes(...)`
+  - model: `CommandeModel.get_historique_demandes_par_commandes(...)`
+
+5) Resume demandes fermeture (COUNT + dernier statut)
+- AVANT (vue): SQL COUNT/MAX dans chaque carte commande.
+- APRES:
+  - controller: `CommandeController.get_resume_demande_fermeture_commande(...)`
+  - model: `CommandeModel.get_resume_demande_fermeture_commande(...)`
+
+6) Validation admin vers "Livré et payé"
+- AVANT (vue): SQL UPDATE direct `commandes SET statut='Livré et payé', date_fermeture=NOW()`.
+- APRES:
+  - controller: `CommandeController.valider_commande_livree_payee(...)`
+  - model: `CommandeModel.valider_commande_livree_payee(...)`
+
+7) Onglet "Upload PDFs des commandes terminées"
+- AVANT (vue): SQL SELECT commandes livrees + filtres dates/client/couturier.
+- APRES:
+  - controller: `CommandeController.lister_commandes_livrees_pour_pdf(...)`
+  - model: `CommandeModel.lister_commandes_livrees_pour_pdf(...)`
+
+Vue: `views/admin_view.py` -> fonction `afficher_page_administration()`
+
+8) Nombre total clients distincts du salon
+- AVANT (vue): SQL SELECT COUNT(DISTINCT c.id) avec JOIN couturiers.
+- APRES:
+  - controller: `AdminController.compter_clients_distincts_salon(...)`
+  - model: `ClientModel.compter_clients_distincts_salon(...)`
+
+--------------------------------------------------
+NOUVELLES METHODES AJOUTEES
+--------------------------------------------------
+
+Dans `models/database.py`:
+- `ClientModel.compter_clients_distincts_salon(...)`
+- `CommandeModel.lister_commandes_paiements_a_completer(...)`
+- `CommandeModel.mettre_a_jour_statut_si_soldee(...)`
+- `CommandeModel.lister_commandes_terminees_pour_livraison(...)`
+- `CommandeModel.get_historique_demandes_par_commandes(...)`
+- `CommandeModel.get_resume_demande_fermeture_commande(...)`
+- `CommandeModel.valider_commande_livree_payee(...)`
+- `CommandeModel.lister_commandes_livrees_pour_pdf(...)`
+
+Dans `controllers/commande_controller.py`:
+- wrappers d'orchestration correspondants aux methodes model ci-dessus.
+
+Nouveau fichier controller:
+- `controllers/admin_controller.py`
+  - `AdminController.compter_clients_distincts_salon(...)`
+
+--------------------------------------------------
+AVANTAGES
+--------------------------------------------------
+- Respect strict MVC sur les vues cibles (plus de SQL direct en presentation).
+- Lisibilite: vue recentree sur UX, moins de bruit technique SQL.
+- Reutilisabilite: requetes SQL reutilisables via model/controller.
+- Testabilite: la logique data est testable sans interface Streamlit.
+- Evolution future simplifiee (modification SQL centralisee).
+
+--------------------------------------------------
+MINI TEST MANUEL PAR PARCOURS UTILISATEUR
+--------------------------------------------------
+
+Parcours 1 - Employe / Fermer commandes:
+1) Ouvrir "Fermer mes commandes" onglet "Modifier les paiements".
+2) Verifier affichage des commandes avec avance > 0 et reste > 0.
+3) Modifier un paiement, enregistrer.
+4) Si reste passe a 0, verifier passage en "Terminé".
+5) Onglet "Commandes terminées": envoyer une demande de livraison.
+
+Parcours 2 - Admin / Validation:
+1) Ouvrir "Fermer mes commandes" en profil admin.
+2) Onglet "Commandes terminées": verifier liste salon + filtres.
+3) Cliquer "Valider et passer en Livré et payé".
+4) Verifier statut mis a jour et presence dans onglet PDF.
+
+Parcours 3 - PDF commandes validees:
+1) Ouvrir onglet "Upload PDFs des commandes terminées".
+2) Tester filtres (date debut/fin, nom client, couturier si admin).
+3) Verifier commandes retournees + telechargement PDF fonctionnel.
+
+Parcours 4 - Dashboard admin:
+1) Ouvrir page administration.
+2) Verifier KPI "nombre clients" charge sans erreur.
+3) Verifier coherence des valeurs avec les donnees salon.
+
+Verification technique:
+- Compilation Python OK sur:
+  - models/database.py
+  - controllers/commande_controller.py
+  - controllers/admin_controller.py
+  - views/fermer_commandes_view.py
+  - views/admin_view.py
+==================================================
+V0-03 - Harmonisation rapide pages critiques
+==================================================
+
+Date: 2026-02-26
+
+BUT:
+- Unifier rapidement l'apparence des pages les plus utilisees pour une UX coherente sans refactor lourd.
+
+PROMPT:
+"Uniformise visuellement les pages critiques (auth, dashboard, commande, liste):
+- header coherent
+- marges/padding coherents
+- boutons et titres homogones
+- etats erreur/loading minimaux
+
+Fais-le via composants reutilisables, pas via duplication.
+Donne avant/apres et liste de composants extraits."
+
+Fichiers modifies:
+- utils/ui.py
+- views/auth_view.py
+- views/dashboard_view.py
+- views/commande_view.py
+- views/liste_view.py
+
+--------------------------------------------------
+AVANT
+--------------------------------------------------
+- Styles et micro-comportements UI partiellement heterogenes entre pages critiques.
+- Titres de sections souvent ecrits en dur (`st.markdown("### ...")`) avec rendu variable.
+- Etats de chargement/info/erreur geres de maniere non uniforme (messages/formats differents).
+- Marges/padding/arrondis des boutons non harmonises explicitement au meme endroit.
+
+--------------------------------------------------
+APRES
+--------------------------------------------------
+- Base visuelle commune appliquee aux pages critiques via un composant UI unique.
+- Headers de page coherents sur les 4 pages critiques (auth + dashboard + commande + liste).
+- Titres de sections homogenises via helper reutilisable.
+- Etats erreur/info/loading minimaux harmonises via helpers communs.
+- Pas de duplication: extraction des patterns UI dans `utils/ui.py`, puis adoption dans les vues.
+
+--------------------------------------------------
+COMPOSANTS REUTILISABLES EXTRAITS
+--------------------------------------------------
+Depuis `utils/ui.py`:
+- `appliquer_style_pages_critiques()`
+  - normalise largeur/padding du container principal
+  - homogeneise rendu des titres de section et boutons
+- `afficher_titre_section(titre, niveau=3)`
+  - unifie l'affichage des titres `###/####` sans duplication
+- `afficher_erreur_minimale(message)`
+  - format d'erreur court et coherent
+- `afficher_info_minimale(message)`
+  - format info court et coherent
+- `etat_chargement(message)` (context manager)
+  - spinner standardise pour operations de chargement
+
+--------------------------------------------------
+DETAIL PAR PAGE CRITIQUE
+--------------------------------------------------
+1) auth (`views/auth_view.py`)
+- Application du style commun `appliquer_style_pages_critiques()`.
+- Header de page standardise via `afficher_header_page("🔐 Authentification", ...)`.
+- Harmonisation de plusieurs etats info/erreur/loading via helpers.
+- Uniformisation de certains titres internes ("Connexion securisee", "Identifiants...").
+
+2) dashboard (`views/dashboard_view.py`)
+- Application du style commun.
+- Remplacement de plusieurs titres de section en dur par `afficher_titre_section(...)`.
+- Uniformisation des retours utilisateur (`afficher_info_minimale`, `afficher_erreur_minimale`).
+
+3) commande (`views/commande_view.py`)
+- Application du style commun.
+- Homogeneisation des titres de sections majeures et sous-sections.
+- Remplacement de spinners critiques par `etat_chargement(...)`.
+- Uniformisation de certains messages info/erreur.
+
+4) liste (`views/liste_view.py`)
+- Application du style commun.
+- Titres sections/sous-sections harmonises.
+- Chargements PDF/liste harmonises via `etat_chargement(...)`.
+- Messages info cles uniformises via helper reutilisable.
+
+--------------------------------------------------
+CONTRAINTES
+--------------------------------------------------
+- Pas de SQL en vue: aucune nouvelle requete SQL ajoutee dans les vues.
+- Pas de streamlit dans controllers: aucun controller modifie.
+- Pas de regression fonctionnelle visee: harmonisation purement UI/UX (presentation + feedback), logique metier inchangee.
+
+--------------------------------------------------
+VERIFICATION TECHNIQUE
+--------------------------------------------------
+- Compilation Python OK sur:
+  - utils/ui.py
+  - views/auth_view.py
+  - views/dashboard_view.py
+  - views/commande_view.py
+  - views/liste_view.py
+
+--------------------------------------------------
+TEST MANUEL PAS A PAS (V0-03)
+--------------------------------------------------
+1. Ouvrir la page de connexion:
+   - verifier presence du header standardise.
+   - verifier titre "Connexion securisee" et formulaire lisible.
+2. Se connecter:
+   - verifier spinner harmonise pendant verification identifiants.
+   - verifier messages erreur/info coherents en cas d'echec.
+3. Aller sur Dashboard:
+   - verifier titres de sections homogenes.
+   - verifier message de periode et erreurs de date au format minimal.
+4. Aller sur Nouvelle commande:
+   - verifier titres sections/sous-sections homogenes.
+   - verifier spinners harmonises pendant enregistrement / generation PDF / copie PDF.
+5. Aller sur Liste commandes:
+   - verifier titres "Statistiques", "Filtres", "Details" homogenes.
+   - verifier spinner harmonise au chargement liste et generation PDF.
+6. Controle final:
+   - navigation complete auth -> dashboard -> commande -> liste OK.
+   - aucune perte de fonctionnalite metier observee.
+Objectif du lot:
+- Corriger des limites dans les vues sans changer la logique metier finale.
+- Respecter MVC:
+  - views = presentation uniquement
+  - controllers = orchestration metier (sans Streamlit)
+  - models = SQL/CRUD
+
+==================================================
+1) SQL direct retire de la vue
+==================================================
+
+Fichier modifie:
+- views/super_admin_dashboard.py
+
+Avant:
+- La vue executait directement du SQL dans le bloc de diagnostic:
+  - verification existence table `salons`
+  - `SELECT COUNT(*) FROM salons`
+  - `SELECT salon_id, nom, quartier FROM salons LIMIT 5`
+- La vue ouvrait/fermait elle-meme le curseur DB.
+
+Apres:
+- La vue appelle uniquement le controleur:
+  - `super_admin_ctrl.diagnostiquer_salons()`
+- La vue se limite a afficher le resultat (message succes/erreur, compteur, echantillon).
+
+Pourquoi ce changement:
+- Le SQL dans une vue casse la separation MVC.
+- Le code etait plus fragile et plus difficile a maintenir/tester.
+
+Avantage:
+- Vue plus propre (presentation seulement).
+- SQL centralise dans la couche model.
+- Maintenance plus simple, meilleure lisibilite, moins de duplication future.
+
+==================================================
+2) Ajout orchestration controller pour le diagnostic
+==================================================
+
+Fichier modifie:
+- controllers/super_admin_controller.py
+
+Avant:
+- Aucun point d'entree controller pour le diagnostic `salons`.
+
+Apres:
+- Ajout de la methode:
+  - `diagnostiquer_salons()`
+- Cette methode delegue vers le model:
+  - `SalonModel(self.db).diagnostiquer_table_salons()`
+
+Pourquoi ce changement:
+- Le controller doit orchestrer les besoins de la vue.
+- Evite que la vue parle directement a la base.
+
+Avantage:
+- Respect strict de l'architecture cible.
+- La vue reste simple et stable.
+
+==================================================
+3) Ajout methode SQL/CRUD dediee dans le model
+==================================================
+
+Fichier modifie:
+- models/salon_model.py
+
+Avant:
+- Pas de methode dediee pour diagnostiquer techniquement la table `salons`.
+
+Apres:
+- Ajout de:
+  - `diagnostiquer_table_salons()`
+- Cette methode retourne un dict structure:
+  - `table_exists` (bool)
+  - `count` (int)
+  - `samples` (liste de salons)
+  - `error` (message d'erreur ou None)
+
+Pourquoi ce changement:
+- Le SQL doit rester dans model.
+- Un format de retour structure est plus fiable pour la vue.
+
+Avantage:
+- Gestion d'erreur plus propre.
+- Reutilisable ailleurs (autres vues/controllers).
+- Plus testable.
+
+==================================================
+4) Suppression des blocages UI (time.sleep)
+==================================================
+
+Fichier modifie:
+- views/super_admin_dashboard.py
+
+Avant:
+- Apres creation/modification salon:
+  - `time.sleep(2)`
+  - puis `st.rerun()`
+- Effet: blocage inutile et reruns moins fluides.
+
+Apres:
+- Suppression de `time.sleep`.
+- Utilisation de messages flash en `st.session_state`:
+  - `super_admin_created_salon`
+  - `super_admin_updated_salon`
+- Puis `st.rerun()` immediat.
+
+Pourquoi ce changement:
+- `time.sleep` bloque l'interface et degrade l'experience utilisateur.
+- Le message flash permet de conserver le feedback sans blocage.
+
+Avantage:
+- Interface plus reactive.
+- Meme comportement fonctionnel conserve (creation/modification + retour visuel).
+
+==================================================
+5) Validation technique effectuee
+==================================================
+
+- Linter: aucun probleme sur les fichiers modifies.
+- Verification syntaxe Python:
+  - views/super_admin_dashboard.py
+  - controllers/super_admin_controller.py
+  - models/salon_model.py
+  => compilation OK.
+
+==================================================
+Resume court
+==================================================
+
+Ce lot n'a pas change la logique metier finale.
+Il a surtout:
+- deplace le SQL hors de la vue vers model/controller,
+- supprime un blocage `time.sleep`,
+- garde le comportement utilisateur existant avec feedback visuel.
+
+==================================================
+V0-01 - INVENTAIRE EXACT DES POINTS DANGEREUX UI
+==================================================
+
+Date: 2026-02-26
+
+Tableau d'inventaire (fichier | fonction | type risque | impact prod | action recommandee | priorite)
+
+| fichier | fonction | type risque | impact prod | action recommandee | priorite |
+|---|---|---|---|---|---|
+| app.py | module-level CSS injecte | CSS global agressif (`button`, `p, span, div`, `[role]`, `[data-testid]`, `!important` massif) | collisions visuelles entre pages, maintenance difficile, rendu fragile selon versions Streamlit | reduire progressivement les selecteurs globaux et scoper par zone | P1 |
+| app.py | module-level script (retire) | JS inline DOM hack (`MutationObserver`, `setTimeout`, `querySelector`) | rerenders instables, risque casse DOM, comportement non deterministe | suppression complete du JS inline, conservation CSS/fonctionnement natif | P0 |
+| app.py | _sidebar_styles_css (script retire) | JS inline pour bouton actif sidebar | dependance DOM fragile | suppression JS, fallback sans class active auto | P0 |
+| app.py | get_page_background_html (script retire) | JS inline de creation de calques DOM | duplication CSS/JS + risque d'empilement visuel | garder version CSS (pseudo-elements), supprimer JS | P0 |
+| views/commande_view.py | bloc generation PDF (retire) | script auto-download inline (`st.components.v1.html`, `setTimeout`, `click`) | telechargement fragile selon navigateur, surface XSS inutile | suppression bloc script, garder flux natif Streamlit (`download_button`) | P0 |
+| views/auth_view.py | hide_st_style | CSS applique globalement (boutons) | effet de bord hors scope login | scoper sur `.login-scope` | P1 |
+| views/admin_view.py | afficher_page_administration | header HTML inline duplique | duplication composant + maintenance repetitive | utiliser `utils/page_header.py` | P2 |
+| views/calendrier_view.py | afficher_page_calendrier | header HTML inline duplique | idem | utiliser `utils/page_header.py` | P2 |
+| views/mes_charges_view.py | afficher_page_mes_charges | header HTML inline duplique | idem | utiliser `utils/page_header.py` | P2 |
+| views/commande_view.py, views/liste_view.py, views/dashboard_view.py, views/admin_view.py | diverses fonctions | `st.markdown("<br>", unsafe_allow_html=True)` duplique | pattern fragile et inutilement permissif | remplacer par utilitaire central `utils/ui.py` | P2 |
+| views/fermer_commandes_view.py | formulaire modification paiement | `span style` inline + unsafe html | rendu fragile et maintenance difficile | remplacer par composant Streamlit (`st.metric`) | P2 |
+| utils/page_header.py | afficher_header_page | HTML inline volontaire (composant central) | risque maitrise (centralise) | conserver comme point unique de presentation | P3 |
+| utils/bottom_nav.py | render_bottom_nav | HTML/CSS injecte | risque maitrise mais a monitorer | conserver temporairement, envisager refonte composant plus tard | P3 |
+
+==================================================
+EXECUTION DU PLAN - LOTS APPLIQUES
+==================================================
+
+LOT A - Neutralisation JS inline critique (P0)
+--------------------------------------------------
+Fichiers modifies:
+- app.py
+
+Avant:
+- scripts inline dans app.py pour forcer styles boutons, marquer nav active, injecter fond via DOM.
+- usages: MutationObserver, setTimeout, querySelector, window/document.
+
+Apres:
+- suppression complete des scripts inline dans:
+  - bloc CSS global module-level
+  - _sidebar_styles_css()
+  - get_page_background_html()
+- suppression du marqueur HTML cache `#sidebar-current-page` devenu inutile.
+
+Pourquoi:
+- JS inline DOM-level est le point le plus fragile en production.
+
+Avantage:
+- moins de risque de rerender/casse DOM.
+- comportement plus deterministe.
+
+Risques:
+- perte du surlignage automatique du bouton actif dans la sidebar (cosmetique uniquement).
+
+Tests manuels:
+- navigation sidebar sur toutes pages.
+- verification fond principal.
+- verification style boutons sans clignotement.
+
+LOT B - Suppression script auto-download PDF (P0)
+--------------------------------------------------
+Fichiers modifies:
+- views/commande_view.py
+
+Avant:
+- bloc HTML+JS auto-download (setTimeout + click sur lien cache) present dans le flux PDF.
+
+Apres:
+- suppression du bloc script.
+- conservation du flux natif Streamlit de telechargement (deja present).
+
+Pourquoi:
+- eviter JS navigateur fragile et inutile.
+
+Avantage:
+- telechargement plus robuste et plus secure.
+
+Risques:
+- aucun risque metier attendu (bloc retire etait non necessaire).
+
+Tests manuels:
+- creer commande.
+- generer PDF.
+- verifier telechargement via bouton Streamlit.
+
+LOT C - Reduction progressive de unsafe/collisions CSS
+--------------------------------------------------
+Fichiers modifies:
+- views/auth_view.py
+- views/fermer_commandes_view.py
+- views/commande_view.py
+- views/dashboard_view.py
+- views/liste_view.py
+- views/admin_view.py
+- utils/ui.py (nouveau)
+
+Avant:
+- plusieurs usages de `<br>` en `unsafe_allow_html=True`.
+- style inline `span` pour afficher le reste.
+- CSS login avec selecteurs boutons globaux.
+
+Apres:
+- ajout utilitaire central:
+  - utils/ui.py -> `ajouter_espace_vertical()`
+- remplacement des `<br>` unsafe par `ajouter_espace_vertical()` dans les vues.
+- remplacement du `span style` par `st.metric` dans `fermer_commandes_view.py`.
+- scoping des selecteurs boutons dans `auth_view.py` sous `.login-scope`.
+
+Pourquoi:
+- diminuer surface `unsafe_allow_html`.
+- eviter collisions globales.
+
+Avantage:
+- UI plus stable et plus maintainable.
+- meilleure separation presentation / comportement.
+
+Risques:
+- ecarts mineurs d'espacement ou rendu pixel-perfect.
+
+Tests manuels:
+- verifier formulaires et espacements:
+  - nouvelle commande
+  - dashboard
+  - liste commandes
+  - admin (gestion roles)
+  - fermeture commandes (affichage reste)
+
+LOT D - Deduplication visuelle (headers)
+--------------------------------------------------
+Fichiers modifies:
+- views/admin_view.py
+- views/calendrier_view.py
+- views/mes_charges_view.py
+
+Avant:
+- headers HTML inline dupliques avec meme gradient/theme.
+
+Apres:
+- utilisation du composant central:
+  - utils/page_header.py -> `afficher_header_page(...)`
+
+Pourquoi:
+- centraliser le design.
+- eviter divergence de styles entre pages.
+
+Avantage:
+- maintenance simplifiee.
+- coherence visuelle cross-pages.
+
+Risques:
+- rendu du header legerement different sur certaines pages (cosmetique).
+
+Tests manuels:
+- ouvrir chaque page et comparer:
+  - administration
+  - calendrier (standalone)
+  - mes charges
+
+==================================================
+VERIFICATION TECHNIQUE FINALE
+==================================================
+
+- Linter: aucun probleme sur les fichiers modifies.
+- Compilation Python OK sur:
+  - app.py
+  - views/commande_view.py
+  - views/dashboard_view.py
+  - views/liste_view.py
+  - views/admin_view.py
+  - views/calendrier_view.py
+  - views/mes_charges_view.py
+  - views/fermer_commandes_view.py
+  - views/auth_view.py
+  - utils/ui.py
+
+==================================================
+LOT E - MODE VISUEL SAFE (stabilisation production)
+==================================================
+
+Date: 2026-02-26
+
+Objectif:
+- Stabiliser immediatement le rendu en production en desactivant les mecanismes front fragiles.
+- Garder un style minimal stable.
+- Conserver le branding essentiel (nom app, sous-titre, couleurs primaires, logo page).
+
+Prompt applique:
+- "Implemente un mode visuel safe:
+  - desactive les scripts JS DOM fragiles
+  - garde un style minimal stable
+  - conserve le branding essentiel
+  Contraintes:
+  - pas de SQL en vue
+  - pas de streamlit dans controllers
+  - pas de regression fonctionnelle."
+
+Fichiers modifies:
+- config.py
+- app.py
+
+1) Ajout d'un flag central "mode visuel safe"
+--------------------------------------------------
+Fichier modifie:
+- config.py
+
+Avant:
+- Aucun flag global dedie pour forcer un rendu visuel minimal/stable en production.
+
+Apres:
+- Ajout de `_env_flag(...)` pour parser proprement un bool depuis l'environnement.
+- Ajout de `VISUAL_SAFE_MODE`:
+  - actif par defaut en production (`IS_RENDER`)
+  - surcharge possible via variable d'environnement `VISUAL_SAFE_MODE=true|false`
+
+Pourquoi:
+- Permet d'activer des garde-fous visuels sans toucher la logique metier.
+
+2) Activation d'un theme minimal stable en safe mode
+--------------------------------------------------
+Fichier modifie:
+- app.py
+
+Avant:
+- CSS global riche et tres agressif (beaucoup de selecteurs et surcharges).
+
+Apres:
+- Ajout d'un CSS dedie `_safe_visual_css()` (minimal, stable, peu intrusif):
+  - fond clair
+  - sidebar sobre
+  - boutons stables (sans animations/transforms fragiles)
+  - liens en couleur de marque
+- Chargement conditionnel:
+  - si `VISUAL_SAFE_MODE=True` -> CSS safe uniquement
+  - sinon -> theme complet existant
+
+Pourquoi:
+- Reduire les risques de collisions CSS et de rendu non deterministe selon versions/navigateurs.
+
+3) Desactivation des decorations visuelles fragiles en safe mode
+--------------------------------------------------
+Fichier modifie:
+- app.py
+
+Avant:
+- Fond image par page + effets de calques (blur/overlay) + footer HTML riche.
+
+Apres:
+- `get_page_background_html(...)` retourne vide en safe mode (pas de calques dynamiques de fond).
+- Sidebar forcee en fond uni en safe mode (pas d'image de fond de connexion).
+- Footer complexe `render_bottom_nav(...)` remplace en safe mode par un footer texte simple (`st.caption`) conservant le branding essentiel.
+
+Pourquoi:
+- Diminuer la surface front fragile (HTML/CSS injectes complexes), tout en preservant l'identite visuelle de base.
+
+Contraintes verifiees
+--------------------------------------------------
+- Pas de SQL en vue: aucun changement SQL introduit dans les vues.
+- Pas de Streamlit dans controllers: aucun controller modifie.
+- Pas de regression fonctionnelle: routage/pages et logique metier inchanges.
+
+Verification technique rapide
+--------------------------------------------------
+- Compilation Python OK:
+  - app.py
+  - config.py
+
+Test manuel pas a pas
+--------------------------------------------------
+1. Lancer l'application en mode production/safe:
+   - verifier que `VISUAL_SAFE_MODE` est actif (par defaut en Render).
+2. Ouvrir la page de connexion:
+   - verifier affichage stable (fond uni sidebar, pas d'effet visuel agressif).
+   - verifier que la connexion fonctionne normalement.
+3. Naviguer successivement:
+   - dashboard
+   - nouvelle commande
+   - liste commandes
+   - comptabilite
+   - charges
+   - fermer commandes
+   - calendrier
+   - administration (selon droits)
+   Pour chaque page:
+   - verifier absence de clignotement/render instable.
+   - verifier boutons lisibles et cliquables.
+4. Verifier branding essentiel:
+   - logo visible sur pages authentifiees (si asset present).
+   - couleurs de marque appliquees (boutons/liens).
+   - nom/sous-titre presents dans le footer simplifie.
+5. Verifier non-regression fonctionnelle:
+   - creer une commande
+   - modifier une commande
+   - exporter/imprimer selon flux existants
+   - deconnexion/reconnexion
+6. Controle final:
+   - pas d'erreur bloquante UI
+   - navigation complete possible sans perte de fonctionnalite.
+
+==================================================
+LOT F - Durcissement complementaire (Render/session/PDF)
+==================================================
+
+Date: 2026-02-26
+
+Fichiers modifies:
+- app.py
+- controllers/pdf_controller.py
+- controllers/commande_controller.py
+- services/session_service.py
+
+1) Cold start: reduction des imports lourds au boot
+--------------------------------------------------
+Avant:
+- `app.py` importait des composants DB/controllers au niveau module.
+
+Apres:
+- Imports de `DatabaseConnection`, `ChargesModel`, `AuthController`, `CommandeController`
+  deplaces dans les fonctions de connexion (`connecter_postgresql_local`, `connecter_render_production`).
+
+Pourquoi:
+- Eviter de charger ces dependances au demarrage si non necessaires.
+
+2) PDF plus robuste sur filesystem ephemere
+--------------------------------------------------
+Avant:
+- `controllers/pdf_controller.py` ecrivait les PDFs dans `tempfile.gettempdir()` directement.
+- Les images tissu/modele etaient lues principalement depuis des chemins fichiers.
+
+Apres:
+- Les PDFs sont ecrits dans `self.storage_path` (centralise via `config.PDF_STORAGE_PATH`).
+- Ajout de `_build_reportlab_image(...)`:
+  - priorite au fichier si present
+  - fallback automatique sur bytes (`fabric_image` / `model_image`) issus de la BDD.
+
+Pourquoi:
+- Limiter les echecs PDF quand les chemins fichiers deviennent invalides (redemarrage/deploiement Render).
+
+3) Ecritures images harmonisees avec Render
+--------------------------------------------------
+Avant:
+- `CommandeController.sauvegarder_image(...)` ecrivait dans un dossier base sur le projet.
+
+Apres:
+- En Render: ecriture forcee dans `PDF_STORAGE_PATH/images` (temp dedie).
+- En local: comportement conserve (dossier voisin des PDFs).
+- Creation dossier via `os.makedirs(..., exist_ok=True)`.
+
+Pourquoi:
+- Unifier l'ecriture temporaire et reduire les erreurs de dossier en production.
+
+4) Session_state: reduction du stale state
+--------------------------------------------------
+Avant:
+- Plusieurs cles de formulaires restaient ad hoc et pouvaient persister entre sessions.
+
+Apres:
+- `services/session_service.py` etend `TRANSIENT_KEYS` avec les cles critiques de `commande_view`
+  (`prix_total_form`, `avance_form`, `reste_form`, `modele_selectionne`, etc.).
+- Ces cles sont purgees automatiquement quand l'utilisateur n'est plus authentifie.
+
+Pourquoi:
+- Reduire collisions/states obsoletes apres reruns/logout.
+

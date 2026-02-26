@@ -27,6 +27,7 @@ from PIL import Image as PILImage
 import qrcode
 
 from models.database import ChargesModel, CommandeModel
+from utils.page_header import afficher_header_page
 
 
 # ============================================================================
@@ -235,15 +236,7 @@ def afficher_page_mes_charges():
         titre = "💰 Gestion des Charges"
         sous_titre = "Atelier de Couture - Tableau de bord complet"
     
-    st.markdown(f"""
-        <div style='background: linear-gradient(135deg, #B19CD9 0%, #40E0D0 100%); 
-                    padding: 2rem; border-radius: 16px; margin-bottom: 2rem; 
-                    box-shadow: 0 4px 8px rgba(0,0,0,0.1); text-align: center;'>
-            <h1 style='color: white; margin: 0; font-size: 2.5rem; font-weight: 700; 
-                       font-family: Poppins, sans-serif; text-shadow: 0 2px 4px rgba(0,0,0,0.2);'>{titre}</h1>
-            <p style='color: rgba(255,255,255,0.95); margin: 0.5rem 0 0 0; font-size: 1.1rem;'>{sous_titre}</p>
-        </div>
-    """, unsafe_allow_html=True)
+    afficher_header_page(titre, sous_titre)
     
     # ========================================================================
     # TABS PRINCIPAUX
@@ -431,12 +424,11 @@ def afficher_formulaire_ajout_charge(charges_model: ChargesModel,
         with col_btn1:
             submit = st.form_submit_button(
                 "💾 Enregistrer la charge",
-                type="primary",
-                width='stretch'
+                type="primary"
             )
         
         with col_btn2:
-            st.form_submit_button("🔄 Réinitialiser", width='stretch')
+            st.form_submit_button("🔄 Réinitialiser")
         
         # Traitement du formulaire
         if submit:
@@ -2292,7 +2284,7 @@ def _formulaire_salaire(charges_model, couturier_id, salon_id_user: Optional[str
                 help="Référence de paiement (générée automatiquement N+1, modifiable)"
             )
         
-        submit = st.form_submit_button("💾 Enregistrer le salaire", type="primary", width='stretch')
+        submit = st.form_submit_button("💾 Enregistrer le salaire", type="primary")
         
         if submit:
             if not employe_id:
@@ -2424,7 +2416,7 @@ def _formulaire_ponctuelle(charges_model, couturier_id, salon_id_user: Optional[
             key="file_ponctuelle"
         )
         
-        submit = st.form_submit_button("💾 Enregistrer la charge", type="primary", width='stretch')
+        submit = st.form_submit_button("💾 Enregistrer la charge", type="primary")
         
         if submit:
             if montant <= 0:
@@ -2551,7 +2543,7 @@ def _formulaire_fixe(charges_model, couturier_id, salon_id_user: Optional[str] =
             key="file_fixe"
         )
         
-        submit = st.form_submit_button("💾 Enregistrer la charge", type="primary", width='stretch')
+        submit = st.form_submit_button("💾 Enregistrer la charge", type="primary")
         
         if submit:
             if montant <= 0:
@@ -2708,7 +2700,7 @@ def _formulaire_commande(charges_model, commande_model, couturier_id, salon_id_u
             key="file_commande"
         )
         
-        submit = st.form_submit_button("💾 Enregistrer la charge", type="primary", width='stretch')
+        submit = st.form_submit_button("💾 Enregistrer la charge", type="primary")
         
         if submit:
             if not commande_id:

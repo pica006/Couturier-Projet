@@ -137,46 +137,24 @@ def afficher_vue_ensemble(super_admin_ctrl, salon_model):
         
         with st.expander("🔍 Debug - Diagnostic complet"):
             st.markdown("### Vérifications à effectuer :")
-            
-            # Tester la connexion et la table
-            try:
-                cursor = st.session_state.db_connection.get_connection().cursor()
-                
-                # Vérifier si la table existe
-                if st.session_state.db_connection.db_type == 'mysql':
-                    cursor.execute("SHOW TABLES LIKE 'salons'")
-                else:  # PostgreSQL
-                    cursor.execute("""
-                        SELECT table_name 
-                        FROM information_schema.tables 
-                        WHERE table_schema = 'public' AND table_name = 'salons'
-                    """)
-                table_exists = cursor.fetchone()
-                
-                if table_exists:
-                    st.success("✅ La table 'salons' existe")
-                    
-                    # Compter les salons
-                    cursor.execute("SELECT COUNT(*) FROM salons")
-                    count = cursor.fetchone()[0]
-                    st.info(f"📊 Nombre de salons dans la table : {count}")
-                    
-                    if count > 0:
-                        # Afficher les premiers salons
-                        cursor.execute("SELECT salon_id, nom, quartier FROM salons LIMIT 5")
-                        rows = cursor.fetchall()
-                        st.markdown("**Premiers salons trouvés :**")
-                        for row in rows:
-                            st.write(f"- {row[0]} : {row[1]} ({row[2]})")
-                    else:
-                        st.warning("⚠️ La table est vide. Créez un salon d'abord.")
+
+            diagnostic = super_admin_ctrl.diagnostiquer_salons()
+            if diagnostic.get("error"):
+                st.error(f"❌ Erreur lors du diagnostic : {diagnostic['error']}")
+            elif diagnostic.get("table_exists"):
+                st.success("✅ La table 'salons' existe")
+                st.info(f"📊 Nombre de salons dans la table : {diagnostic.get('count', 0)}")
+
+                samples = diagnostic.get("samples", [])
+                if samples:
+                    st.markdown("**Premiers salons trouvés :**")
+                    for row in samples:
+                        st.write(f"- {row['salon_id']} : {row['nom']} ({row['quartier']})")
                 else:
-                    st.error("❌ La table 'salons' n'existe pas")
-                    st.info("💡 Vous devez créer la table 'salons' d'abord")
-                
-                cursor.close()
-            except Exception as e:
-                st.error(f"❌ Erreur lors du diagnostic : {e}")
+                    st.warning("⚠️ La table est vide. Créez un salon d'abord.")
+            else:
+                st.error("❌ La table 'salons' n'existe pas")
+                st.info("💡 Vous devez créer la table 'salons' d'abord")
             
             st.markdown("---")
             st.code("""
@@ -469,6 +447,17 @@ def afficher_gestion_salons(salon_model):
     """Onglet 2 : Gestion des salons"""
     
     st.subheader("🏢 Gestion des salons de couture")
+
+    created_salon_flash = st.session_state.pop("super_admin_created_salon", None)
+    if created_salon_flash:
+        st.success(
+            f"✅ Salon créé avec succès ! Salon ID: {created_salon_flash.get('salon_id')} | "
+            f"Code admin: {created_salon_flash.get('code_admin')}"
+        )
+
+    updated_salon_flash = st.session_state.pop("super_admin_updated_salon", None)
+    if updated_salon_flash:
+        st.success(f"✅ Salon modifié avec succès : {updated_salon_flash}")
     
     # Sous-onglets
     sub_tab1, sub_tab2, sub_tab3 = st.tabs([
@@ -631,7 +620,7 @@ def afficher_gestion_salons(salon_model):
                 nom_admin = st.text_input("Nom de l'admin *", placeholder="Ex: DIOP")
                 prenom_admin = st.text_input("Prénom de l'admin *", placeholder="Ex: Moustapha")
             
-            submitted = st.form_submit_button("💾 Créer le salon", width='stretch')
+            submitted = st.form_submit_button("💾 Créer le salon")
             
             if submitted:
                 # Validation
@@ -662,19 +651,11 @@ def afficher_gestion_salons(salon_model):
                         )
                         
                         if result and result.get('success'):
-                            st.success(f"""
-                            ✅ Salon créé avec succès !
-                            
-                            **Salon ID** : {result['salon_id']}  
-                            **Code admin** : {result['code_admin']}
-                            
-                            L'administrateur peut maintenant se connecter avec ce code.
-                            """)
                             st.balloons()
-                            
-                            # Rafraîchir après 2 secondes
-                            import time
-                            time.sleep(2)
+                            st.session_state["super_admin_created_salon"] = {
+                                "salon_id": result.get("salon_id"),
+                                "code_admin": result.get("code_admin"),
+                            }
                             st.rerun()
                         elif result:
                             st.error(f"❌ Erreur : {result.get('message', 'Erreur inconnue')}")
@@ -752,10 +733,10 @@ def afficher_gestion_salons(salon_model):
                     col_submit1, col_submit2 = st.columns(2)
                     
                     with col_submit1:
-                        submitted = st.form_submit_button("💾 Enregistrer les modifications", width='stretch')
+                        submitted = st.form_submit_button("💾 Enregistrer les modifications")
                     
                     with col_submit2:
-                        if st.form_submit_button("❌ Annuler", width='stretch'):
+                        if st.form_submit_button("❌ Annuler"):
                             st.rerun()
                     
                     if submitted:
@@ -780,12 +761,8 @@ def afficher_gestion_salons(salon_model):
                             )
                             
                             if success:
-                                st.success("✅ Salon modifié avec succès !")
                                 st.balloons()
-                                
-                                # Rafraîchir après 2 secondes
-                                import time
-                                time.sleep(2)
+                                st.session_state["super_admin_updated_salon"] = salon['salon_id']
                                 st.rerun()
                             else:
                                 st.error("❌ Erreur lors de la modification du salon")
@@ -934,7 +911,7 @@ def afficher_gestion_utilisateurs(super_admin_ctrl, salon_model, couturier_model
                 with col4:
                     telephone = st.text_input("Téléphone")
                 
-                submitted = st.form_submit_button("💾 Créer l'admin", width='stretch')
+                submitted = st.form_submit_button("💾 Créer l'admin")
                 
                 if submitted:
                     if not all([selected_salon, code_couturier, password, nom, prenom]):
@@ -1011,7 +988,7 @@ def afficher_gestion_utilisateurs(super_admin_ctrl, salon_model, couturier_model
                 with col4:
                     telephone = st.text_input("Téléphone")
                 
-                submitted = st.form_submit_button("💾 Créer l'employé", width='stretch')
+                submitted = st.form_submit_button("💾 Créer l'employé")
                 
                 if submitted:
                     if not all([selected_salon, code_couturier, password, nom, prenom]):
@@ -1387,7 +1364,7 @@ def afficher_demandes_globales_super_admin(commande_model, salon_model):
                         key=f"comment_val_super_{demande['id']}",
                         height=80
                     )
-                    if st.form_submit_button("✅ Valider", type="primary", width='stretch'):
+                    if st.form_submit_button("✅ Valider", type="primary"):
                         try:
                             if commande_model.valider_fermeture(
                                 demande['id'],
@@ -1410,7 +1387,7 @@ def afficher_demandes_globales_super_admin(commande_model, salon_model):
                         key=f"comment_rej_super_{demande['id']}",
                         height=80
                     )
-                    if st.form_submit_button("❌ Rejeter", width='stretch'):
+                    if st.form_submit_button("❌ Rejeter"):
                         try:
                             if commande_model.valider_fermeture(
                                 demande['id'],

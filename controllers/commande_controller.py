@@ -5,7 +5,7 @@ from typing import Optional, Dict, List, Tuple
 from models.database import DatabaseConnection, ClientModel, CommandeModel
 from datetime import datetime
 import os
-from config import PDF_STORAGE_PATH
+from config import PDF_STORAGE_PATH, IS_RENDER
 
 
 class CommandeController:
@@ -53,10 +53,13 @@ class CommandeController:
             Chemin relatif du fichier sauvegardé ou None
         """
         try:
-            # Créer le dossier images s'il n'existe pas
-            images_path = os.path.join(os.path.dirname(PDF_STORAGE_PATH), 'images')
-            if not os.path.exists(images_path):
-                os.makedirs(images_path)
+            # En production Render, on force un dossier temporaire dédié.
+            # En local, on garde le comportement historique à côté du stockage PDF.
+            if IS_RENDER:
+                images_path = os.path.join(PDF_STORAGE_PATH, "images")
+            else:
+                images_path = os.path.join(os.path.dirname(PDF_STORAGE_PATH), "images")
+            os.makedirs(images_path, exist_ok=True)
             
             # Générer un nom de fichier unique
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -281,3 +284,65 @@ class CommandeController:
         except Exception as e:
             print(f"Erreur calcul somme livrées: {e}")
             return (0.0, 0)
+
+    def lister_commandes_paiements_a_completer(
+        self, couturier_id: int, salon_id: str, date_debut=None, date_fin=None
+    ) -> List[Dict]:
+        return self.commande_model.lister_commandes_paiements_a_completer(
+            couturier_id=couturier_id,
+            salon_id=salon_id,
+            date_debut=date_debut,
+            date_fin=date_fin,
+        )
+
+    def mettre_a_jour_statut_si_soldee(self, commande_id: int, nouveau_reste: float) -> bool:
+        return self.commande_model.mettre_a_jour_statut_si_soldee(commande_id, nouveau_reste)
+
+    def lister_commandes_terminees_pour_livraison(
+        self,
+        salon_id: str,
+        date_debut=None,
+        date_fin=None,
+        couturier_id: Optional[int] = None,
+        couturier_id_filter: Optional[int] = None,
+        vue_admin: bool = False,
+    ) -> List[Dict]:
+        return self.commande_model.lister_commandes_terminees_pour_livraison(
+            salon_id=salon_id,
+            date_debut=date_debut,
+            date_fin=date_fin,
+            couturier_id=couturier_id,
+            couturier_id_filter=couturier_id_filter,
+            vue_admin=vue_admin,
+        )
+
+    def get_historique_demandes_par_commandes(
+        self, couturier_id: int, commande_ids: List[int]
+    ) -> Dict[int, Dict[str, int]]:
+        return self.commande_model.get_historique_demandes_par_commandes(couturier_id, commande_ids)
+
+    def get_resume_demande_fermeture_commande(self, commande_id: int, couturier_id: int) -> Dict:
+        return self.commande_model.get_resume_demande_fermeture_commande(commande_id, couturier_id)
+
+    def valider_commande_livree_payee(self, commande_id: int) -> bool:
+        return self.commande_model.valider_commande_livree_payee(commande_id)
+
+    def lister_commandes_livrees_pour_pdf(
+        self,
+        salon_id: str,
+        couturier_id: Optional[int] = None,
+        vue_admin: bool = False,
+        date_debut=None,
+        date_fin=None,
+        nom_client_filter: Optional[str] = None,
+        couturier_id_filter: Optional[int] = None,
+    ) -> List[Dict]:
+        return self.commande_model.lister_commandes_livrees_pour_pdf(
+            salon_id=salon_id,
+            couturier_id=couturier_id,
+            vue_admin=vue_admin,
+            date_debut=date_debut,
+            date_fin=date_fin,
+            nom_client_filter=nom_client_filter,
+            couturier_id_filter=couturier_id_filter,
+        )

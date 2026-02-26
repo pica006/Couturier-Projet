@@ -30,11 +30,40 @@ OÙ IL EST UTILISÉ ?
 # os : Module Python pour interagir avec le système d'exploitation
 # Utilisé ici pour créer des chemins de fichiers et des dossiers
 import os
+import tempfile
 
-# Charger .env dès l'import de config (pour DB_PASSWORD, etc.)
+# Parse robuste des booleens depuis variables d'environnement
+def _env_flag(value: str, default: bool = False) -> bool:
+    if value is None:
+        return default
+    return str(value).strip().lower() in {"1", "true", "yes", "on", "y"}
+
+
+def _env_int(value: str, default: int) -> int:
+    """Convertit une variable d'environnement en int sans casser l'import."""
+    if value is None:
+        return default
+    try:
+        return int(str(value).strip())
+    except (TypeError, ValueError):
+        return default
+
+
+def _safe_mkdir(path: str) -> bool:
+    """Crée un dossier sans lever d'exception bloquante au boot."""
+    try:
+        os.makedirs(path, exist_ok=True)
+        return True
+    except Exception:
+        return False
+
+# Charger .env UNIQUEMENT en local (jamais sur Render - Render utilise ses propres variables)
+# Sur Render : RENDER est défini automatiquement, ou DATABASE_HOST est défini manuellement
 try:
     from dotenv import load_dotenv
-    load_dotenv()
+    _on_render = os.getenv('RENDER') or os.getenv('DATABASE_HOST') or os.getenv('DATABASE_URL')
+    if not _on_render:
+        load_dotenv()  # Charger .env seulement en local
 except Exception:
     pass
 
@@ -109,21 +138,32 @@ COMPANY_INFO = {
 # UTILISÉ OÙ ? Dans app.py et views/auth_view.py lors de la connexion
 
 # Détecter si on est sur Render (production)
-IS_RENDER = os.getenv('RENDER') is not None or os.getenv('DATABASE_HOST') is not None
+# Priorité : DATABASE_HOST ou DATABASE_URL ou RENDER (Render définit RENDER=true automatiquement)
+# Si l'un est défini → on utilise la config Render, JAMAIS localhost
+IS_RENDER = bool(
+    os.getenv('RENDER') or
+    os.getenv('DATABASE_HOST') or
+    os.getenv('DATABASE_URL')
+)
+
+# Mode visuel safe:
+# - Par défaut actif en production (Render) pour stabiliser le rendu
+# - Surcharge possible via VISUAL_SAFE_MODE=true|false
+VISUAL_SAFE_MODE = _env_flag(os.getenv('VISUAL_SAFE_MODE'), default=IS_RENDER)
 
 if IS_RENDER:
     # ========== CONFIGURATION RENDER (PRODUCTION) ==========
-    # Les variables d'environnement sont automatiquement configurées par Render
-    # sslmode=require : requis pour PostgreSQL sur Render
+    # Variables d'environnement Render (Dashboard → Environment)
+    # Render n'utilise PAS le fichier .env - tout vient des variables Render
     DATABASE_CONFIG = {
         'render_production': {
             'host': os.getenv('DATABASE_HOST', ''),
-            'port': os.getenv('DATABASE_PORT', '5432'),
+            'port': _env_int(os.getenv('DATABASE_PORT'), 5432),
             'database': os.getenv('DATABASE_NAME', ''),
             'user': os.getenv('DATABASE_USER', ''),
             'password': os.getenv('DATABASE_PASSWORD', ''),
             'sslmode': os.getenv('DATABASE_SSLMODE', 'require'),
-            'connect_timeout': int(os.getenv('DATABASE_CONNECT_TIMEOUT', '5'))
+            'connect_timeout': _env_int(os.getenv('DB_CONNECT_TIMEOUT'), 6)
         }
     }
 else:
@@ -143,7 +183,7 @@ else:
             'database': os.getenv('DB_NAME', 'db_couturier'),
             'user': os.getenv('DB_USER', 'postgres'),
             'password': os.getenv('DB_PASSWORD', ''),  # À mettre dans .env uniquement
-            'connect_timeout': int(os.getenv('DB_CONNECT_TIMEOUT', '5'))
+            'connect_timeout': _env_int(os.getenv('DB_CONNECT_TIMEOUT'), 6)
         }
     }
 
@@ -511,7 +551,7 @@ MESURES = {
 EMAIL_CONFIG = {
     'enabled': True,
     'host': os.getenv('EMAIL_HOST', 'smtp.gmail.com'),
-    'port': int(os.getenv('EMAIL_PORT', '587')),
+    'port': _env_int(os.getenv('EMAIL_PORT'), 587),
     'user': os.getenv('EMAIL_USER', ''),
     'password': os.getenv('EMAIL_PASSWORD', ''),
     'from_email': os.getenv('EMAIL_FROM', os.getenv('EMAIL_USER', '')),
@@ -537,11 +577,11 @@ EMAIL_CONFIG = {
 # 3. if not os.path.exists(...) → Vérifie si le dossier existe
 #    Si le dossier n'existe pas, on le crée avec os.makedirs()
  
-PDF_STORAGE_PATH = os.path.join(os.path.dirname(__file__), 'pdfs')
-
-# Créer le dossier 'pdfs' s'il n'existe pas encore
-if not os.path.exists(PDF_STORAGE_PATH):
-    os.makedirs(PDF_STORAGE_PATH)  # Crée le dossier et tous les dossiers parents si nécessaire
+if IS_RENDER:
+    PDF_STORAGE_PATH = os.path.join(tempfile.gettempdir(), 'couturier_pdfs')
+else:
+    PDF_STORAGE_PATH = os.path.join(os.path.dirname(__file__), 'pdfs')
+_safe_mkdir(PDF_STORAGE_PATH)
 
 # ============================================================================
 # RÉPERTOIRE DE STOCKAGE DES DOCUMENTS DE CHARGES
@@ -551,8 +591,8 @@ if not os.path.exists(PDF_STORAGE_PATH):
 # COMMENT ? On crée un chemin vers le dossier 'charges_docs' à côté de ce fichier
 # UTILISÉ OÙ ? Dans views/comptabilite_view.py lors de l'upload de documents
 
-CHARGES_STORAGE_PATH = os.path.join(os.path.dirname(__file__), 'charges_docs')
-
-# Créer le dossier 'charges_docs' s'il n'existe pas encore
-if not os.path.exists(CHARGES_STORAGE_PATH):
-    os.makedirs(CHARGES_STORAGE_PATH)
+if IS_RENDER:
+    CHARGES_STORAGE_PATH = os.path.join(tempfile.gettempdir(), 'couturier_charges_docs')
+else:
+    CHARGES_STORAGE_PATH = os.path.join(os.path.dirname(__file__), 'charges_docs')
+_safe_mkdir(CHARGES_STORAGE_PATH)

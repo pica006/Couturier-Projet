@@ -2,6 +2,7 @@
 Modèle pour la gestion des salons (système multi-tenant)
 """
 from typing import Optional, Dict, List
+from utils.security import hash_password
 
 try:
     from mysql.connector import Error as MySQLError  # type: ignore
@@ -264,17 +265,18 @@ class SalonModel:
                 ),
             )
             
-            # ÉTAPE 2 : Créer l'admin (salon_id est VARCHAR)
+            # ÉTAPE 2 : Créer l'admin (mot de passe hashe, salon_id est VARCHAR)
+            admin_password_hash = hash_password(password_admin)
             query_admin = """
                 INSERT INTO couturiers (code_couturier, password, nom, prenom, role, salon_id, email, telephone)
                 VALUES (%s, %s, %s, %s, 'admin', %s, %s, %s)
             """
             if self.db.db_type == 'mysql':
-                cursor.execute(query_admin, (code_admin, password_admin, nom_admin, prenom_admin, salon_id, email, telephone))
+                cursor.execute(query_admin, (code_admin, admin_password_hash, nom_admin, prenom_admin, salon_id, email, telephone))
                 admin_id = cursor.lastrowid
             else:  # PostgreSQL
                 query_admin += " RETURNING id"
-                cursor.execute(query_admin, (code_admin, password_admin, nom_admin, prenom_admin, salon_id, email, telephone))
+                cursor.execute(query_admin, (code_admin, admin_password_hash, nom_admin, prenom_admin, salon_id, email, telephone))
                 admin_id = cursor.fetchone()[0]
             
             conn.commit()
@@ -314,6 +316,64 @@ class SalonModel:
         except Exception as e:
             print(f"Erreur prévisualisation salon_id : {e}")
             return None
+
+    def diagnostiquer_table_salons(self) -> Dict:
+        """
+        Diagnostic technique de la table salons.
+        Retourne l'existence de la table, le nombre de lignes et un échantillon.
+        """
+        diagnostic = {
+            "table_exists": False,
+            "count": 0,
+            "samples": [],
+            "error": None,
+        }
+        cursor = None
+        try:
+            cursor = self.db.get_connection().cursor()
+
+            if self.db.db_type == "mysql":
+                cursor.execute("SHOW TABLES LIKE 'salons'")
+            else:  # PostgreSQL
+                cursor.execute(
+                    """
+                    SELECT table_name
+                    FROM information_schema.tables
+                    WHERE table_schema = 'public' AND table_name = 'salons'
+                    """
+                )
+            table_exists = cursor.fetchone()
+            diagnostic["table_exists"] = bool(table_exists)
+
+            if not diagnostic["table_exists"]:
+                return diagnostic
+
+            cursor.execute("SELECT COUNT(*) FROM salons")
+            row_count = cursor.fetchone()
+            diagnostic["count"] = int(row_count[0]) if row_count and row_count[0] is not None else 0
+
+            if diagnostic["count"] > 0:
+                cursor.execute("SELECT salon_id, nom, quartier FROM salons LIMIT 5")
+                rows = cursor.fetchall() or []
+                diagnostic["samples"] = [
+                    {
+                        "salon_id": row[0],
+                        "nom": row[1],
+                        "quartier": row[2],
+                    }
+                    for row in rows
+                ]
+
+            return diagnostic
+        except Exception as e:
+            diagnostic["error"] = str(e)
+            return diagnostic
+        finally:
+            try:
+                if cursor:
+                    cursor.close()
+            except Exception:
+                pass
     
     def lister_tous_salons(self) -> List[Dict]:
         """

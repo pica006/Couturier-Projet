@@ -3,6 +3,7 @@ Modèle de gestion de la base de données (Model dans MVC)
 """
 from typing import Optional, Dict, List, Tuple
 from datetime import datetime
+from utils.security import hash_password
 
 # Support multi-SGBD: PostgreSQL (legacy) et MySQL (XAMPP)
 try:
@@ -55,49 +56,59 @@ class DatabaseConnection:
         Returns:
             True si succès, False sinon
         """
+        # Réutiliser une connexion déjà active évite une nouvelle négociation réseau.
+        if self.is_connected():
+            return True
+
         self.last_error = None
+
         try:
             if self.db_type == 'postgresql':
                 if psycopg2 is None:
-                    print("psycopg2 non installé")
                     self.last_error = "psycopg2 non installé"
+                    print(self.last_error)
                     return False
-                connect_timeout = int(self.config.get('connect_timeout', 5))
                 conn_params = {
                     'host': self.config['host'],
                     'port': int(self.config.get('port', 5432)),
                     'database': self.config['database'],
                     'user': self.config['user'],
                     'password': self.config['password'],
-                    'connect_timeout': connect_timeout
+                    'connect_timeout': int(self.config.get('connect_timeout', 6)),
+                    'application_name': self.config.get('application_name', 'couturier_app')
                 }
                 # SSL requis pour Render PostgreSQL
                 if self.config.get('sslmode'):
                     conn_params['sslmode'] = self.config['sslmode']
+                # Keepalive pour limiter les connexions "zombies" en cloud.
+                conn_params['keepalives'] = int(self.config.get('keepalives', 1))
+                conn_params['keepalives_idle'] = int(self.config.get('keepalives_idle', 30))
+                conn_params['keepalives_interval'] = int(self.config.get('keepalives_interval', 10))
+                conn_params['keepalives_count'] = int(self.config.get('keepalives_count', 5))
                 self.connection = psycopg2.connect(**conn_params)
                 return True
             elif self.db_type == 'mysql':
                 if mysql is None:
-                    print("mysql-connector-python non installé")
                     self.last_error = "mysql-connector-python non installé"
+                    print(self.last_error)
                     return False
-                connect_timeout = int(self.config.get('connect_timeout', 5))
                 self.connection = mysql.connector.connect(
                     host=self.config['host'],
                     port=int(self.config['port']),
                     database=self.config['database'],
                     user=self.config['user'],
                     password=self.config['password'],
-                    connection_timeout=connect_timeout
+                    connection_timeout=int(self.config.get('connect_timeout', 6))
                 )
                 return True
             else:
-                print(f"Type de base de données non supporté: {self.db_type}")
                 self.last_error = f"Type de base de données non supporté: {self.db_type}"
+                print(self.last_error)
                 return False
         except (MySQLError, PGError, Exception) as e:
-            print(f"Erreur de connexion: {e}")
             self.last_error = str(e)
+            print(f"Erreur de connexion: {self.last_error}")
+            self.connection = None
             return False
     
     def disconnect(self):
@@ -121,10 +132,6 @@ class DatabaseConnection:
             return not getattr(self.connection, 'closed', True)
         except Exception:
             return False
-
-    def get_last_error(self) -> Optional[str]:
-        """Retourne la dernière erreur de connexion capturée."""
-        return self.last_error
 
 
 class CouturierModel:
@@ -329,7 +336,7 @@ class CouturierModel:
         
         Args:
             code_couturier: Code unique de connexion (ex: COUT001)
-            password: Mot de passe en clair (sera stocké tel quel)
+            password: Mot de passe en clair (sera hashe en bcrypt)
             nom: Nom de l'utilisateur
             prenom: Prénom de l'utilisateur
             role: Rôle de l'utilisateur ('admin' ou 'employe')
@@ -352,20 +359,23 @@ class CouturierModel:
             
             cursor = self.db.get_connection().cursor()
             
+            # Hasher le mot de passe avant stockage
+            password_hash = hash_password(password)
+
             # Insérer l'utilisateur (actif par défaut)
             if self.db.db_type == 'mysql':
                 query = """
                     INSERT INTO couturiers (code_couturier, password, nom, prenom, role, email, telephone, salon_id, actif)
                     VALUES (%s, %s, %s, %s, %s, %s, %s, %s, 1)
                 """
-                cursor.execute(query, (code_couturier, password, nom, prenom, role, email, telephone, salon_id))
+                cursor.execute(query, (code_couturier, password_hash, nom, prenom, role, email, telephone, salon_id))
                 user_id = cursor.lastrowid
             else:
                 query = """
                     INSERT INTO couturiers (code_couturier, password, nom, prenom, role, email, telephone, salon_id, actif)
                     VALUES (%s, %s, %s, %s, %s, %s, %s, %s, TRUE) RETURNING id
                 """
-                cursor.execute(query, (code_couturier, password, nom, prenom, role, email, telephone, salon_id))
+                cursor.execute(query, (code_couturier, password_hash, nom, prenom, role, email, telephone, salon_id))
                 user_id = cursor.fetchone()[0]
             
             # Si c'est un admin et qu'il n'a pas de salon_id, lui assigner son propre id
@@ -417,7 +427,7 @@ class CouturierModel:
         try:
             cursor = self.db.get_connection().cursor()
             query = "UPDATE couturiers SET password = %s WHERE id = %s"
-            cursor.execute(query, (nouveau_password, couturier_id))
+            cursor.execute(query, (hash_password(nouveau_password), couturier_id))
             self.db.get_connection().commit()
             cursor.close()
             return True
@@ -633,6 +643,26 @@ class ClientModel:
         except Error as e:
             print(f"Erreur recherche client: {e}")
             return None
+
+    def compter_clients_distincts_salon(self, salon_id: str) -> int:
+        """
+        Compte les clients distincts d'un salon (tous couturiers du salon).
+        """
+        try:
+            cursor = self.db.get_connection().cursor()
+            query = """
+                SELECT COUNT(DISTINCT c.id)
+                FROM clients c
+                INNER JOIN couturiers ct ON c.couturier_id = ct.id
+                WHERE ct.salon_id = %s
+            """
+            cursor.execute(query, (salon_id,))
+            result = cursor.fetchone()
+            cursor.close()
+            return int(result[0]) if result and result[0] is not None else 0
+        except Exception as e:
+            print(f"Erreur comptage clients salon: {e}")
+            return 0
 
 
 class CommandeModel:
@@ -1806,6 +1836,350 @@ class CommandeModel:
             return demandes
         except (MySQLError, PGError, Exception) as e:
             print(f"Erreur liste demandes validation: {e}")
+            return []
+
+    def lister_commandes_paiements_a_completer(
+        self,
+        couturier_id: int,
+        salon_id: str,
+        date_debut=None,
+        date_fin=None,
+    ) -> List[Dict]:
+        """
+        Liste les commandes avec avance > 0 et reste > 0 pour un couturier/salon.
+        """
+        try:
+            cursor = self.db.get_connection().cursor()
+            query = """
+                SELECT c.id, c.modele, c.prix_total, c.avance, c.reste, c.statut,
+                       c.date_creation, c.date_livraison,
+                       cl.nom, cl.prenom
+                FROM commandes c
+                JOIN clients cl ON c.client_id = cl.id
+                JOIN couturiers co ON c.couturier_id = co.id
+                WHERE c.couturier_id = %s
+                  AND co.salon_id = %s
+                  AND c.statut != 'Fermé'
+                  AND c.avance > 0
+                  AND c.reste > 0
+            """
+            params = [couturier_id, salon_id]
+            if date_debut:
+                query += " AND c.date_creation::date >= %s"
+                params.append(date_debut)
+            if date_fin:
+                query += " AND c.date_creation::date <= %s"
+                params.append(date_fin)
+            query += " ORDER BY c.date_creation DESC"
+            cursor.execute(query, tuple(params))
+            rows = cursor.fetchall()
+            cursor.close()
+            return [
+                {
+                    "id": row[0],
+                    "modele": row[1],
+                    "prix_total": float(row[2]),
+                    "avance": float(row[3]),
+                    "reste": float(row[4]),
+                    "statut": row[5],
+                    "date_creation": row[6],
+                    "date_livraison": row[7],
+                    "client_nom": row[8],
+                    "client_prenom": row[9],
+                }
+                for row in rows
+            ]
+        except Exception as e:
+            print(f"Erreur liste paiements à compléter: {e}")
+            return []
+
+    def mettre_a_jour_statut_si_soldee(self, commande_id: int, nouveau_reste: float) -> bool:
+        """
+        Passe la commande en 'Terminé' si le reste est soldé.
+        """
+        try:
+            if float(nouveau_reste) > 0:
+                return True
+            connection = self.db.get_connection()
+            cursor = connection.cursor()
+            cursor.execute(
+                "UPDATE commandes SET statut = 'Terminé' WHERE id = %s",
+                (commande_id,),
+            )
+            connection.commit()
+            cursor.close()
+            return True
+        except Exception as e:
+            print(f"Erreur mise à jour statut soldé: {e}")
+            return False
+
+    def lister_commandes_terminees_pour_livraison(
+        self,
+        salon_id: str,
+        date_debut=None,
+        date_fin=None,
+        couturier_id: Optional[int] = None,
+        couturier_id_filter: Optional[int] = None,
+        vue_admin: bool = False,
+    ) -> List[Dict]:
+        """
+        Liste les commandes terminées (reste <= 0, statut Terminé) prêtes pour demande/validation livraison.
+        """
+        try:
+            cursor = self.db.get_connection().cursor()
+            if vue_admin:
+                query = """
+                    SELECT c.id, c.modele, c.prix_total, c.avance, c.reste, c.statut,
+                           c.date_creation, c.date_livraison,
+                           cl.nom, cl.prenom, cl.email, c.couturier_id,
+                           co.nom as couturier_nom, co.prenom as couturier_prenom
+                    FROM commandes c
+                    JOIN clients cl ON c.client_id = cl.id
+                    LEFT JOIN couturiers co ON c.couturier_id = co.id
+                    WHERE co.salon_id = %s
+                      AND c.reste <= 0
+                      AND c.statut = 'Terminé'
+                """
+                params = [salon_id]
+                if couturier_id_filter:
+                    query += " AND c.couturier_id = %s"
+                    params.append(couturier_id_filter)
+            else:
+                query = """
+                    SELECT c.id, c.modele, c.prix_total, c.avance, c.reste, c.statut,
+                           c.date_creation, c.date_livraison,
+                           cl.nom, cl.prenom
+                    FROM commandes c
+                    JOIN clients cl ON c.client_id = cl.id
+                    JOIN couturiers co ON c.couturier_id = co.id
+                    WHERE c.couturier_id = %s
+                      AND co.salon_id = %s
+                      AND c.reste <= 0
+                      AND c.statut = 'Terminé'
+                """
+                params = [couturier_id, salon_id]
+                if couturier_id_filter:
+                    query += " AND c.couturier_id = %s"
+                    params.append(couturier_id_filter)
+            if date_debut:
+                query += " AND c.date_creation::date >= %s"
+                params.append(date_debut)
+            if date_fin:
+                query += " AND c.date_creation::date <= %s"
+                params.append(date_fin)
+            query += " ORDER BY c.date_creation DESC"
+            cursor.execute(query, tuple(params))
+            rows = cursor.fetchall()
+            cursor.close()
+            commandes: List[Dict] = []
+            for row in rows:
+                data = {
+                    "id": row[0],
+                    "modele": row[1],
+                    "prix_total": float(row[2]),
+                    "avance": float(row[3]),
+                    "reste": float(row[4]),
+                    "statut": row[5],
+                    "date_creation": row[6],
+                    "date_livraison": row[7],
+                    "client_nom": row[8],
+                    "client_prenom": row[9],
+                }
+                if vue_admin:
+                    data.update(
+                        {
+                            "client_email": row[10],
+                            "couturier_id": row[11],
+                            "couturier_nom": row[12],
+                            "couturier_prenom": row[13],
+                        }
+                    )
+                commandes.append(data)
+            return commandes
+        except Exception as e:
+            print(f"Erreur liste commandes terminées livraison: {e}")
+            return []
+
+    def get_historique_demandes_par_commandes(
+        self, couturier_id: int, commande_ids: List[int]
+    ) -> Dict[int, Dict[str, int]]:
+        """
+        Retourne des stats agrégées des demandes de fermeture par commande.
+        """
+        if not commande_ids:
+            return {}
+        try:
+            cursor = self.db.get_connection().cursor()
+            placeholders = ", ".join(["%s"] * len(commande_ids))
+            query = f"""
+                SELECT commande_id,
+                       COUNT(*) as total,
+                       SUM(CASE WHEN statut_validation = 'en_attente' THEN 1 ELSE 0 END) as en_attente,
+                       SUM(CASE WHEN statut_validation = 'validee' THEN 1 ELSE 0 END) as validee,
+                       SUM(CASE WHEN statut_validation = 'rejetee' THEN 1 ELSE 0 END) as rejetee
+                FROM historique_commandes
+                WHERE couturier_id = %s
+                  AND type_action = 'fermeture_demande'
+                  AND commande_id IN ({placeholders})
+                GROUP BY commande_id
+            """
+            cursor.execute(query, tuple([couturier_id] + commande_ids))
+            rows = cursor.fetchall()
+            cursor.close()
+            return {
+                row[0]: {
+                    "total": int(row[1] or 0),
+                    "en_attente": int(row[2] or 0),
+                    "validee": int(row[3] or 0),
+                    "rejetee": int(row[4] or 0),
+                }
+                for row in rows
+            }
+        except Exception as e:
+            print(f"Erreur historique demandes par commandes: {e}")
+            return {}
+
+    def get_resume_demande_fermeture_commande(self, commande_id: int, couturier_id: int) -> Dict:
+        """
+        Retourne le total des demandes et le dernier statut pour une commande.
+        """
+        try:
+            cursor = self.db.get_connection().cursor()
+            cursor.execute(
+                """
+                SELECT COUNT(*), MAX(statut_validation)
+                FROM historique_commandes
+                WHERE commande_id = %s
+                  AND couturier_id = %s
+                  AND type_action = 'fermeture_demande'
+                """,
+                (commande_id, couturier_id),
+            )
+            row = cursor.fetchone()
+            cursor.close()
+            return {
+                "total": int(row[0] or 0) if row else 0,
+                "dernier_statut": row[1] if row else None,
+            }
+        except Exception as e:
+            print(f"Erreur résumé demande fermeture: {e}")
+            return {"total": 0, "dernier_statut": None}
+
+    def valider_commande_livree_payee(self, commande_id: int) -> bool:
+        """
+        Valide directement une commande en 'Livré et payé'.
+        """
+        try:
+            connection = self.db.get_connection()
+            cursor = connection.cursor()
+            cursor.execute(
+                "UPDATE commandes SET statut = 'Livré et payé', date_fermeture = NOW() WHERE id = %s",
+                (commande_id,),
+            )
+            connection.commit()
+            cursor.close()
+            return True
+        except Exception as e:
+            print(f"Erreur validation commande livrée/payée: {e}")
+            return False
+
+    def lister_commandes_livrees_pour_pdf(
+        self,
+        salon_id: str,
+        couturier_id: Optional[int] = None,
+        vue_admin: bool = False,
+        date_debut=None,
+        date_fin=None,
+        nom_client_filter: Optional[str] = None,
+        couturier_id_filter: Optional[int] = None,
+    ) -> List[Dict]:
+        """
+        Liste les commandes validées (Livré et payé) pour téléchargement PDF.
+        """
+        try:
+            cursor = self.db.get_connection().cursor()
+            if vue_admin:
+                query = """
+                    SELECT c.id, c.modele, c.prix_total, c.avance, c.reste, c.statut,
+                           c.date_creation, c.date_livraison,
+                           cl.nom, cl.prenom, cl.telephone, cl.email,
+                           c.couturier_id, co.nom as couturier_nom, co.prenom as couturier_prenom,
+                           c.pdf_name, c.pdf_path
+                    FROM commandes c
+                    JOIN clients cl ON c.client_id = cl.id
+                    LEFT JOIN couturiers co ON c.couturier_id = co.id
+                    WHERE co.salon_id = %s
+                      AND c.statut = 'Livré et payé'
+                """
+                params = [salon_id]
+                if couturier_id_filter:
+                    query += " AND c.couturier_id = %s"
+                    params.append(couturier_id_filter)
+            else:
+                query = """
+                    SELECT c.id, c.modele, c.prix_total, c.avance, c.reste, c.statut,
+                           c.date_creation, c.date_livraison,
+                           cl.nom, cl.prenom, cl.telephone, cl.email,
+                           c.pdf_name, c.pdf_path
+                    FROM commandes c
+                    JOIN clients cl ON c.client_id = cl.id
+                    JOIN couturiers co ON c.couturier_id = co.id
+                    WHERE c.couturier_id = %s
+                      AND co.salon_id = %s
+                      AND c.statut = 'Livré et payé'
+                """
+                params = [couturier_id, salon_id]
+            if date_debut:
+                query += " AND c.date_creation::date >= %s"
+                params.append(date_debut)
+            if date_fin:
+                query += " AND c.date_creation::date <= %s"
+                params.append(date_fin)
+            if nom_client_filter:
+                query += " AND (cl.nom LIKE %s OR cl.prenom LIKE %s)"
+                params.append(f"%{nom_client_filter}%")
+                params.append(f"%{nom_client_filter}%")
+            query += " ORDER BY c.date_creation DESC"
+            cursor.execute(query, tuple(params))
+            rows = cursor.fetchall()
+            cursor.close()
+            commandes: List[Dict] = []
+            for row in rows:
+                data = {
+                    "id": row[0],
+                    "modele": row[1],
+                    "prix_total": float(row[2]),
+                    "avance": float(row[3]),
+                    "reste": float(row[4]),
+                    "statut": row[5],
+                    "date_creation": row[6],
+                    "date_livraison": row[7],
+                    "client_nom": row[8],
+                    "client_prenom": row[9],
+                    "client_telephone": row[10],
+                    "client_email": row[11],
+                }
+                if vue_admin:
+                    data.update(
+                        {
+                            "couturier_id": row[12],
+                            "couturier_nom": row[13],
+                            "couturier_prenom": row[14],
+                            "pdf_name": row[15] if len(row) > 15 else None,
+                            "pdf_path": row[16] if len(row) > 16 else None,
+                        }
+                    )
+                else:
+                    data.update(
+                        {
+                            "pdf_name": row[12] if len(row) > 12 else None,
+                            "pdf_path": row[13] if len(row) > 13 else None,
+                        }
+                    )
+                commandes.append(data)
+            return commandes
+        except Exception as e:
+            print(f"Erreur liste commandes livrées pour PDF: {e}")
             return []
 
 

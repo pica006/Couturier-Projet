@@ -22,9 +22,12 @@ from reportlab.lib.utils import ImageReader
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 
 from models.database import ChargesModel, CommandeModel, CouturierModel, ClientModel, AppLogoModel
+from controllers.admin_controller import AdminController
 from views.mes_charges_view import _generer_pdf_impots
 from models.salon_model import SalonModel
 from utils.role_utils import est_admin, obtenir_salon_id
+from utils.page_header import afficher_header_page
+from utils.ui import ajouter_espace_vertical
 
 # Barème d'impôts (identique à celui de mes_charges_view.py)
 TRANCHES_IMPOTS = [
@@ -83,15 +86,7 @@ def afficher_page_administration():
     # HEADER DE LA PAGE
     # ========================================================================
     
-    st.markdown("""
-        <div style='background: linear-gradient(135deg, #B19CD9 0%, #40E0D0 100%); 
-                    padding: 2rem; border-radius: 16px; margin-bottom: 2rem; 
-                    box-shadow: 0 4px 8px rgba(0,0,0,0.1); text-align: center;'>
-            <h1 style='color: white; margin: 0; font-size: 2.5rem; font-weight: 700; 
-                       font-family: Poppins, sans-serif; text-shadow: 0 2px 4px rgba(0,0,0,0.2);'>👑 Administration</h1>
-            <p style='color: rgba(255,255,255,0.95); margin: 0.5rem 0 0 0; font-size: 1.1rem;'>Vue 360° de l'entreprise - Toutes les activités</p>
-        </div>
-    """, unsafe_allow_html=True)
+    afficher_header_page("👑 Administration", "Vue 360° de l'entreprise - Toutes les activités")
     
     # Afficher les informations du salon actuel
     if salon_info:
@@ -315,18 +310,8 @@ def afficher_vue_360(couturier_model: CouturierModel, charges_model: ChargesMode
     
     # Nombre total de clients (tous les couturiers du salon)
     try:
-        cursor = client_model.db.get_connection().cursor()
-        # Requête compatible MySQL et PostgreSQL
-        query = """
-            SELECT COUNT(DISTINCT c.id)
-            FROM clients c
-            INNER JOIN couturiers ct ON c.couturier_id = ct.id
-            WHERE ct.salon_id = %s
-        """
-        cursor.execute(query, (salon_id_admin,))
-        result = cursor.fetchone()
-        nb_clients_total = result[0] if result and result[0] is not None else 0
-        cursor.close()
+        admin_controller = AdminController(st.session_state.db_connection)
+        nb_clients_total = admin_controller.compter_clients_distincts_salon(salon_id_admin)
     except Exception as e:
         print(f"Erreur récupération nombre de clients: {e}")
         nb_clients_total = 0
@@ -1582,8 +1567,7 @@ def afficher_formulaire_creation_utilisateur(couturier_model: CouturierModel, ad
         
         submit = st.form_submit_button(
             "💾 Créer l'utilisateur",
-            type="primary",
-            width='stretch'
+            type="primary"
         )
         
         if submit:
@@ -1717,7 +1701,7 @@ def afficher_liste_utilisateurs(couturier_model: CouturierModel, admin_data: Dic
             )
         
         with col_r2:
-            st.markdown("<br>", unsafe_allow_html=True)  # Espacement
+            ajouter_espace_vertical()
             if st.button("💾 Modifier le rôle", type="primary", width='stretch', key="btn_modif_role"):
                 if nouveau_role != role_actuel:
                     if couturier_model.modifier_role(user_id, nouveau_role):
@@ -1786,8 +1770,7 @@ def afficher_gestion_mots_de_passe(couturier_model: CouturierModel, admin_data: 
         
         submit = st.form_submit_button(
             "🔐 Réinitialiser le mot de passe",
-            type="primary",
-            width='stretch'
+            type="primary"
         )
         
         if submit:
@@ -1879,8 +1862,7 @@ def afficher_reinitialisation_mot_de_passe(couturier_model: CouturierModel, admi
                 
                 submit = st.form_submit_button(
                     "🔐 Réinitialiser le mot de passe",
-                    type="primary",
-                    width='stretch'
+                    type="primary"
                 )
                 
                 if submit:
@@ -1939,8 +1921,7 @@ def afficher_reinitialisation_mot_de_passe(couturier_model: CouturierModel, admi
             
             submit = st.form_submit_button(
                 "🔐 Réinitialiser mon mot de passe",
-                type="primary",
-                width='stretch'
+                type="primary"
             )
             
             if submit:
@@ -2228,7 +2209,7 @@ def afficher_gestion_commandes_admin(commande_model: CommandeModel, admin_data: 
                                 height=100
                             )
                             
-                            if st.form_submit_button("✅ Valider", type="primary", width='stretch'):
+                            if st.form_submit_button("✅ Valider", type="primary"):
                                 try:
                                     if commande_model.valider_fermeture(
                                         demande['id'], admin_id, True, commentaire_admin
@@ -2249,7 +2230,7 @@ def afficher_gestion_commandes_admin(commande_model: CommandeModel, admin_data: 
                                 height=100
                             )
                             
-                            if st.form_submit_button("❌ Rejeter", width='stretch'):
+                            if st.form_submit_button("❌ Rejeter"):
                                 try:
                                     if commande_model.valider_fermeture(
                                         demande['id'], admin_id, False, commentaire_rejet

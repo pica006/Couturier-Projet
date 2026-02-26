@@ -22,12 +22,21 @@ Dans app.py, ligne : afficher_page_connexion()
 import base64
 import mimetypes
 import os
+import logging
 import streamlit as st
 from controllers.auth_controller import AuthController
-from models.database import DatabaseConnection
-from config import DATABASE_CONFIG, APP_CONFIG, BRANDING
+from config import DATABASE_CONFIG, APP_CONFIG, BRANDING, VISUAL_SAFE_MODE
 from utils.bottom_nav import load_site_content
+from services.db_bootstrap_service import connect_and_initialize, validate_required_config
+from utils.ui import (
+    appliquer_style_pages_critiques,
+    afficher_erreur_minimale,
+    afficher_info_minimale,
+    afficher_titre_section,
+    etat_chargement,
+)
 
+logger = logging.getLogger(__name__)
 
 def _resolve_logo_path():
     logo_base = APP_CONFIG.get('logo_path')
@@ -68,7 +77,26 @@ def _get_logo_data_uri():
         return None
 
 
-lux_vars_style = f"""
+@st.cache_data(show_spinner=False)
+def _load_wallpaper_data_uri(wallpaper_path: str):
+    """Charge et encode l'image de fond en base64 (cache pour éviter 10s de chargement)."""
+    if not wallpaper_path:
+        return None
+    project_root = os.path.dirname(os.path.dirname(__file__))
+    image_path = os.path.join(project_root, wallpaper_path)
+    if not os.path.exists(image_path):
+        return None
+    try:
+        with open(image_path, 'rb') as f:
+            img_b64 = base64.b64encode(f.read()).decode('utf-8')
+        mime = mimetypes.guess_type(image_path)[0] or 'image/png'
+        return f"data:{mime};base64,{img_b64}"
+    except Exception:
+        return None
+
+
+def _get_lux_vars_style():
+    return f"""
     <style>
     :root {{
         --lux-primary: {BRANDING.get('primary', '#C9A227')};
@@ -79,9 +107,8 @@ lux_vars_style = f"""
     }}
     </style>
 """
-st.markdown(lux_vars_style, unsafe_allow_html=True)
 
-# Styles CSS pour la page de connexion
+# Styles CSS pour la page de connexion (appliqués dans afficher_page_connexion)
 hide_st_style = """
     <style>
     #MainMenu {visibility: hidden;}
@@ -89,7 +116,7 @@ hide_st_style = """
     header {visibility: hidden;}
     
     /* Boutons avec dégradé violet-bleu (pas de rouge !) */
-    .stButton > button {
+    .login-scope .stButton > button {
         background: linear-gradient(135deg, #B19CD9 0%, #40E0D0 100%) !important;
         color: #FFFFFF !important;
         border: none !important;
@@ -100,7 +127,7 @@ hide_st_style = """
         box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1) !important;
     }
 
-    .stButton > button:hover {
+    .login-scope .stButton > button:hover {
         background: linear-gradient(135deg, #B19CD9 0%, #40E0D0 100%) !important;
         color: #FFFFFF !important;
         transform: translateY(-2px);
@@ -109,29 +136,29 @@ hide_st_style = """
     }
     
     /* Boutons primaires - dégradé inversé */
-    button[kind="primary"],
-    button[data-baseweb="button"][kind="primary"] {
+    .login-scope button[kind="primary"],
+    .login-scope button[data-baseweb="button"][kind="primary"] {
         background: linear-gradient(135deg, #40E0D0 0%, #B19CD9 100%) !important;
         color: #FFFFFF !important;
         border: none !important;
     }
     
-    button[kind="primary"]:hover,
-    button[kind="primary"]:active,
-    button[kind="primary"]:focus {
+    .login-scope button[kind="primary"]:hover,
+    .login-scope button[kind="primary"]:active,
+    .login-scope button[kind="primary"]:focus {
         background: linear-gradient(135deg, #40E0D0 0%, #B19CD9 100%) !important;
         color: #FFFFFF !important;
     }
     
     /* Empêcher Streamlit de mettre du rouge par défaut */
-    button[data-baseweb="button"] {
+    .login-scope button[data-baseweb="button"] {
         background: linear-gradient(135deg, #B19CD9 0%, #40E0D0 100%) !important;
         color: #FFFFFF !important;
     }
     
-    button[data-baseweb="button"]:hover,
-    button[data-baseweb="button"]:active,
-    button[data-baseweb="button"]:focus {
+    .login-scope button[data-baseweb="button"]:hover,
+    .login-scope button[data-baseweb="button"]:active,
+    .login-scope button[data-baseweb="button"]:focus {
         background: linear-gradient(135deg, #B19CD9 0%, #40E0D0 100%) !important;
         color: #FFFFFF !important;
     }
@@ -337,7 +364,45 @@ hide_st_style = """
 
     </style>
 """
-st.markdown(hide_st_style, unsafe_allow_html=True)
+
+
+def _ensure_db_connection() -> tuple[bool, str]:
+    """
+    Etablit la connexion DB uniquement quand c'est necessaire (au submit).
+    """
+    existing = st.session_state.get("db_connection")
+    if existing is not None:
+        try:
+            if existing.is_connected() if hasattr(existing, "is_connected") else bool(existing.get_connection()):
+                return True, ""
+            st.session_state.db_connection = None
+            st.session_state.db_type = None
+        except Exception:
+            st.session_state.db_connection = None
+            st.session_state.db_type = None
+
+    from config import IS_RENDER
+    config_key = "render_production" if IS_RENDER else "postgresql_local"
+    config = DATABASE_CONFIG.get(config_key, {})
+    required = ("host", "database", "user", "password") if IS_RENDER else ("host", "database", "user")
+    missing = validate_required_config(config, required)
+
+    if missing:
+        if IS_RENDER:
+            return False, (
+                "Configuration Render incomplète. Vérifiez les variables "
+                "DATABASE_HOST, DATABASE_NAME, DATABASE_USER, DATABASE_PASSWORD."
+            )
+        return False, "Configuration PostgreSQL locale incomplète. Vérifiez config.py / .env."
+
+    ok, db_connection, error_msg = connect_and_initialize(config)
+    if not ok or not db_connection:
+        base_label = "Render" if IS_RENDER else "PostgreSQL local"
+        return False, f"Échec connexion {base_label}: {error_msg or 'Erreur inconnue'}"
+
+    st.session_state.db_connection = db_connection
+    st.session_state.db_type = config_key
+    return True, ""
 
 
 def afficher_page_connexion():
@@ -352,196 +417,58 @@ def afficher_page_connexion():
     
     UTILISÉ OÙ ? Appelé dans app.py quand l'user n'est pas authentifié
     """
-    
+    appliquer_style_pages_critiques()
+
+    # Appliquer les styles CSS (doit être dans la fonction, pas au niveau module,
+    # pour éviter les erreurs d'import sur Render : st.* avant set_page_config)
+    try:
+        st.markdown(_get_lux_vars_style(), unsafe_allow_html=True)
+        if not VISUAL_SAFE_MODE:
+            st.markdown(hide_st_style, unsafe_allow_html=True)
+        from utils.page_header import afficher_header_page
+        afficher_header_page("🔐 Authentification", "Accédez à votre espace atelier")
+    except Exception as e:
+        logger.exception("Erreur affichage initial page connexion: %s", e)
+        # En cas d'erreur UI, on réaffiche les éléments Streamlit natifs.
+        st.markdown(
+            "<style>header{visibility:visible!important;} footer{visibility:visible!important;}</style>",
+            unsafe_allow_html=True,
+        )
+        afficher_erreur_minimale("Erreur d'initialisation de l'interface de connexion.")
+
     content = load_site_content()
     
     # ========================================================================
     # FOND D'ÉCRAN PLEIN ÉCRAN (image en arrière-plan, formulaire par-dessus)
     # ========================================================================
     
+    # Fond d'écran : cache pour éviter 4-13 s de chargement à chaque requête
     wallpaper_path = APP_CONFIG.get('wallpaper_url')
-    if wallpaper_path:
-        project_root = os.path.dirname(os.path.dirname(__file__))
-        image_path = os.path.join(project_root, wallpaper_path)
-        if os.path.exists(image_path):
-            try:
-                with open(image_path, 'rb') as f:
-                    img_b64 = base64.b64encode(f.read()).decode('utf-8')
-                mime = mimetypes.guess_type(image_path)[0] or 'image/png'
-                data_uri = f"data:{mime};base64,{img_b64}"
-                st.markdown(f"""
-                    <style>
-                    .stApp {{
-                        background-image: url("{data_uri}") !important;
-                        background-size: cover !important;
-                        background-position: center !important;
-                        background-attachment: fixed !important;
-                        background-repeat: no-repeat !important;
-                        background-color: transparent !important;
-                        min-height: 100vh;
-                    }}
-                    .main .block-container {{
-                        background: transparent !important;
-                        padding-top: 2rem;
-                        max-width: 1200px;
-                    }}
-                    </style>
-                """, unsafe_allow_html=True)
-            except Exception as e:
-                st.warning(f"⚠️ Impossible de charger l'image de fond : {e}")
-        else:
-            st.warning(f"⚠️ Image de fond introuvable : {image_path}")
+    data_uri = _load_wallpaper_data_uri(wallpaper_path) if wallpaper_path else None
+    if data_uri:
+        st.markdown(f"""
+            <style>
+            .stApp {{
+                background-image: url("{data_uri}") !important;
+                background-size: cover !important;
+                background-position: center !important;
+                background-attachment: fixed !important;
+                background-repeat: no-repeat !important;
+                background-color: transparent !important;
+                min-height: 100vh;
+            }}
+            .main .block-container {{
+                background: transparent !important;
+                padding-top: 2rem;
+                max-width: 1200px;
+            }}
+            </style>
+        """, unsafe_allow_html=True)
     
-    # ========================================================================
-    # DÉTECTION AUTOMATIQUE DE RENDER
-    # ========================================================================
-    
-    # Si on est sur Render, se connecter automatiquement à la base
-    from config import IS_RENDER
-    
-    if IS_RENDER and st.session_state.db_connection is None:
-        # Sur Render, on se connecte automatiquement avec les variables d'environnement
-        st.info("🌐 Détection de l'environnement Render - Connexion automatique...")
-        
-        try:
-            config = DATABASE_CONFIG.get('render_production', {})
-            
-            if not all([config.get('host'), config.get('database'), config.get('user'), config.get('password')]):
-                st.error("❌ Configuration Render incomplète. Vérifiez les variables d'environnement.")
-                st.stop()
-            
-            # Créer la connexion automatiquement
-            db_connection = DatabaseConnection('postgresql', config)
-            
-            if db_connection.connect():
-                # Sauvegarder la connexion
-                st.session_state.db_connection = db_connection
-                st.session_state.db_type = 'render_production'
-                
-                # Initialiser les tables
-                auth_controller = AuthController(db_connection)
-                auth_controller.initialiser_tables()
-                
-                from controllers.commande_controller import CommandeController
-                commande_controller = CommandeController(db_connection)
-                commande_controller.initialiser_tables()
-                
-                from models.database import ChargesModel
-                charges_model = ChargesModel(db_connection)
-                charges_model.creer_tables()
-                
-                st.success("✅ Connexion à la base Render réussie!")
-                st.rerun()
-            else:
-                st.error("❌ Échec de la connexion à la base Render. Vérifiez les variables d'environnement.")
-                st.stop()
-        except Exception as e:
-            st.error(f"❌ Erreur lors de la connexion automatique : {e}")
-            st.stop()
-    
-    # ========================================================================
-    # CONNEXION AUTOMATIQUE À LA BASE DE DONNÉES (LOCAL)
-    # ========================================================================
-    
-    # Si on est en local et pas encore connecté, se connecter automatiquement
-    if not IS_RENDER and st.session_state.db_connection is None:
-        st.info("🏠 Connexion automatique à PostgreSQL local...")
-        
-        try:
-            config = DATABASE_CONFIG.get('postgresql_local', {})
-            
-            if not all([config.get('host'), config.get('database'), config.get('user')]):
-                st.error("❌ Configuration PostgreSQL locale incomplète. Vérifiez config.py")
-                st.code(f"""
-Configuration actuelle:
-- Host: {config.get('host', 'NON DÉFINI')}
-- Port: {config.get('port', 'NON DÉFINI')}
-- Database: {config.get('database', 'NON DÉFINI')}
-- User: {config.get('user', 'NON DÉFINI')}
-- Password: {'***' if config.get('password') else '(VIDE)'}
-                """)
-                st.stop()
-            
-            # Créer la connexion automatiquement
-            db_connection = DatabaseConnection('postgresql', config)
-            
-            try:
-                # Tenter la connexion avec gestion d'erreur détaillée
-                connection_result = db_connection.connect()
-                
-                if connection_result:
-                    # Sauvegarder la connexion
-                    st.session_state.db_connection = db_connection
-                    st.session_state.db_type = 'postgresql_local'
-                    
-                    # Initialiser les tables
-                    auth_controller = AuthController(db_connection)
-                    auth_controller.initialiser_tables()
-                    
-                    from controllers.commande_controller import CommandeController
-                    commande_controller = CommandeController(db_connection)
-                    commande_controller.initialiser_tables()
-                    
-                    from models.database import ChargesModel
-                    charges_model = ChargesModel(db_connection)
-                    charges_model.creer_tables()
-                    
-                    st.success("✅ Connexion à PostgreSQL local réussie!")
-                    st.rerun()
-                else:
-                    error_msg = db_connection.get_last_error() or "Erreur inconnue de connexion"
-                    st.error("❌ Échec de la connexion à PostgreSQL local")
-                    st.error(f"**Erreur détaillée :** {error_msg}")
-                    
-                    # Diagnostic selon le type d'erreur
-                    if "does not exist" in error_msg or "n'existe pas" in error_msg:
-                        st.warning("🔍 **Diagnostic :** La base de données n'existe pas")
-                        st.info("💡 **Solution :** Exécutez `python creer_base_postgresql.py` pour créer la base")
-                    elif "password authentication failed" in error_msg.lower() or "mot de passe" in error_msg.lower():
-                        st.warning("🔍 **Diagnostic :** Mot de passe incorrect")
-                        st.info("💡 **Solution :** Vérifiez le mot de passe dans `config.py`")
-                    elif "could not connect" in error_msg.lower() or "refused" in error_msg.lower() or "timeout" in error_msg.lower():
-                        st.warning("🔍 **Diagnostic :** PostgreSQL n'est pas démarré ou n'est pas accessible")
-                        if config.get('port') == 3306 or config.get('port') == '3306':
-                            st.error("⚠️ **Vous utilisez le port 3306 (MySQL).** Pour PostgreSQL, utilisez le port **5432** dans votre fichier `.env` : `DB_PORT=5432`")
-                        st.info("💡 **Solutions :**")
-                        st.info("   1. Vérifiez que PostgreSQL est démarré (Services Windows → PostgreSQL)")
-                        st.info("   2. Dans `.env` : **DB_PORT=5432** (pas 3306), **DB_NAME=db_couturier**, **DB_USER=postgres**, **DB_PASSWORD=votre_mot_de_passe**")
-                        st.info("   3. Vérifiez que le host 'localhost' est correct")
-                    else:
-                        st.info("💡 **Solutions possibles :**")
-                        st.info("   1. Vérifiez que PostgreSQL est démarré")
-                        st.info("   2. Vérifiez la configuration dans `config.py`")
-                        st.info("   3. Exécutez `python test_connexion_postgresql.py` pour un diagnostic complet")
-                    
-                    port_ok = config.get('port') not in (3306, '3306')
-                    st.code(f"""
-Configuration utilisée (lue depuis .env ou config.py):
-- Host: {config.get('host')}
-- Port: {config.get('port')}{'  ← Utilisez 5432 pour PostgreSQL (3306 = MySQL)' if not port_ok else ''}
-- Database: {config.get('database')}
-- User: {config.get('user')}
-- Password: {'***' if config.get('password') else '(VIDE - peut être le problème!)'}
-- Connect timeout: {config.get('connect_timeout', 5)}s
-
-Pour PostgreSQL local, dans votre fichier .env à la racine du projet, mettez:
-DB_HOST=localhost
-DB_PORT=5432
-DB_NAME=db_couturier
-DB_USER=postgres
-DB_PASSWORD=votre_mot_de_passe_postgresql
-DB_CONNECT_TIMEOUT=5
-                    """)
-                    st.stop()
-            except Exception as conn_error:
-                st.error(f"❌ Erreur lors de la connexion : {conn_error}")
-                st.info("💡 Exécutez `python test_connexion_postgresql.py` pour un diagnostic complet")
-                st.stop()
-        except Exception as e:
-            st.error(f"❌ Erreur lors de la connexion : {e}")
-            import traceback
-            st.code(traceback.format_exc())
-            st.stop()
+    if st.session_state.get("db_connection") is None:
+        afficher_info_minimale(
+            "La connexion base de données sera établie uniquement au clic sur « Se connecter »."
+        )
     
     # ========================================================================
     # AUTHENTIFICATION DU COUTURIER
@@ -562,14 +489,14 @@ DB_CONNECT_TIMEOUT=5
 
     with form_col:
         st.markdown('<div class="login-card">', unsafe_allow_html=True)
-        st.markdown("### Connexion sécurisée")
+        afficher_titre_section("Connexion sécurisée")
         st.markdown(
             "<div class='login-muted'>Accédez à votre atelier et gérez vos commandes en toute sérénité.</div>",
             unsafe_allow_html=True
         )
         
         with st.form("auth_form", clear_on_submit=False):
-            st.markdown("#### 🔑 Identifiants de connexion")
+            afficher_titre_section("🔑 Identifiants de connexion", niveau=4)
             
             # Champ de saisie du code couturier
             code_couturier = st.text_input(
@@ -591,7 +518,6 @@ DB_CONNECT_TIMEOUT=5
             # Bouton de soumission
             submit_auth = st.form_submit_button(
                 "🔓 Se connecter",
-                width='stretch',
                 type="primary"
             )
             
@@ -607,52 +533,63 @@ DB_CONNECT_TIMEOUT=5
                     st.error("⚠️ Veuillez entrer votre mot de passe")
                 else:
                     # Afficher un spinner pendant la vérification
-                    with st.spinner("Vérification des identifiants..."):
-                        
-                        # Créer un contrôleur d'authentification
-                        # POURQUOI ? Pour gérer la logique d'authentification
-                        auth_controller = AuthController(st.session_state.db_connection)
-                        
-                        # Appeler la méthode authentifier() avec CODE + MOT DE PASSE
-                        # RETOURNE : (succès, données, message)
-                        # - succès : True si code + password corrects, False sinon
-                        # - données : Informations du couturier (nom, prénom, etc.)
-                        # - message : Message à afficher à l'utilisateur
-                        succes, donnees, message = auth_controller.authentifier(code_couturier, password_input)
-                        
-                        # Si l'authentification a réussi
-                        if succes:
-                            # Sauvegarder l'état d'authentification dans la session
-                            st.session_state.authentifie = True
-                            
-                            # Sauvegarder les données du couturier
-                            st.session_state.couturier_data = donnees
-                            
-                            # Rediriger selon le rôle de l'utilisateur
-                            # Si c'est un super administrateur, rediriger vers le dashboard super admin
-                            role_utilisateur = donnees.get('role', '')
-                            # Normaliser le rôle (gérer les variations : SUPER_ADMIN, super_admin, etc.)
-                            role_normalise = str(role_utilisateur).upper().strip()
-                            
-                            # Debug : afficher le rôle détecté (temporaire)
-                            if role_normalise == 'SUPER_ADMIN':
-                                st.info(f"🔧 Rôle détecté : {role_utilisateur} → Redirection vers Dashboard Super Admin")
-                                st.session_state.page = 'super_admin_dashboard'
+                    try:
+                        with etat_chargement("Connexion à la base et vérification des identifiants..."):
+                            ok_conn, msg_conn = _ensure_db_connection()
+                            if not ok_conn:
+                                afficher_erreur_minimale(msg_conn)
                             else:
-                                # Pour les autres rôles, rediriger vers la page de nouvelle commande
-                                st.session_state.page = 'nouvelle_commande'
-                            
-                            # Afficher un message de succès
-                            st.success(f"✅ {message}")
-                            
-                            # Afficher des ballons pour célébrer !
-                            st.balloons()
-                            
-                            # Recharger la page pour afficher l'interface principale
-                            st.rerun()
-                        else:
-                            # Si l'authentification a échoué, afficher l'erreur
-                            st.error(f"❌ {message}")
+                                # Créer un contrôleur d'authentification
+                                # POURQUOI ? Pour gérer la logique d'authentification
+                                auth_controller = AuthController(st.session_state.db_connection)
+
+                                # Appeler la méthode authentifier() avec CODE + MOT DE PASSE
+                                # RETOURNE : (succès, données, message)
+                                # - succès : True si code + password corrects, False sinon
+                                # - données : Informations du couturier (nom, prénom, etc.)
+                                # - message : Message à afficher à l'utilisateur
+                                succes, donnees, message = auth_controller.authentifier(code_couturier, password_input)
+
+                                # Si l'authentification a réussi
+                                if succes:
+                                    # Sauvegarder l'état d'authentification dans la session
+                                    st.session_state.authentifie = True
+
+                                    # Sauvegarder les données du couturier
+                                    st.session_state.couturier_data = donnees
+
+                                    # Rediriger selon le rôle de l'utilisateur
+                                    # Si c'est un super administrateur, rediriger vers le dashboard super admin
+                                    role_utilisateur = donnees.get('role', '')
+                                    # Normaliser le rôle (gérer les variations : SUPER_ADMIN, super_admin, etc.)
+                                    role_normalise = str(role_utilisateur).upper().strip()
+
+                                    # Debug : afficher le rôle détecté (temporaire)
+                                    if role_normalise == 'SUPER_ADMIN':
+                                        afficher_info_minimale(
+                                            f"Rôle détecté : {role_utilisateur} → Redirection vers Dashboard Super Admin"
+                                        )
+                                        st.session_state.page = 'super_admin_dashboard'
+                                    else:
+                                        # Pour les autres rôles, rediriger vers la page de nouvelle commande
+                                        st.session_state.page = 'nouvelle_commande'
+
+                                    # Afficher un message de succès
+                                    st.success(f"✅ {message}")
+
+                                    # Afficher des ballons pour célébrer !
+                                    st.balloons()
+
+                                    # Recharger la page pour afficher l'interface principale
+                                    st.rerun()
+                                else:
+                                    # Si l'authentification a échoué, afficher l'erreur
+                                    afficher_erreur_minimale(message)
+                    except Exception as e:
+                        logger.exception("Erreur non capturee pendant la connexion: %s", e)
+                        afficher_erreur_minimale(
+                            "Une erreur inattendue est survenue pendant la connexion. Veuillez reessayer."
+                        )
         
         support_text = content.get("support_text", "")
         if support_text:

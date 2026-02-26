@@ -13,6 +13,9 @@ services:
     # Build
     buildCommand: pip install -r requirements.txt
 
+    # Health check : Streamlit expose /_stcore/health (évite l'écran blanc)
+    healthCheckPath: /_stcore/health
+
     # Commande de démarrage Streamlit (PORT fourni par Render)
     startCommand: streamlit run app.py --server.port=$PORT --server.address=0.0.0.0 --server.headless=true --server.enableCORS=false --server.enableXsrfProtection=true
 

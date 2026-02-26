@@ -3,6 +3,7 @@ Contrôleur pour le Super Administrateur (Vue 360° multi-salons)
 """
 from typing import Optional, Dict, List
 from models.database import DatabaseConnection
+from models.salon_model import SalonModel
 from datetime import datetime, timedelta
 
 
@@ -11,6 +12,14 @@ class SuperAdminController:
     
     def __init__(self, db_connection: DatabaseConnection):
         self.db = db_connection
+
+    def diagnostiquer_salons(self) -> Dict:
+        """
+        Retourne un diagnostic technique de la table salons.
+        Délégué au modèle pour respecter la séparation MVC.
+        """
+        salon_model = SalonModel(self.db)
+        return salon_model.diagnostiquer_table_salons()
 
     def obtenir_statistiques_globales(
         self,

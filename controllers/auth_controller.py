@@ -23,6 +23,7 @@ Dans views/auth_view.py, ligne : auth_controller.authentifier(code, password)
 from typing import Optional, Dict, Tuple
 from models.database import DatabaseConnection, CouturierModel
 from models.salon_model import SalonModel
+from utils.security import verify_password
 
 
 class AuthController:
@@ -123,11 +124,9 @@ class AuthController:
             return False, None, "Mot de passe non configuré pour cet utilisateur"
         
         # ====================================================================
-        # VÉRIFICATION SIMPLE : COMPARAISON DIRECTE DES MOTS DE PASSE
+        # VÉRIFICATION DU MOT DE PASSE (BCRYPT + COMPAT LEGACY)
         # ====================================================================
-        
-        # Comparer directement le mot de passe saisi avec celui de la base
-        if password == password_db:
+        if verify_password(password, password_db):
             # ✅ MOT DE PASSE CORRECT !
 
             # 1) Vérifier d'abord si l'utilisateur lui-même est actif

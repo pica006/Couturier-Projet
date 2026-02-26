@@ -7,6 +7,7 @@ import os
 import io
 import json
 import re
+import tempfile
 from datetime import datetime
 from typing import Dict, Optional
 
@@ -45,6 +46,31 @@ class PDFController:
         self.db_connection = db_connection
         self.last_error = None
         self.last_error_details = None
+
+    def _build_reportlab_image(
+        self,
+        image_path: Optional[str],
+        image_bytes: Optional[bytes],
+        width_cm: float = 7.0,
+        height_cm: float = 7.0,
+    ):
+        """
+        Construit une image ReportLab depuis le fichier, puis fallback bytes BDD.
+        """
+        if image_path:
+            normalized = os.path.normpath(str(image_path))
+            if normalized.startswith("./") or normalized.startswith(".\\"):
+                base_dir = os.path.dirname(os.path.dirname(__file__))
+                normalized = os.path.join(base_dir, normalized.lstrip("./\\"))
+            if os.path.exists(normalized):
+                return Image(normalized, width=width_cm * cm, height=height_cm * cm)
+
+        if image_bytes:
+            try:
+                return Image(ImageReader(io.BytesIO(image_bytes)), width=width_cm * cm, height=height_cm * cm)
+            except Exception:
+                return None
+        return None
 
     def _build_footer_lines(self, salon_id: Optional[str]) -> Optional[list]:
         """
@@ -129,10 +155,7 @@ class PDFController:
             nom_complet = f"{client_prenom}_{client_nom}" if client_prenom else client_nom
 
             filename = f"{nom_complet}_{commande_id}_{date_str}.pdf"
-            # Créer un fichier temporaire au lieu d'un dossier permanent
-            import tempfile
-            temp_dir = tempfile.gettempdir()
-            filepath = os.path.join(temp_dir, filename)
+            filepath = os.path.join(self.storage_path, filename)
 
             # ---------------------------
             # Filigrane (logo PDF en arrière-plan) - Récupéré depuis la BDD
@@ -159,18 +182,6 @@ class PDFController:
                         print(f"✅ Salon ID récupéré depuis couturier_id: {salon_id}")
                 except Exception as e:
                     print(f"⚠️ Erreur récupération salon_id depuis couturier_id: {e}")
-            
-            # 3. Si toujours pas de salon_id, essayer depuis la session (pour les admins)
-            if not salon_id and self.db_connection:
-                try:
-                    import streamlit as st
-                    if hasattr(st, 'session_state') and st.session_state.get('couturier_data'):
-                        from utils.role_utils import obtenir_salon_id
-                        salon_id = obtenir_salon_id(st.session_state.couturier_data)
-                        if salon_id:
-                            print(f"✅ Salon ID récupéré depuis session: {salon_id}")
-                except Exception as e:
-                    print(f"⚠️ Erreur récupération salon_id depuis session: {e}")
             
             if self.db_connection and salon_id:
                 try:
@@ -433,48 +444,28 @@ class PDFController:
             # Créer une table pour afficher les deux images côte à côte
             images_row = []
             
-            # Image du tissu du client
-            fabric_image_path = commande_data.get('fabric_image_path')
-            # Normaliser le chemin (supprimer les points et backslashes)
-            if fabric_image_path:
-                fabric_image_path = os.path.normpath(fabric_image_path)
-                # Si le chemin commence par ./, le convertir en chemin absolu
-                if fabric_image_path.startswith('./') or fabric_image_path.startswith('.\\'):
-                    base_dir = os.path.dirname(os.path.dirname(__file__))
-                    fabric_image_path = os.path.join(base_dir, fabric_image_path.lstrip('./\\'))
-            
-            if fabric_image_path and os.path.exists(fabric_image_path):
-                try:
-                    fabric_img = Image(fabric_image_path, width=7*cm, height=7*cm)
-                    images_row.append(fabric_img)
-                    print(f"✅ Image du tissu chargée: {fabric_image_path}")
-                except Exception as e:
-                    print(f"❌ Erreur chargement image tissu: {e}")
-                    images_row.append(Paragraph("Image du tissu\nnon disponible", styles['Normal']))
+            # Image du tissu du client (fallback bytes BDD si le fichier n'existe plus)
+            fabric_img = self._build_reportlab_image(
+                image_path=commande_data.get('fabric_image_path'),
+                image_bytes=commande_data.get('fabric_image'),
+                width_cm=7.0,
+                height_cm=7.0,
+            )
+            if fabric_img:
+                images_row.append(fabric_img)
             else:
-                print(f"⚠️ Chemin image tissu invalide ou fichier introuvable: {fabric_image_path}")
                 images_row.append(Paragraph("Image du tissu\nnon disponible", styles['Normal']))
             
-            # Image du modèle
-            model_image_path = commande_data.get('model_image_path')
-            # Normaliser le chemin (supprimer les points et backslashes)
-            if model_image_path:
-                model_image_path = os.path.normpath(model_image_path)
-                # Si le chemin commence par ./, le convertir en chemin absolu
-                if model_image_path.startswith('./') or model_image_path.startswith('.\\'):
-                    base_dir = os.path.dirname(os.path.dirname(__file__))
-                    model_image_path = os.path.join(base_dir, model_image_path.lstrip('./\\'))
-            
-            if model_image_path and os.path.exists(model_image_path):
-                try:
-                    model_img = Image(model_image_path, width=7*cm, height=7*cm)
-                    images_row.append(model_img)
-                    print(f"✅ Image du modèle chargée: {model_image_path}")
-                except Exception as e:
-                    print(f"❌ Erreur chargement image modèle: {e}")
-                    images_row.append(Paragraph("Image du modèle\nnon disponible", styles['Normal']))
+            # Image du modèle (fallback bytes BDD si le fichier n'existe plus)
+            model_img = self._build_reportlab_image(
+                image_path=commande_data.get('model_image_path'),
+                image_bytes=commande_data.get('model_image'),
+                width_cm=7.0,
+                height_cm=7.0,
+            )
+            if model_img:
+                images_row.append(model_img)
             else:
-                print(f"⚠️ Chemin image modèle invalide ou fichier introuvable: {model_image_path}")
                 images_row.append(Paragraph("Image du modèle\nnon disponible", styles['Normal']))
             
             # Table avec les deux images
@@ -612,7 +603,8 @@ class PDFController:
             
             # Créer l'image du QR code
             qr_img = qr.make_image(fill_color="black", back_color="white")
-            qr_path = os.path.join(self.storage_path, f"qr_temp_{commande_data.get('id', 'temp')}.png")
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmp_qr:
+                qr_path = tmp_qr.name
             qr_img.save(qr_path)
 
             # Centrer le QR code dans une table
@@ -750,9 +742,7 @@ class PDFController:
             nom_complet = f"{client_prenom}_{client_nom}" if client_prenom else client_nom
 
             filename = f"Livraison_{nom_complet}_{commande_id}_{date_str}.pdf"
-            import tempfile
-            temp_dir = tempfile.gettempdir()
-            filepath = os.path.join(temp_dir, filename)
+            filepath = os.path.join(self.storage_path, filename)
 
             # -----------------------------------------------------------------
             # Récupérer le logo depuis la BDD (multi-tenant, via AppLogoModel)
@@ -778,19 +768,7 @@ class PDFController:
                 except Exception as e:
                     print(f"⚠️ Erreur récupération salon_id pour PDF livraison depuis couturier_id: {e}")
 
-            # 3) En dernier recours, essayer de récupérer le salon_id depuis la session Streamlit
-            if not salon_id and self.db_connection:
-                try:
-                    import streamlit as st
-                    if hasattr(st, 'session_state') and st.session_state.get('couturier_data'):
-                        from utils.role_utils import obtenir_salon_id
-                        salon_id = obtenir_salon_id(st.session_state.couturier_data)
-                        if salon_id:
-                            print(f"✅ Salon ID récupéré depuis session pour PDF livraison: {salon_id}")
-                except Exception as e:
-                    print(f"⚠️ Erreur récupération salon_id pour PDF livraison depuis session: {e}")
-
-            # 4) Utiliser AppLogoModel en priorité si on a un salon_id
+            # 3) Utiliser AppLogoModel en priorité si on a un salon_id
             if self.db_connection and salon_id:
                 try:
                     from models.database import AppLogoModel

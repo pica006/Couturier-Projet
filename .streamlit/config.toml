@@ -9,4 +9,6 @@ enableCORS = false
 gatherUsageStats = false
 
 [client]
-showErrorDetails = true
+# En production : false pour ne pas exposer les details techniques aux clients.
+# Mettre true temporairement en cas de diagnostic d'incident.
+showErrorDetails = false

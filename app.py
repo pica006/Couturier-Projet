@@ -4,29 +4,28 @@ Architecture MVC
 """
 import os
 import base64
+import logging
 import streamlit as st
-from dotenv import load_dotenv
+try:
+    from dotenv import load_dotenv
+except Exception:
+    load_dotenv = None
 
-# Charger .env AVANT tout import de config (sinon DB_PASSWORD etc. restent vides)
-load_dotenv()
+# Charger .env AVANT tout import de config (sinon DB_PASSWORD etc. restent vides).
+# Ne jamais faire echouer le demarrage si python-dotenv est absent.
+if load_dotenv is not None:
+    try:
+        load_dotenv()
+    except Exception:
+        pass
 
-from views.auth_view import afficher_page_connexion
-from views.commande_view import afficher_page_commande
-from views.liste_view import afficher_page_liste_commandes
-from views.comptabilite_view import afficher_page_comptabilite
-from views.dashboard_view import afficher_page_dashboard
-from views.mes_charges_view import afficher_page_mes_charges
-from views.admin_view import afficher_page_administration
-from views.fermer_commandes_view import afficher_page_fermer_commandes
-from views.calendrier_view import afficher_page_calendrier
-from views.super_admin_dashboard import afficher_dashboard_super_admin
 from utils.role_utils import est_admin
 from utils.bottom_nav import render_bottom_nav
 from utils.permissions import est_super_admin
-from models.database import DatabaseConnection, ChargesModel
-from controllers.auth_controller import AuthController
-from controllers.commande_controller import CommandeController
-from config import APP_CONFIG, PAGE_BACKGROUND_IMAGES
+from config import APP_CONFIG, PAGE_BACKGROUND_IMAGES, VISUAL_SAFE_MODE
+from services.session_service import initialize_session_state, sanitize_session_state, logout_user
+
+logger = logging.getLogger(__name__)
 
 
 # Configuration de la page
@@ -43,26 +42,81 @@ st.set_page_config(
 # Elle est bénigne et n'affecte pas le fonctionnement de l'application
 # Aucun JavaScript personnalisé n'est utilisé pour éviter d'aggraver le problème
 
-# Image de fond pour la sidebar (assets/nav.png) - UNIQUEMENT sur la page de connexion
 SIDEBAR_BG_PLAIN = "background: #FAFAFA !important;"
-sidebar_bg_css_with_image = SIDEBAR_BG_PLAIN
-try:
-    project_root = os.path.dirname(__file__)
-    nav_path = os.path.join(project_root, "assets", "nav.png")
-    if os.path.exists(nav_path):
+
+
+@st.cache_data(show_spinner=False)
+def _get_sidebar_bg_css_with_image() -> str:
+    """Charge l'image sidebar a la demande (pas au boot)."""
+    try:
+        project_root = os.path.dirname(__file__)
+        nav_path = os.path.join(project_root, "assets", "nav.png")
+        if not os.path.exists(nav_path):
+            return SIDEBAR_BG_PLAIN
         with open(nav_path, "rb") as f:
             nav_b64 = base64.b64encode(f.read()).decode("utf-8")
         data_uri = f"data:image/png;base64,{nav_b64}"
-        sidebar_bg_css_with_image = f"""
+        return f"""
         background-image: url('{data_uri}') !important;
         background-size: cover !important;
         background-position: center !important;
         background-repeat: no-repeat !important;
         """
-except Exception:
-    pass
+    except Exception:
+        return SIDEBAR_BG_PLAIN
 
-st.markdown("""
+def _safe_visual_css() -> str:
+    """
+    Mode visuel safe: style minimal, stable et non intrusif.
+    """
+    return """
+    <style>
+    .stApp, .main .block-container {
+        background: #FEFEFE !important;
+        color: #2C2C2C !important;
+        font-family: 'Inter', 'Segoe UI', sans-serif;
+    }
+
+    .main .block-container {
+        max-width: 1100px;
+        padding-top: 1.5rem;
+        padding-bottom: 1.5rem;
+    }
+
+    [data-testid="stSidebar"] {
+        background: #FAFAFA !important;
+        border-right: 1px solid #EAEAEA;
+    }
+
+    .stButton > button, button[kind="primary"] {
+        background: #B19CD9 !important;
+        color: #FFFFFF !important;
+        border: 1px solid #B19CD9 !important;
+        border-radius: 10px !important;
+        box-shadow: none !important;
+        transition: none !important;
+        transform: none !important;
+    }
+
+    .stButton > button:hover, button[kind="primary"]:hover {
+        background: #9F87D3 !important;
+        color: #FFFFFF !important;
+        opacity: 1 !important;
+    }
+
+    a, a:visited, a:hover {
+        color: #40E0D0 !important;
+    }
+    </style>
+    """
+
+
+_apply_rich_theme = bool(st.session_state.get("authentifie", False))
+
+if VISUAL_SAFE_MODE:
+    st.markdown(_safe_visual_css(), unsafe_allow_html=True)
+elif _apply_rich_theme:
+    st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Poppins:wght@400;500;600;700&display=swap');
     
@@ -399,47 +453,57 @@ st.markdown("""
         margin: 2rem 0;
     }
     </style>
-    
-    <script>
-    // Forcer le dégradé violet-bleu sur tous les boutons (SAUF la sidebar, qui a sa propre palette pastel)
-    function forceButtonColors() {
-        var sidebar = document.querySelector('[data-testid="stSidebar"]');
-        function isInSidebar(btn) { return sidebar && sidebar.contains(btn); }
-        // Tous les boutons (hors sidebar)
-        document.querySelectorAll('button[data-baseweb="button"]').forEach(btn => {
-            if (isInSidebar(btn)) return;
-            if (!btn.style.background || btn.style.background.includes('rgb') || btn.style.background.includes('#ff')) {
-                btn.style.background = 'linear-gradient(135deg, #B19CD9 0%, #40E0D0 100%)';
-                btn.style.backgroundColor = 'transparent';
-                btn.style.color = '#FFFFFF';
-                btn.style.border = 'none';
-            }
-        });
-        // Boutons primaires (hors sidebar)
-        document.querySelectorAll('button[kind="primary"], button[data-baseweb="button"][kind="primary"]').forEach(btn => {
-            if (isInSidebar(btn)) return;
-            btn.style.background = 'linear-gradient(135deg, #40E0D0 0%, #B19CD9 100%)';
-            btn.style.backgroundColor = 'transparent';
-            btn.style.color = '#FFFFFF';
-            btn.style.border = 'none';
-        });
-    }
-    
-    // Exécuter immédiatement et après le chargement
-    forceButtonColors();
-    window.addEventListener('load', forceButtonColors);
-    setTimeout(forceButtonColors, 100);
-    setTimeout(forceButtonColors, 500);
-    
-    // Observer les changements DOM pour forcer les styles sur les nouveaux boutons
-    const observer = new MutationObserver(forceButtonColors);
-    observer.observe(document.body, { childList: true, subtree: true });
-    </script>
 """, unsafe_allow_html=True)
+
+if (not VISUAL_SAFE_MODE) and (not _apply_rich_theme):
+    # Ecran de connexion: style leger pour accelerer le premier rendu.
+    st.markdown(
+        """
+        <style>
+        .stApp, .main .block-container {
+            background: #FEFEFE !important;
+            color: #2C2C2C !important;
+            font-family: 'Inter', 'Segoe UI', sans-serif;
+        }
+        .main .block-container {
+            max-width: 980px;
+            padding-top: 1.2rem;
+            padding-bottom: 1.2rem;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
 
 # Surcharge du fond de la sidebar + harmonisation des boutons (palette atelier couture)
 # Note: le fond avec image (nav.png) est injecté dans main() uniquement pour la page de connexion
 def _sidebar_styles_css(sidebar_bg_css):
+    if VISUAL_SAFE_MODE:
+        return f"""
+        <style>
+        [data-testid="stSidebar"] {{
+            {sidebar_bg_css}
+        }}
+        [data-testid="stSidebar"] [data-testid="stSidebarContent"] {{
+            background: transparent !important;
+        }}
+        [data-testid="stSidebar"] .stButton > button {{
+            background: #F3EEF9 !important;
+            color: #2C2C2C !important;
+            border: 1px solid #D8CCE9 !important;
+            border-radius: 10px !important;
+            box-shadow: none !important;
+            transition: none !important;
+            transform: none !important;
+            opacity: 1 !important;
+        }}
+        [data-testid="stSidebar"] .stButton > button:hover {{
+            background: #ECE4F8 !important;
+            color: #2C2C2C !important;
+        }}
+        </style>
+        """
+
     return f"""
     <style>
     [data-testid="stSidebar"] {{
@@ -499,38 +563,6 @@ def _sidebar_styles_css(sidebar_bg_css):
         border-color: rgba(107, 100, 122, 0.3) !important;
     }}
     </style>
-    <script>
-    (function() {{
-        var pageToLabel = {{
-            'super_admin_dashboard': 'Dashboard Super Admin',
-            'dashboard': 'Tableau de bord',
-            'nouvelle_commande': 'Nouvelle commande',
-            'liste_commandes': 'Mes commandes',
-            'comptabilite': 'Comptabilité',
-            'charges': 'Mes charges',
-            'fermer_commandes': 'Fermer mes commandes',
-            'calendrier': 'Modèles & Calendrier',
-            'administration': 'Administration'
-        }};
-        function markSidebarActive() {{
-            var el = document.querySelector('#sidebar-current-page');
-            if (!el) return;
-            var page = el.getAttribute('data-page');
-            var label = pageToLabel[page];
-            if (!label) return;
-            var sidebar = document.querySelector('[data-testid="stSidebar"]');
-            if (!sidebar) return;
-            sidebar.querySelectorAll('.stButton > button').forEach(function(btn) {{
-                btn.classList.remove('sidebar-btn-active');
-                if (btn.textContent.indexOf(label) !== -1) btn.classList.add('sidebar-btn-active');
-            }});
-        }}
-        markSidebarActive();
-        if (document.readyState !== 'complete') window.addEventListener('load', markSidebarActive);
-        setTimeout(markSidebarActive, 150);
-        setTimeout(markSidebarActive, 500);
-    }})();
-    </script>
     """
 
 
@@ -541,7 +573,9 @@ def get_page_background_html(page_id):
     Logo logoBon.png affiché au coin gauche de la zone principale.
     CSS direct + JS de secours pour appliquer sur .main.
     """
-    import json
+    if VISUAL_SAFE_MODE:
+        return ""
+
     image_name = PAGE_BACKGROUND_IMAGES.get(page_id)
     if not image_name:
         return ""
@@ -555,7 +589,6 @@ def get_page_background_html(page_id):
         ext = os.path.splitext(image_name)[1].lower()
         mime = "image/jpeg" if ext in (".jpg", ".jpeg") else "image/png"
         data_uri = f"data:{mime};base64,{b64}"
-        data_uri_js = json.dumps(data_uri)
         # Échapper pour CSS url() : les apostrophes dans la data URI
         data_uri_css = data_uri.replace("'", "\\'")
 
@@ -607,28 +640,6 @@ def get_page_background_html(page_id):
         box-shadow: 0 2px 14px rgba(0, 0, 0, 0.05) !important;
     }}
     </style>
-    <script>
-    (function() {{
-        var dataUri = {data_uri_js};
-        function applyBg() {{
-            var main = document.querySelector(".main");
-            if (main && !main.querySelector('.page-bg-blur')) {{
-                var blur = document.createElement('div');
-                blur.className = 'page-bg-blur';
-                blur.style.cssText = 'position:absolute;inset:0;z-index:-2;background-image:url(' + dataUri + ');background-size:cover;background-position:center;filter:blur(14px);opacity:0.75;';
-                main.insertBefore(blur, main.firstChild);
-                var veil = document.createElement('div');
-                veil.className = 'page-bg-veil';
-                veil.style.cssText = 'position:absolute;inset:0;z-index:-1;background:rgba(255,255,255,0.72);';
-                main.insertBefore(veil, main.firstChild);
-            }}
-        }}
-        applyBg();
-        if (document.readyState !== "complete") window.addEventListener("load", applyBg);
-        setTimeout(applyBg, 100);
-        setTimeout(applyBg, 500);
-    }})();
-    </script>
     """
     except Exception:
         return ""
@@ -647,30 +658,39 @@ def initialiser_session_state():
     - page : Page actuelle ('connexion', 'nouvelle_commande', 'liste_commandes')
     - db_type : Type de connexion choisi ('postgresql_local' ou 'render_production')
     """
-    # Vérifier si 'db_connection' existe dans la session
-    # Si non, on l'initialise à None (pas de connexion)
-    if 'db_connection' not in st.session_state:
-        st.session_state.db_connection = None
-    
-    # Vérifier si l'utilisateur est authentifié
-    # Par défaut : False (non connecté)
-    if 'authentifie' not in st.session_state:
-        st.session_state.authentifie = False
-    
-    # Données du couturier connecté
-    # Par défaut : None (pas de données)
-    if 'couturier_data' not in st.session_state:
-        st.session_state.couturier_data = None
-    
-    # Page actuelle de l'application
-    # Par défaut : 'connexion' (page de démarrage)
-    if 'page' not in st.session_state:
-        st.session_state.page = 'connexion'
-    
-    # Type de base de données choisie
-    # Par défaut : None (pas encore choisi)
-    if 'db_type' not in st.session_state:
-        st.session_state.db_type = None
+    initialize_session_state()
+    sanitize_session_state()
+
+
+def _render_authenticated_page(page_id: str):
+    """Charge les vues à la demande pour réduire le cold start."""
+    if page_id == 'super_admin_dashboard':
+        from views.super_admin_dashboard import afficher_dashboard_super_admin
+        afficher_dashboard_super_admin()
+    elif page_id == 'nouvelle_commande':
+        from views.commande_view import afficher_page_commande
+        afficher_page_commande()
+    elif page_id == 'liste_commandes':
+        from views.liste_view import afficher_page_liste_commandes
+        afficher_page_liste_commandes()
+    elif page_id == 'comptabilite':
+        from views.comptabilite_view import afficher_page_comptabilite
+        afficher_page_comptabilite()
+    elif page_id == 'charges':
+        from views.mes_charges_view import afficher_page_mes_charges
+        afficher_page_mes_charges()
+    elif page_id == 'fermer_commandes':
+        from views.fermer_commandes_view import afficher_page_fermer_commandes
+        afficher_page_fermer_commandes()
+    elif page_id == 'calendrier':
+        from views.calendrier_view import afficher_page_calendrier
+        afficher_page_calendrier(onglet_admin=False)
+    elif page_id == 'dashboard':
+        from views.dashboard_view import afficher_page_dashboard
+        afficher_page_dashboard()
+    elif page_id == 'administration':
+        from views.admin_view import afficher_page_administration
+        afficher_page_administration()
 
 
 def deconnecter_utilisateur():
@@ -709,6 +729,10 @@ def connecter_postgresql_local(config: dict) -> bool:
     UTILISÉ OÙ ? Dans views/auth_view.py quand l'user choisit PostgreSQL local
     """
     try:
+        from models.database import DatabaseConnection, ChargesModel
+        from controllers.auth_controller import AuthController
+        from controllers.commande_controller import CommandeController
+
         # Créer l'objet de connexion avec le type 'postgresql'
         db_connection = DatabaseConnection('postgresql', config)
         
@@ -769,6 +793,10 @@ def connecter_render_production(config: dict) -> bool:
     UTILISÉ OÙ ? Dans views/auth_view.py quand l'user choisit Render
     """
     try:
+        from models.database import DatabaseConnection, ChargesModel
+        from controllers.auth_controller import AuthController
+        from controllers.commande_controller import CommandeController
+
         # Créer l'objet de connexion avec le type 'postgresql'
         # (Render utilise aussi PostgreSQL, mais hébergé en ligne)
         db_connection = DatabaseConnection('postgresql', config)
@@ -835,7 +863,7 @@ def afficher_header_app():
                     logo_base64 = base64.b64encode(logo_bytes).decode()
     except Exception as e:
         # En cas d'erreur, on continue sans logo
-        print(f"Erreur récupération logo depuis BDD: {e}")
+        logger.warning("Erreur recuperation logo depuis BDD: %s", e)
         logo_base64 = None
     
     # Fallback : chercher le logo dans le système de fichiers si pas en BDD
@@ -875,12 +903,6 @@ def afficher_sidebar():
     """Affiche la barre latérale avec navigation"""
     with st.sidebar:
         if st.session_state.authentifie:
-            # Marqueur pour le JS : page courante (pour style bouton actif)
-            current_page = st.session_state.get("page", "connexion")
-            st.markdown(
-                f'<div id="sidebar-current-page" data-page="{current_page}" style="display:none;"></div>',
-                unsafe_allow_html=True,
-            )
             # Informations du couturier connecté
             st.success(f"**Connecté:** {st.session_state.couturier_data['prenom']} {st.session_state.couturier_data['nom']}")
             role_display = st.session_state.couturier_data.get('role', 'employe')
@@ -942,35 +964,7 @@ def afficher_sidebar():
             
             # Bouton de déconnexion avec approche simplifiée
             if st.button("🚪 Déconnexion", width='stretch', key="btn_deconnexion"):
-                # Nettoyer la session immédiatement
-                try:
-                    # Déconnecter la base de données
-                    if st.session_state.get('db_connection'):
-                        try:
-                            st.session_state.db_connection.disconnect()
-                        except:
-                            pass
-                    
-                    # Nettoyer toutes les clés sauf les essentielles
-                    keys_to_keep = ['db_connection', 'db_type']
-                    for key in list(st.session_state.keys()):
-                        if key not in keys_to_keep:
-                            try:
-                                del st.session_state[key]
-                            except:
-                                pass
-                    
-                    # Marquer comme déconnecté
-                    st.session_state.authentifie = False
-                    st.session_state.couturier_data = None
-                    st.session_state.page = 'connexion'
-                    
-                except Exception:
-                    # En cas d'erreur, forcer quand même la déconnexion
-                    st.session_state.authentifie = False
-                    st.session_state.couturier_data = None
-                    st.session_state.page = 'connexion'
-                
+                logout_user()
                 # Rediriger vers la page de connexion
                 st.rerun()
         else:
@@ -997,7 +991,11 @@ def main():
     initialiser_session_state()
     
     # Sidebar : image de fond (nav.png) uniquement sur la page de connexion
-    sidebar_bg_css = sidebar_bg_css_with_image if not st.session_state.authentifie else SIDEBAR_BG_PLAIN
+    sidebar_bg_css = (
+        SIDEBAR_BG_PLAIN
+        if VISUAL_SAFE_MODE
+        else (_get_sidebar_bg_css_with_image() if not st.session_state.authentifie else SIDEBAR_BG_PLAIN)
+    )
     st.markdown(_sidebar_styles_css(sidebar_bg_css), unsafe_allow_html=True)
     
     # Afficher la sidebar
@@ -1009,6 +1007,7 @@ def main():
     # Router selon la page
     if not st.session_state.authentifie:
         # Page de connexion
+        from views.auth_view import afficher_page_connexion
         afficher_page_connexion()
     else:
         # Pages authentifiées : image de fond selon la page (calque fixe + style)
@@ -1033,29 +1032,20 @@ def main():
         # Dashboard SUPER_ADMIN (priorité absolue)
         if st.session_state.page == 'super_admin_dashboard':
             if est_super_admin():
-                afficher_dashboard_super_admin()
+                _render_authenticated_page('super_admin_dashboard')
             else:
                 st.error("❌ Accès refusé. Cette page est réservée au Super Administrateur.")
                 st.session_state.page = 'dashboard'
                 st.rerun()
-        elif st.session_state.page == 'nouvelle_commande':
-            afficher_page_commande()
-        elif st.session_state.page == 'liste_commandes':
-            afficher_page_liste_commandes()
-        elif st.session_state.page == 'comptabilite':
-            afficher_page_comptabilite()
-        elif st.session_state.page == 'charges':
-            afficher_page_mes_charges()
-        elif st.session_state.page == 'fermer_commandes':
-            afficher_page_fermer_commandes()
-        elif st.session_state.page == 'calendrier':
-            afficher_page_calendrier(onglet_admin=False)
-        elif st.session_state.page == 'dashboard':
-            afficher_page_dashboard()
+        elif st.session_state.page in {
+            'nouvelle_commande', 'liste_commandes', 'comptabilite',
+            'charges', 'fermer_commandes', 'calendrier', 'dashboard'
+        }:
+            _render_authenticated_page(st.session_state.page)
         elif st.session_state.page == 'administration':
             # Vérifier que l'utilisateur est admin
             if est_admin(st.session_state.couturier_data):
-                afficher_page_administration()
+                _render_authenticated_page('administration')
             else:
                 st.error("❌ Accès refusé. Cette page est réservée aux administrateurs.")
                 st.session_state.page = 'dashboard'
@@ -1068,10 +1058,17 @@ def main():
                 st.session_state.page = 'dashboard'
             st.rerun()
 
-    render_bottom_nav({
-        "app_name": APP_CONFIG.get("name", ""),
-        "app_subtitle": APP_CONFIG.get("subtitle", "")
-    })
+    if VISUAL_SAFE_MODE:
+        st.markdown("---")
+        st.caption(
+            f"{APP_CONFIG.get('name', 'Gestion Couturier')} - "
+            f"{APP_CONFIG.get('subtitle', 'Systeme de gestion d atelier')}"
+        )
+    else:
+        render_bottom_nav({
+            "app_name": APP_CONFIG.get("name", ""),
+            "app_subtitle": APP_CONFIG.get("subtitle", "")
+        })
 
 
 if __name__ == "__main__":

@@ -227,7 +227,7 @@ def afficher_page_salons():
                     placeholder="Ex: Moustapha"
                 )
             
-            submitted = st.form_submit_button("💾 Créer le salon", width='stretch')
+            submitted = st.form_submit_button("💾 Créer le salon")
             
             if submitted:
                 # Validation
