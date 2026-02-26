@@ -46,6 +46,7 @@ class DatabaseConnection:
         self.db_type = db_type
         self.config = config
         self.connection = None
+        self.last_error: Optional[str] = None
         
     def connect(self) -> bool:
         """
@@ -54,17 +55,21 @@ class DatabaseConnection:
         Returns:
             True si succès, False sinon
         """
+        self.last_error = None
         try:
             if self.db_type == 'postgresql':
                 if psycopg2 is None:
                     print("psycopg2 non installé")
+                    self.last_error = "psycopg2 non installé"
                     return False
+                connect_timeout = int(self.config.get('connect_timeout', 5))
                 conn_params = {
                     'host': self.config['host'],
                     'port': int(self.config.get('port', 5432)),
                     'database': self.config['database'],
                     'user': self.config['user'],
-                    'password': self.config['password']
+                    'password': self.config['password'],
+                    'connect_timeout': connect_timeout
                 }
                 # SSL requis pour Render PostgreSQL
                 if self.config.get('sslmode'):
@@ -74,20 +79,25 @@ class DatabaseConnection:
             elif self.db_type == 'mysql':
                 if mysql is None:
                     print("mysql-connector-python non installé")
+                    self.last_error = "mysql-connector-python non installé"
                     return False
+                connect_timeout = int(self.config.get('connect_timeout', 5))
                 self.connection = mysql.connector.connect(
                     host=self.config['host'],
                     port=int(self.config['port']),
                     database=self.config['database'],
                     user=self.config['user'],
-                    password=self.config['password']
+                    password=self.config['password'],
+                    connection_timeout=connect_timeout
                 )
                 return True
             else:
                 print(f"Type de base de données non supporté: {self.db_type}")
+                self.last_error = f"Type de base de données non supporté: {self.db_type}"
                 return False
         except (MySQLError, PGError, Exception) as e:
             print(f"Erreur de connexion: {e}")
+            self.last_error = str(e)
             return False
     
     def disconnect(self):
@@ -111,6 +121,10 @@ class DatabaseConnection:
             return not getattr(self.connection, 'closed', True)
         except Exception:
             return False
+
+    def get_last_error(self) -> Optional[str]:
+        """Retourne la dernière erreur de connexion capturée."""
+        return self.last_error
 
 
 class CouturierModel:

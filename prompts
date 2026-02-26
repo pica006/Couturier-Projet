@@ -1,0 +1,328 @@
+# BIBLIOTHEQUE DE PROMPTS - REMEDIATION VUES (MVC + DESIGN)
+
+Date: 2026-02-26
+Projet: Couturier-Projet
+But: Avoir des prompts prets a copier-coller pour corriger toutes les limites des vues identifiees.
+
+---
+
+## 0) Prompt MASTER (pilotage global)
+
+Utilise ce prompt pour lancer un cycle complet d'analyse + correction, sans casser le MVC.
+BUT: piloter un chantier complet, lot par lot, avec une discipline MVC stricte et des verifications apres chaque modification.
+
+PROMPT:
+"Tu es un ingenieur logiciel senior expert Python, Streamlit, PostgreSQL, MVC, Render.
+Travaille sur ce repo en respectant strictement:
+1) views = presentation uniquement
+2) controllers = orchestration metier, jamais de Streamlit
+3) models = SQL/CRUD uniquement
+4) design centralise dans utils/ui
+
+Mission:
+- Corriger en priorite les limites des vues:
+  - SQL direct dans les vues
+  - HTML/JS inline fragiles (unsafe_allow_html=True excessif)
+  - usages dangereux de st.session_state
+  - duplications de composants visuels
+  - reruns en cascade et blocages (time.sleep/st.stop mal places)
+- Appliquer les corrections par petits lots atomiques.
+- Apres chaque lot: donner diff, risques, tests manuels.
+
+Contraintes:
+- Ne pas modifier la logique metier finale sans validation.
+- Ne pas toucher les credentials.
+- Maintenir le comportement fonctionnel existant.
+
+Sortie attendue:
+1) Plan court du lot en cours
+2) Changements de code
+3) Verification
+4) Prochain lot recommande."
+
+---
+
+## 1) Prompts V0 - Stabilite visuelle immediate
+
+### V0-01 - Inventaire exact des points dangereux UI
+
+BUT: obtenir une cartographie exhaustive des risques visuels (HTML/CSS/JS) pour prioriser les corrections sans aveuglement.
+
+PROMPT:
+"Fais un inventaire complet des usages visuels risqués dans le projet:
+- tous les unsafe_allow_html=True
+- tout script inline (JS, MutationObserver, setTimeout, DOM hacks)
+- styles CSS globaux agressifs
+- composants HTML dupliques
+
+Donne un tableau avec colonnes:
+fichier | fonction | type risque | impact prod | action recommandee | priorite.
+
+Puis propose un plan de neutralisation progressive qui ne casse pas la prod."
+
+### V0-02 - Mode visuel safe
+
+BUT: stabiliser immediatement le rendu en production en desactivant les mecanismes front fragiles.
+
+PROMPT:
+"Implemente un mode visuel safe:
+- desactive les scripts JS DOM fragiles
+- garde un style minimal stable
+- conserve le branding essentiel
+
+Contraintes:
+- pas de SQL en vue
+- pas de streamlit dans controllers
+- pas de regression fonctionnelle.
+
+Donne les fichiers modifies et un test manuel pas a pas."
+
+### V0-03 - Harmonisation rapide pages critiques
+
+BUT: unifier rapidement l'apparence des pages les plus utilisees pour une UX cohérente sans refactor lourd.
+
+PROMPT:
+"Uniformise visuellement les pages critiques (auth, dashboard, commande, liste):
+- header coherent
+- marges/padding coherents
+- boutons et titres homogones
+- etats erreur/loading minimaux
+
+Fais-le via composants reutilisables, pas via duplication.
+Donne avant/apres et liste de composants extraits."
+
+---
+
+## 2) Prompts V1 - Design system + MVC propre
+
+### V1-01 - Creer le dossier ui reutilisable
+
+BUT: centraliser le design dans une couche reutilisable afin de supprimer la duplication visuelle.
+
+PROMPT:
+"Cree une couche `utils/ui` pour centraliser le design:
+- `theme_tokens.py` (couleurs, spacing, radius, typo)
+- `components.py` (header, kpi_card, empty_state, section_container)
+- `page_layout.py` (helpers de mise en page)
+
+Refactor au moins 2 vues pour utiliser ces composants.
+Ne mets aucune logique metier dans utils/ui."
+
+### V1-02 - Retirer SQL direct des vues
+
+BUT: restaurer la separation MVC en retirant toute requete SQL de la couche presentation.
+
+PROMPT:
+"Refactor les vues qui executent du SQL direct.
+Pour chaque vue cible:
+1) extraire requetes SQL vers models
+2) faire passer l'orchestration par controllers
+3) garder la vue purement presentation
+
+Donne mapping exact:
+ancienne fonction vue -> nouveau model/controller.
+Ajoute un mini test manuel par parcours utilisateur."
+
+### V1-03 - Retirer Streamlit des controllers
+
+BUT: decoupler completement la logique metier de l'interface Streamlit pour des controllers propres et testables.
+
+PROMPT:
+"Audit tous les controllers et supprime toute dependance a Streamlit:
+- pas de import streamlit
+- pas de st.session_state
+- pas de rendu UI
+
+Si un controller a besoin de contexte utilisateur, passe des parametres explicites.
+Fournis la liste des signatures modifiees."
+
+### V1-04 - Session state propre et minimal
+
+BUT: rendre l'etat UI previsible en limitant `st.session_state` aux donnees legeres et necessaires.
+
+PROMPT:
+"Definis un schema propre de st.session_state:
+- cles autorisees
+- type attendu
+- point de creation
+- point de reset
+
+Puis refactor les vues pour:
+- supprimer stockage d'objets lourds
+- limiter st.rerun aux cas necessaires
+- eviter les boucles de rerun.
+
+Donne une checklist de verification."
+
+### V1-05 - Supprimer duplications UI
+
+BUT: reduire la dette technique front en remplaçant les blocs repetes par des composants communs.
+
+PROMPT:
+"Detecte et supprime les duplications visuelles:
+- headers repetes
+- cards repetes
+- blocs CSS copies
+
+Remplace par composants communs dans utils/ui.
+Donne:
+1) duplications detectees
+2) composants crees
+3) fichiers simplifies."
+
+---
+
+## 3) Prompts V2 - Robustesse UX long terme
+
+### V2-01 - Etats UI standardises
+
+BUT: uniformiser les etats utilisateur (chargement, erreur, vide, succes) pour une experience stable sur toutes les vues.
+
+PROMPT:
+"Standardise les etats UI sur toutes les vues:
+- loading
+- empty state
+- warning
+- error
+- success
+
+Chaque etat doit reutiliser un composant commun.
+Montre les ecrans cibles et le composant associe."
+
+### V2-02 - Accessibilite et lisibilite
+
+BUT: ameliorer la qualite d'usage (contraste, typographie, feedback) sans casser l'identite visuelle.
+
+PROMPT:
+"Ameliore l'accessibilite UI:
+- contraste suffisant
+- hierarchie typographique claire
+- labels explicites
+- feedback validation lisible
+
+Propose les ajustements de tokens/design sans casser le branding."
+
+### V2-03 - Guardrails anti-regression MVC
+
+BUT: installer des garde-fous durables pour eviter le retour des anti-patterns MVC/UI dans les prochaines evolutions.
+
+PROMPT:
+"Mets en place des garde-fous anti-regression:
+- checklist PR MVC/UI
+- regles simples de revue
+- controles automatiques si possible (lint/search patterns)
+
+Objectif: empecher le retour de SQL en vue et de Streamlit en controller."
+
+---
+
+## 4) Prompts cibles par probleme concret
+
+### Probleme A - Trop de unsafe_allow_html=True
+
+BUT: reduire le risque front en conservant seulement les usages HTML indispensables et en supprimant le reste.
+
+PROMPT:
+"Refactor tous les usages de unsafe_allow_html=True en 3 categories:
+1) indispensable (a conserver)
+2) remplaçable par Streamlit natif
+3) a supprimer
+
+Applique les changements categories 2 et 3 en priorite sur pages critiques."
+
+### Probleme B - Scripts JS inline fragiles
+
+BUT: supprimer les comportements DOM instables et revenir a des mecanismes Streamlit robustes.
+
+PROMPT:
+"Supprime les scripts inline fragiles (MutationObserver, setTimeout DOM hacks) et remplace par:
+- comportement natif Streamlit
+- logique Python/etat explicite
+
+Conserve la meme UX autant que possible."
+
+### Probleme C - SQL dans views
+
+BUT: faire respecter strictement MVC en laissant aux vues uniquement le role d'affichage/interactions.
+
+PROMPT:
+"Prends la vue cible et elimine tout SQL direct.
+Deplace requetes vers model, orchestration vers controller.
+La vue ne fait que collecter input et afficher output."
+
+### Probleme D - time.sleep/st.stop mal places
+
+BUT: eliminer les blocages et interruptions brutales qui degradent l'experience utilisateur en production.
+
+PROMPT:
+"Supprime les blocages UI (time.sleep, st.stop brutaux) dans les vues.
+Remplace par:
+- messages d'etat utilisateur
+- retry explicite
+- traitement non bloquant quand possible."
+
+### Probleme E - Session state gonfle
+
+BUT: diminuer la consommation memoire et les reruns parasites en allégeant la session.
+
+PROMPT:
+"Refactor la vue pour ne garder dans st.session_state que:
+- auth
+- navigation
+- filtres legers
+
+Supprime bytes lourds et objets volumineux de la session."
+
+---
+
+## 5) Prompt de verification finale (fin de lot)
+
+BUT: verifier systematiquement qu'un lot corrige bien le probleme sans introduire de regression MVC, UX ou stabilite.
+
+PROMPT:
+"Fais une revue finale du lot applique et verifie:
+1) MVC respecte (pas SQL dans vues, pas Streamlit dans controllers)
+2) design centralise (utils/ui + tokens)
+3) pas de JS DOM fragile residuel
+4) session_state propre
+5) parcours critiques OK
+
+Donne:
+- anomalies restantes
+- risques residuels
+- next tickets recommandes."
+
+---
+
+## 6) Prompt de production Render (validation pre-deploiement)
+
+BUT: valider la readiness production cote UI avant de deployer sur Render avec un verdict Go/No-Go clair.
+
+PROMPT:
+"Prepare une validation pre-prod Render orientee UI:
+- verifier pages critiques
+- verifier comportement en erreur DB
+- verifier chargement CSS/asset
+- verifier absence d'ecran blanc
+- verifier logs erreurs front/back
+
+Donne une checklist Go/No-Go de deploiement."
+
+---
+
+## 7) Ordre d'utilisation recommande
+
+1. V0-01 (inventaire exact)  
+2. V0-02 (mode safe)  
+3. V0-03 (harmonisation critique)  
+4. V1-01, V1-02, V1-03 (fondation MVC + design system)  
+5. V1-04, V1-05 (etat/session + dedup)  
+6. V2-01, V2-02, V2-03 (qualite long terme)  
+7. verification finale + validation Render
+
+---
+
+## 8) Note pratique
+
+Si tu veux aller vite, utilise le prompt MASTER puis enchaine ticket par ticket.
+Si tu veux controler finement, utilise les prompts par section V0/V1/V2.

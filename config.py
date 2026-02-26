@@ -122,7 +122,8 @@ if IS_RENDER:
             'database': os.getenv('DATABASE_NAME', ''),
             'user': os.getenv('DATABASE_USER', ''),
             'password': os.getenv('DATABASE_PASSWORD', ''),
-            'sslmode': os.getenv('DATABASE_SSLMODE', 'require')
+            'sslmode': os.getenv('DATABASE_SSLMODE', 'require'),
+            'connect_timeout': int(os.getenv('DATABASE_CONNECT_TIMEOUT', '5'))
         }
     }
 else:
@@ -141,7 +142,8 @@ else:
             'port': _port,
             'database': os.getenv('DB_NAME', 'db_couturier'),
             'user': os.getenv('DB_USER', 'postgres'),
-            'password': os.getenv('DB_PASSWORD', '')  # À mettre dans .env uniquement
+            'password': os.getenv('DB_PASSWORD', ''),  # À mettre dans .env uniquement
+            'connect_timeout': int(os.getenv('DB_CONNECT_TIMEOUT', '5'))
         }
     }
 

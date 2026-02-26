@@ -465,9 +465,6 @@ Configuration actuelle:
             # Créer la connexion automatiquement
             db_connection = DatabaseConnection('postgresql', config)
             
-            # Capturer l'erreur détaillée
-            import psycopg2
-            
             try:
                 # Tenter la connexion avec gestion d'erreur détaillée
                 connection_result = db_connection.connect()
@@ -492,50 +489,40 @@ Configuration actuelle:
                     st.success("✅ Connexion à PostgreSQL local réussie!")
                     st.rerun()
                 else:
-                    # Si connect() retourne False, essayer de capturer l'erreur directement
-                    try:
-                        test_conn = psycopg2.connect(
-                            host=config.get('host'),
-                            port=config.get('port'),
-                            database=config.get('database'),
-                            user=config.get('user'),
-                            password=config.get('password', '')
-                        )
-                        test_conn.close()
-                    except psycopg2.OperationalError as pg_error:
-                        error_msg = str(pg_error)
-                        st.error("❌ Échec de la connexion à PostgreSQL local")
-                        st.error(f"**Erreur détaillée :** {error_msg}")
-                        
-                        # Diagnostic selon le type d'erreur
-                        if "does not exist" in error_msg or "n'existe pas" in error_msg:
-                            st.warning("🔍 **Diagnostic :** La base de données n'existe pas")
-                            st.info("💡 **Solution :** Exécutez `python creer_base_postgresql.py` pour créer la base")
-                        elif "password authentication failed" in error_msg.lower() or "mot de passe" in error_msg.lower():
-                            st.warning("🔍 **Diagnostic :** Mot de passe incorrect")
-                            st.info("💡 **Solution :** Vérifiez le mot de passe dans `config.py` (ligne 84)")
-                        elif "could not connect" in error_msg.lower() or "refused" in error_msg.lower():
-                            st.warning("🔍 **Diagnostic :** PostgreSQL n'est pas démarré ou n'est pas accessible")
-                            if config.get('port') == 3306 or config.get('port') == '3306':
-                                st.error("⚠️ **Vous utilisez le port 3306 (MySQL).** Pour PostgreSQL, utilisez le port **5432** dans votre fichier `.env` : `DB_PORT=5432`")
-                            st.info("💡 **Solutions :**")
-                            st.info("   1. Vérifiez que PostgreSQL est démarré (Services Windows → PostgreSQL)")
-                            st.info("   2. Dans `.env` : **DB_PORT=5432** (pas 3306), **DB_NAME=db_couturier**, **DB_USER=postgres**, **DB_PASSWORD=votre_mot_de_passe**")
-                            st.info("   3. Vérifiez que le host 'localhost' est correct")
-                        else:
-                            st.info("💡 **Solutions possibles :**")
-                            st.info("   1. Vérifiez que PostgreSQL est démarré")
-                            st.info("   2. Vérifiez la configuration dans `config.py`")
-                            st.info("   3. Exécutez `python test_connexion_postgresql.py` pour un diagnostic complet")
-                        
-                        port_ok = config.get('port') not in (3306, '3306')
-                        st.code(f"""
+                    error_msg = db_connection.get_last_error() or "Erreur inconnue de connexion"
+                    st.error("❌ Échec de la connexion à PostgreSQL local")
+                    st.error(f"**Erreur détaillée :** {error_msg}")
+                    
+                    # Diagnostic selon le type d'erreur
+                    if "does not exist" in error_msg or "n'existe pas" in error_msg:
+                        st.warning("🔍 **Diagnostic :** La base de données n'existe pas")
+                        st.info("💡 **Solution :** Exécutez `python creer_base_postgresql.py` pour créer la base")
+                    elif "password authentication failed" in error_msg.lower() or "mot de passe" in error_msg.lower():
+                        st.warning("🔍 **Diagnostic :** Mot de passe incorrect")
+                        st.info("💡 **Solution :** Vérifiez le mot de passe dans `config.py`")
+                    elif "could not connect" in error_msg.lower() or "refused" in error_msg.lower() or "timeout" in error_msg.lower():
+                        st.warning("🔍 **Diagnostic :** PostgreSQL n'est pas démarré ou n'est pas accessible")
+                        if config.get('port') == 3306 or config.get('port') == '3306':
+                            st.error("⚠️ **Vous utilisez le port 3306 (MySQL).** Pour PostgreSQL, utilisez le port **5432** dans votre fichier `.env` : `DB_PORT=5432`")
+                        st.info("💡 **Solutions :**")
+                        st.info("   1. Vérifiez que PostgreSQL est démarré (Services Windows → PostgreSQL)")
+                        st.info("   2. Dans `.env` : **DB_PORT=5432** (pas 3306), **DB_NAME=db_couturier**, **DB_USER=postgres**, **DB_PASSWORD=votre_mot_de_passe**")
+                        st.info("   3. Vérifiez que le host 'localhost' est correct")
+                    else:
+                        st.info("💡 **Solutions possibles :**")
+                        st.info("   1. Vérifiez que PostgreSQL est démarré")
+                        st.info("   2. Vérifiez la configuration dans `config.py`")
+                        st.info("   3. Exécutez `python test_connexion_postgresql.py` pour un diagnostic complet")
+                    
+                    port_ok = config.get('port') not in (3306, '3306')
+                    st.code(f"""
 Configuration utilisée (lue depuis .env ou config.py):
 - Host: {config.get('host')}
 - Port: {config.get('port')}{'  ← Utilisez 5432 pour PostgreSQL (3306 = MySQL)' if not port_ok else ''}
 - Database: {config.get('database')}
 - User: {config.get('user')}
 - Password: {'***' if config.get('password') else '(VIDE - peut être le problème!)'}
+- Connect timeout: {config.get('connect_timeout', 5)}s
 
 Pour PostgreSQL local, dans votre fichier .env à la racine du projet, mettez:
 DB_HOST=localhost
@@ -543,11 +530,9 @@ DB_PORT=5432
 DB_NAME=db_couturier
 DB_USER=postgres
 DB_PASSWORD=votre_mot_de_passe_postgresql
-                        """)
-                        st.stop()
-                    except Exception as test_error:
-                        st.error(f"❌ Erreur lors du test de connexion : {test_error}")
-                        st.stop()
+DB_CONNECT_TIMEOUT=5
+                    """)
+                    st.stop()
             except Exception as conn_error:
                 st.error(f"❌ Erreur lors de la connexion : {conn_error}")
                 st.info("💡 Exécutez `python test_connexion_postgresql.py` pour un diagnostic complet")
