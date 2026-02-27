@@ -524,7 +524,7 @@ def afficher_vue_360(couturier_model: CouturierModel, charges_model: ChargesMode
             st.markdown("**Répartition par modèle**")
             df_display_modeles = df_modeles[['modele', 'categorie', 'sexe', 'nb_commandes', 'CA (FCFA)']].copy()
             df_display_modeles.columns = ['Modèle', 'Catégorie', 'Sexe', 'Nombre', 'CA (FCFA)']
-            st.dataframe(df_display_modeles, hide_index=True, width='stretch')
+            st.dataframe(df_display_modeles, hide_index=True, use_container_width=True)
 
             col_g1, col_g2 = st.columns(2)
             with col_g1:
@@ -2296,7 +2296,7 @@ def afficher_gestion_commandes_admin(commande_model: CommandeModel, admin_data: 
             df_display['Avance'] = df_display['Avance'].apply(lambda x: f"{x:,.0f} FCFA")
             df_display['Reste'] = df_display['Reste'].apply(lambda x: f"{x:,.0f} FCFA")
             
-            st.dataframe(df_display, width='stretch', hide_index=True, height=400)
+            st.dataframe(df_display, use_container_width=True, hide_index=True, height=400)
     
     # ========================================================================
     # ONGLET 3 : COMMANDES FERMÉES
@@ -2393,5 +2393,5 @@ def afficher_gestion_commandes_admin(commande_model: CommandeModel, admin_data: 
             if 'date_fermeture' in df_display.columns:
                 df_display['Date Fermeture'] = pd.to_datetime(df_display['Date Fermeture']).dt.strftime('%d/%m/%Y %H:%M')
             
-            st.dataframe(df_display, width='stretch', hide_index=True, height=400)
+            st.dataframe(df_display, use_container_width=True, hide_index=True, height=400)
 

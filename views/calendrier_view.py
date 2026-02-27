@@ -268,7 +268,7 @@ def _afficher_calendrier(commande_model, couturier_model, couturier_id, salon_id
         df_rappel_display = df_rappel[['modele', 'client_prenom', 'client_nom', 'couturier_prenom', 'couturier_nom', 'prix_total']].copy()
         df_rappel_display.columns = ['Modèle', 'Prénom Client', 'Nom Client', 'Prénom Couturier', 'Nom Couturier', 'Prix (FCFA)']
         df_rappel_display['Prix (FCFA)'] = df_rappel_display['Prix (FCFA)'].apply(lambda x: f"{x:,.0f}")
-        st.dataframe(df_rappel_display, hide_index=True, width='stretch')
+        st.dataframe(df_rappel_display, hide_index=True, use_container_width=True)
     elif commandes_rappel and not commandes_a_rappeler:
         st.success("✅ Rappels pour les livraisons du " + date_rappel.strftime('%d/%m/%Y') + " déjà envoyés.")
     else:
