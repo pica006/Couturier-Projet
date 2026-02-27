@@ -24,6 +24,7 @@ from utils.bottom_nav import render_bottom_nav
 from utils.permissions import est_super_admin
 from config import APP_CONFIG, PAGE_BACKGROUND_IMAGES, VISUAL_SAFE_MODE
 from services.session_service import initialize_session_state, sanitize_session_state, logout_user
+from utils.theme import get_sidebar_bg_css as theme_sidebar_bg_css
 
 logger = logging.getLogger(__name__)
 
@@ -990,9 +991,9 @@ def main():
     """Fonction principale de l'application"""
     initialiser_session_state()
     
-    # Sidebar : image de fond (nav.png) uniquement sur la page de connexion
+    # Sidebar : thème SpiritStitch (Premium / Ultra Minimal) en mode safe, sinon image nav ou plain
     sidebar_bg_css = (
-        SIDEBAR_BG_PLAIN
+        theme_sidebar_bg_css()
         if VISUAL_SAFE_MODE
         else (_get_sidebar_bg_css_with_image() if not st.session_state.authentifie else SIDEBAR_BG_PLAIN)
     )

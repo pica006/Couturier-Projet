@@ -27,6 +27,7 @@ import streamlit as st
 from controllers.auth_controller import AuthController
 from config import DATABASE_CONFIG, APP_CONFIG, BRANDING, VISUAL_SAFE_MODE, IS_RENDER
 from utils.bottom_nav import load_site_content
+from utils.theme import get_login_css, LOGIN_DISPLAY_TITLE, LOGIN_DISPLAY_SUBTITLE
 from services.db_bootstrap_service import connect_and_initialize, validate_required_config
 from utils.ui import (
     appliquer_style_pages_critiques,
@@ -419,14 +420,11 @@ def afficher_page_connexion():
     """
     appliquer_style_pages_critiques()
 
-    # Appliquer les styles CSS (doit être dans la fonction, pas au niveau module,
-    # pour éviter les erreurs d'import sur Render : st.* avant set_page_config)
+    # Appliquer le thème SpiritStitch (Premium Glass / Ultra Minimal) — couche présentation uniquement
     try:
-        st.markdown(_get_lux_vars_style(), unsafe_allow_html=True)
+        st.markdown(get_login_css(), unsafe_allow_html=True)
         if not VISUAL_SAFE_MODE:
-            st.markdown(hide_st_style, unsafe_allow_html=True)
-        from utils.page_header import afficher_header_page
-        afficher_header_page("🔐 Authentification", "Accédez à votre espace atelier")
+            st.markdown(_get_lux_vars_style(), unsafe_allow_html=True)
     except Exception as e:
         logger.exception("Erreur affichage initial page connexion: %s", e)
         # En cas d'erreur UI, on réaffiche les éléments Streamlit natifs.
@@ -462,16 +460,16 @@ def afficher_page_connexion():
     _, form_col, _ = st.columns([1, 1.3, 1], gap="large")
 
     with form_col:
-        st.markdown('<div class="login-card">', unsafe_allow_html=True)
-        afficher_titre_section("Connexion sécurisée")
+        # Carte d'authentification style SpiritStitch (thème depuis utils.theme)
         st.markdown(
-            "<div class='login-muted'>Accédez à votre atelier et gérez vos commandes en toute sérénité.</div>",
+            f'<div class="login-theme-card">'
+            f'<div class="login-theme-title">{LOGIN_DISPLAY_TITLE}</div>'
+            f'<div class="login-theme-subtitle">{LOGIN_DISPLAY_SUBTITLE}</div>'
+            f'<h3 style="text-align:center;margin-bottom:1rem;color:#374151;">Authentification</h3>',
             unsafe_allow_html=True
         )
         
         with st.form("auth_form", clear_on_submit=False):
-            afficher_titre_section("🔑 Identifiants de connexion", niveau=4)
-            
             # Champ de saisie du code couturier
             code_couturier = st.text_input(
                 "Code Couturier *",
@@ -491,8 +489,14 @@ def afficher_page_connexion():
             
             # Bouton de soumission
             submit_auth = st.form_submit_button(
-                "🔓 Se connecter",
+                "Se connecter",
                 type="primary"
+            )
+            
+            # Lien "Mot de passe oublié ?" (présentation modèle SpiritStitch)
+            st.markdown(
+                '<div class="login-theme-forgot"><a href="#">Mot de passe oublié ?</a></div>',
+                unsafe_allow_html=True
             )
             
             # ================================================================
@@ -574,7 +578,7 @@ def afficher_page_connexion():
                     {support_text}
                 </div>
             """, unsafe_allow_html=True)
-        st.markdown("</div>", unsafe_allow_html=True)
+        st.markdown("</div><!-- login-theme-card -->", unsafe_allow_html=True)
     
     st.markdown("</div>", unsafe_allow_html=True)
 
