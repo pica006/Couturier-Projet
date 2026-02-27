@@ -291,22 +291,22 @@ def afficher_page_dashboard():
         col1, col2, col3, col4 = st.columns(4)
         
         with col1:
-            if st.button("➕ Nouvelle commande", use_container_width=True):
+            if st.button("➕ Nouvelle commande", use_container_width=True, key="dashboard_btn_nouvelle_commande"):
                 st.session_state.page = 'nouvelle_commande'
                 st.rerun()
         
         with col2:
-            if st.button("📜 Mes commandes", use_container_width=True):
+            if st.button("📜 Mes commandes", use_container_width=True, key="dashboard_btn_mes_commandes"):
                 st.session_state.page = 'liste_commandes'
                 st.rerun()
         
         with col3:
-            if st.button("💰 Comptabilité", use_container_width=True):
+            if st.button("💰 Comptabilité", use_container_width=True, key="dashboard_btn_comptabilite"):
                 st.session_state.page = 'comptabilite'
                 st.rerun()
         
         with col4:
-            if st.button("📄 Mes charges", use_container_width=True):
+            if st.button("📄 Mes charges", use_container_width=True, key="dashboard_btn_mes_charges"):
                 st.session_state.page = 'charges'
                 st.rerun()
         
