@@ -25,7 +25,7 @@ import os
 import logging
 import streamlit as st
 from controllers.auth_controller import AuthController
-from config import DATABASE_CONFIG, APP_CONFIG, BRANDING, VISUAL_SAFE_MODE
+from config import DATABASE_CONFIG, APP_CONFIG, BRANDING, VISUAL_SAFE_MODE, IS_RENDER
 from utils.bottom_nav import load_site_content
 from services.db_bootstrap_service import connect_and_initialize, validate_required_config
 from utils.ui import (
@@ -437,34 +437,8 @@ def afficher_page_connexion():
         afficher_erreur_minimale("Erreur d'initialisation de l'interface de connexion.")
 
     content = load_site_content()
-    
-    # ========================================================================
-    # FOND D'ÉCRAN PLEIN ÉCRAN (image en arrière-plan, formulaire par-dessus)
-    # ========================================================================
-    
-    # Fond d'écran : cache pour éviter 4-13 s de chargement à chaque requête
-    wallpaper_path = APP_CONFIG.get('wallpaper_url')
-    data_uri = _load_wallpaper_data_uri(wallpaper_path) if wallpaper_path else None
-    if data_uri:
-        st.markdown(f"""
-            <style>
-            .stApp {{
-                background-image: url("{data_uri}") !important;
-                background-size: cover !important;
-                background-position: center !important;
-                background-attachment: fixed !important;
-                background-repeat: no-repeat !important;
-                background-color: transparent !important;
-                min-height: 100vh;
-            }}
-            .main .block-container {{
-                background: transparent !important;
-                padding-top: 2rem;
-                max-width: 1200px;
-            }}
-            </style>
-        """, unsafe_allow_html=True)
-    
+
+    # Message DB avant le formulaire (formulaire rendu en premier pour éviter timeout en prod)
     if st.session_state.get("db_connection") is None:
         afficher_info_minimale(
             "La connexion base de données sera établie uniquement au clic sur « Se connecter »."
@@ -603,4 +577,29 @@ def afficher_page_connexion():
         st.markdown("</div>", unsafe_allow_html=True)
     
     st.markdown("</div>", unsafe_allow_html=True)
+
+    # Fond d'écran après le formulaire (réduit risque de réponse tronquée en prod)
+    # En production (Render) : pas de data URI pour éviter payload lourd / timeout
+    if not IS_RENDER:
+        wallpaper_path = APP_CONFIG.get('wallpaper_url')
+        data_uri = _load_wallpaper_data_uri(wallpaper_path) if wallpaper_path else None
+        if data_uri:
+            st.markdown(f"""
+                <style>
+                .stApp {{
+                    background-image: url("{data_uri}") !important;
+                    background-size: cover !important;
+                    background-position: center !important;
+                    background-attachment: fixed !important;
+                    background-repeat: no-repeat !important;
+                    background-color: transparent !important;
+                    min-height: 100vh;
+                }}
+                .main .block-container {{
+                    background: transparent !important;
+                    padding-top: 2rem;
+                    max-width: 1200px;
+                }}
+                </style>
+            """, unsafe_allow_html=True)
 
