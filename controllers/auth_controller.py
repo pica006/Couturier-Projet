@@ -85,15 +85,17 @@ class AuthController:
         """
         
         # ====================================================================
-        # ÉTAPE 1 : VALIDATION DES ENTRÉES
+        # ÉTAPE 1 : VALIDATION DES ENTRÉES (nettoyage des espaces)
         # ====================================================================
-        
+        code_clean = (code_couturier or "").strip()
+        password_clean = (password or "").strip()
+
         # Vérifier que le code couturier n'est pas vide
-        if not code_couturier or code_couturier.strip() == "":
+        if not code_clean:
             return False, None, "Le code couturier ne peut pas être vide"
         
         # Vérifier que le mot de passe n'est pas vide
-        if not password or password.strip() == "":
+        if not password_clean:
             return False, None, "Le mot de passe ne peut pas être vide"
         
         # Vérifier que la connexion à la base de données est active
@@ -104,9 +106,8 @@ class AuthController:
         # ÉTAPE 2 : RECHERCHE DU COUTURIER DANS LA BASE DE DONNÉES
         # ====================================================================
         
-        # Appeler le modèle pour chercher le couturier par son code
-        # RETOURNE : (existe: bool, donnees: dict ou None)
-        existe, donnees = self.couturier_model.verifier_code(code_couturier)
+        # Appeler le modèle pour chercher le couturier par son code (code nettoyé)
+        existe, donnees = self.couturier_model.verifier_code(code_clean)
         
         # Si le code n'existe pas dans la base
         if not existe:
@@ -126,7 +127,7 @@ class AuthController:
         # ====================================================================
         # VÉRIFICATION DU MOT DE PASSE (BCRYPT + COMPAT LEGACY)
         # ====================================================================
-        if verify_password(password, password_db):
+        if verify_password(password_clean, password_db):
             # ✅ MOT DE PASSE CORRECT !
 
             # 1) Vérifier d'abord si l'utilisateur lui-même est actif

@@ -19,8 +19,6 @@ TRANSIENT_KEYS = {
     "pdf_filename",
     "show_download_section",
     "show_upload_section",
-    "code_input",
-    "password_input",
     # Clés ad hoc de la vue commande (évite stale state entre sessions)
     "prix_total_form",
     "avance_form",

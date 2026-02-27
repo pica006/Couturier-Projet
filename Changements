@@ -977,3 +977,191 @@ Apres:
 Pourquoi:
 - Reduire collisions/states obsoletes apres reruns/logout.
 
+
+================================================================================
+V0-08 - Authentification : lecture robuste du code couturier
+================================================================================
+
+Date: 2026-02-27
+
+BUT:
+- Corriger le cas où l'utilisateur saisit bien COUT001 / admin123 mais où
+  l'application affiche malgré tout « ⚠️ Veuillez entrer votre code utilisateur ».
+
+Fichier modifié:
+- views/auth_view.py
+
+Changement:
+- Dans le traitement du formulaire de connexion, la valeur du champ
+  « Code Couturier » et du « Mot de passe » est maintenant lue de manière
+  plus robuste :
+  - On lit d'abord les valeurs renvoyées par st.text_input
+    (code_couturier, password_input).
+  - Puis on lit aussi st.session_state["code_input"] et
+    st.session_state["password_input"] si présents.
+  - On nettoie ensuite les espaces: code_clean, password_clean.
+- Le contrôleur d'authentification est appelé avec code_clean et
+  password_clean.
+
+Effet attendu:
+- Même si, pour une raison de rerun ou d'état Streamlit, la variable locale
+  code_couturier est vide alors que la valeur est bien stockée dans
+  st.session_state["code_input"], on utilise cette valeur de session pour
+  l'authentification. Le message « Veuillez entrer votre code utilisateur »
+  ne devrait plus apparaître si l'utilisateur a réellement saisi COUT001.
+
+
+================================================================================
+V0-09 - Authentification : délégation complète des erreurs au contrôleur
+================================================================================
+
+Date: 2026-02-27
+
+BUT:
+- Éviter que la vue affiche systématiquement « ⚠️ Veuillez entrer votre code
+  utilisateur » et laisser le contrôleur d'authentification décider du message
+  en fonction des valeurs reçues (code vide, mot de passe vide, code invalide,
+  mot de passe incorrect, salon désactivé, etc.).
+
+Fichier modifié:
+- views/auth_view.py
+
+Changement:
+- Suppression des tests locaux:
+  - if not code_clean: st.error("⚠️ Veuillez entrer votre code utilisateur")
+  - elif not password_clean: st.error("⚠️ Veuillez entrer votre mot de passe")
+- Désormais, après le nettoyage (code_clean/password_clean) et la connexion DB,
+  la vue appelle systématiquement:
+  - succes, donnees, message = auth_controller.authentifier(code_clean, password_clean)
+- Puis:
+  - si succes est True: on stocke l'état connecté, les données du couturier
+    et on redirige selon le rôle.
+  - sinon: on affiche afficher_erreur_minimale(message) avec le message issu
+    du contrôleur.
+
+Effet attendu:
+- Si le code couturier ou le mot de passe sont vides, le message affiché
+  proviendra directement de controllers/auth_controller.py:
+  - "Le code couturier ne peut pas être vide" ou
+  - "Le mot de passe ne peut pas être vide".
+- Si le code est mal saisi malgré tout, le message sera "Code couturier invalide".
+- Si le mot de passe est mauvais, le message sera "Mot de passe incorrect".
+- Si le salon ou l'utilisateur sont désactivés, le message le précisera.
+
+
+================================================================================
+V0-10 - Correction critique: ne plus effacer code_input/password_input avant login
+================================================================================
+
+Date: 2026-02-27
+
+Contexte:
+- Lors du clic sur "Se connecter", Streamlit relance le script complet.
+- La fonction sanitize_session_state() était appelée au début (dans app.py)
+  et, lorsque l'utilisateur n'était pas authentifié, supprimait toutes les
+  TRANSIENT_KEYS, y compris:
+  - "code_input"
+  - "password_input"
+- Résultat: au moment où la vue de connexion lisait st.session_state["code_input"]
+  et st.session_state["password_input"], ces clés venaient d'être supprimées.
+  Les champs arrivaient donc vides au contrôleur, d'où le message:
+  - "Le code couturier ne peut pas être vide" (ou, en DEBUG, code=''…).
+
+Fichiers modifiés:
+- services/session_service.py
+- controllers/auth_controller.py
+
+Changements:
+1) services/session_service.py
+   - Dans TRANSIENT_KEYS, suppression de:
+     - "code_input"
+     - "password_input"
+   - Les champs du formulaire de connexion ne sont plus effacés à chaque
+     sanitize_session_state() quand l'utilisateur n'est pas encore connecté.
+
+2) controllers/auth_controller.py
+   - Suppression du bloc DEBUG temporaire:
+     - return False, None, f"DEBUG code='{code_clean}' password_vide={...}"
+   - Rétablissement de la logique normale:
+     - si code_clean vide → "Le code couturier ne peut pas être vide"
+     - si password_clean vide → "Le mot de passe ne peut pas être vide"
+     - puis vérification de la connexion DB, recherche du couturier,
+       vérification du mot de passe, etc.
+
+Effet attendu:
+- Lors du clic sur "Se connecter", les valeurs saisies dans le formulaire
+  (code_input/password_input) restent présentes dans st.session_state assez
+  longtemps pour être lues, nettoyées et passées au contrôleur.
+- Si l'utilisateur saisit "COUT001" / "admin123", le contrôleur reçoit bien
+  ces valeurs et ne les voit plus comme vides.
+
+
+================================================================================
+V0-07 - Connexion COUT001 / admin123 — vérification base, corrections auth, exécution
+================================================================================
+
+Date: 2026-02-27
+
+Identifiants de connexion (application) :
+- Code Couturier : COUT001
+- Mot de passe   : admin123
+
+(Ne pas confondre avec les identifiants PostgreSQL du .env : DB_USER, DB_PASSWORD.)
+
+--------------------------------------------------
+1. Vérification base de données (exécution réelle)
+--------------------------------------------------
+- Script utilisé : fix_cout001_password.py (à la racine du projet).
+- Connexion à PostgreSQL avec la config .env (DB_HOST=localhost, DB_PORT=5432,
+  DB_NAME=db_couturier, DB_USER=postgres, DB_PASSWORD=***).
+- Requête exécutée : SELECT id, code_couturier, password FROM couturiers WHERE code_couturier = 'COUT001'.
+- Résultat : COUT001 existe déjà ; le mot de passe stocké est valide pour "admin123"
+  (vérification via utils.security.verify_password : bcrypt ou legacy en clair).
+- Aucune modification des données n’a été nécessaire.
+
+Commande exécutée : python fix_cout001_password.py
+Sortie : "OK: COUT001 existe déjà et le mot de passe 'admin123' est valide."
+
+--------------------------------------------------
+2. Corrections du code (authentification)
+--------------------------------------------------
+
+2.1 views/auth_view.py
+- Avant envoi au contrôleur : nettoyage des champs avec .strip() :
+  - code_clean = (code_couturier or "").strip()
+  - password_clean = (password_input or "").strip()
+- Les vérifications "champ vide" et l’appel à auth_controller.authentifier()
+  utilisent code_clean et password_clean.
+- Effet : les espaces en début/fin de saisie ne bloquent plus la connexion.
+
+2.2 controllers/auth_controller.py
+- Dans authentifier() : ajout de code_clean et password_clean (strip) en début
+  d’étape 1 ; toutes les vérifications et la recherche en base utilisent
+  code_clean ; la vérification du mot de passe utilise password_clean.
+- Effet : cohérence et robustesse face aux espaces parasites.
+
+--------------------------------------------------
+3. Fichier créé
+--------------------------------------------------
+- fix_cout001_password.py : script qui se connecte à PostgreSQL (config .env),
+  vérifie/crée COUT001 et met à jour le mot de passe vers admin123 (bcrypt) si
+  besoin. Exécution : python fix_cout001_password.py
+
+--------------------------------------------------
+4. Exécution de l’application
+--------------------------------------------------
+- Commande : python -m streamlit run app.py --server.headless true --server.port 8504
+- L’application a été lancée en arrière-plan.
+- URL locale typique : http://localhost:8504 (ou 8503 selon disponibilité du port).
+- Test de connexion : ouvrir l’URL, saisir Code COUT001, Mot de passe admin123,
+  cliquer sur "Se connecter".
+
+--------------------------------------------------
+5. Résumé des fichiers modifiés / créés (cette session)
+--------------------------------------------------
+- Modifiés : views/auth_view.py, controllers/auth_controller.py
+- Créé : fix_cout001_password.py
+- Mis à jour : Changements (cette section ajoutée à la suite des écrits existants,
+  rien n’a été effacé).
+
+

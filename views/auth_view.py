@@ -526,70 +526,72 @@ def afficher_page_connexion():
             # ================================================================
             
             if submit_auth:
-                # Vérifier que le code n'est pas vide
-                if not code_couturier:
-                    st.error("⚠️ Veuillez entrer votre code utilisateur")
-                elif not password_input:
-                    st.error("⚠️ Veuillez entrer votre mot de passe")
-                else:
-                    # Afficher un spinner pendant la vérification
-                    try:
-                        with etat_chargement("Connexion à la base et vérification des identifiants..."):
-                            ok_conn, msg_conn = _ensure_db_connection()
-                            if not ok_conn:
-                                afficher_erreur_minimale(msg_conn)
-                            else:
-                                # Créer un contrôleur d'authentification
-                                # POURQUOI ? Pour gérer la logique d'authentification
-                                auth_controller = AuthController(st.session_state.db_connection)
+                # Lire les valeurs aussi depuis session_state (plus robuste)
+                code_value = st.session_state.get("code_input", code_couturier)
+                password_value = st.session_state.get("password_input", password_input)
 
-                                # Appeler la méthode authentifier() avec CODE + MOT DE PASSE
-                                # RETOURNE : (succès, données, message)
-                                # - succès : True si code + password corrects, False sinon
-                                # - données : Informations du couturier (nom, prénom, etc.)
-                                # - message : Message à afficher à l'utilisateur
-                                succes, donnees, message = auth_controller.authentifier(code_couturier, password_input)
+                # Nettoyer les espaces (évite échec si l'utilisateur tape des espaces)
+                code_clean = (code_value or "").strip()
+                password_clean = (password_value or "").strip()
 
-                                # Si l'authentification a réussi
-                                if succes:
-                                    # Sauvegarder l'état d'authentification dans la session
-                                    st.session_state.authentifie = True
+                # On NE bloque plus ici sur les champs vides : on laisse le contrôleur
+                # d'authentification renvoyer un message explicite (code vide, mot de passe vide, etc.)
 
-                                    # Sauvegarder les données du couturier
-                                    st.session_state.couturier_data = donnees
+                # Afficher un spinner pendant la vérification
+                try:
+                    with etat_chargement("Connexion à la base et vérification des identifiants..."):
+                        ok_conn, msg_conn = _ensure_db_connection()
+                        if not ok_conn:
+                            afficher_erreur_minimale(msg_conn)
+                        else:
+                            # Créer un contrôleur d'authentification
+                            # POURQUOI ? Pour gérer la logique d'authentification
+                            auth_controller = AuthController(st.session_state.db_connection)
 
-                                    # Rediriger selon le rôle de l'utilisateur
-                                    # Si c'est un super administrateur, rediriger vers le dashboard super admin
-                                    role_utilisateur = donnees.get('role', '')
-                                    # Normaliser le rôle (gérer les variations : SUPER_ADMIN, super_admin, etc.)
-                                    role_normalise = str(role_utilisateur).upper().strip()
+                            # Appeler la méthode authentifier() avec CODE + MOT DE PASSE (nettoyés)
+                            # RETOURNE : (succès, données, message)
+                            succes, donnees, message = auth_controller.authentifier(code_clean, password_clean)
 
-                                    # Debug : afficher le rôle détecté (temporaire)
-                                    if role_normalise == 'SUPER_ADMIN':
-                                        afficher_info_minimale(
-                                            f"Rôle détecté : {role_utilisateur} → Redirection vers Dashboard Super Admin"
-                                        )
-                                        st.session_state.page = 'super_admin_dashboard'
-                                    else:
-                                        # Pour les autres rôles, rediriger vers la page de nouvelle commande
-                                        st.session_state.page = 'nouvelle_commande'
+                            # Si l'authentification a réussi
+                            if succes:
+                                # Sauvegarder l'état d'authentification dans la session
+                                st.session_state.authentifie = True
 
-                                    # Afficher un message de succès
-                                    st.success(f"✅ {message}")
+                                # Sauvegarder les données du couturier
+                                st.session_state.couturier_data = donnees
 
-                                    # Afficher des ballons pour célébrer !
-                                    st.balloons()
+                                # Rediriger selon le rôle de l'utilisateur
+                                # Si c'est un super administrateur, rediriger vers le dashboard super admin
+                                role_utilisateur = donnees.get('role', '')
+                                # Normaliser le rôle (gérer les variations : SUPER_ADMIN, super_admin, etc.)
+                                role_normalise = str(role_utilisateur).upper().strip()
 
-                                    # Recharger la page pour afficher l'interface principale
-                                    st.rerun()
+                                # Debug : afficher le rôle détecté (temporaire)
+                                if role_normalise == 'SUPER_ADMIN':
+                                    afficher_info_minimale(
+                                        f"Rôle détecté : {role_utilisateur} → Redirection vers Dashboard Super Admin"
+                                    )
+                                    st.session_state.page = 'super_admin_dashboard'
                                 else:
-                                    # Si l'authentification a échoué, afficher l'erreur
-                                    afficher_erreur_minimale(message)
-                    except Exception as e:
-                        logger.exception("Erreur non capturee pendant la connexion: %s", e)
-                        afficher_erreur_minimale(
-                            "Une erreur inattendue est survenue pendant la connexion. Veuillez reessayer."
-                        )
+                                    # Pour les autres rôles, rediriger vers la page de nouvelle commande
+                                    st.session_state.page = 'nouvelle_commande'
+
+                                # Afficher un message de succès
+                                st.success(f"✅ {message}")
+
+                                # Afficher des ballons pour célébrer !
+                                st.balloons()
+
+                                # Recharger la page pour afficher l'interface principale
+                                st.rerun()
+                            else:
+                                # Si l'authentification a échoué, afficher l'erreur
+                                afficher_erreur_minimale(message)
+                except Exception as e:
+                    logger.exception("Erreur non capturee pendant la connexion: %s", e)
+                    afficher_erreur_minimale(
+                        "Une erreur inattendue est survenue pendant la connexion. Veuillez reessayer."
+                    )
         
         support_text = content.get("support_text", "")
         if support_text:
