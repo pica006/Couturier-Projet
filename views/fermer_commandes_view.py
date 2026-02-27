@@ -73,7 +73,7 @@ def afficher_page_fermer_commandes():
         # Bouton de rafraîchissement
         col_refresh, _ = st.columns([1, 5])
         with col_refresh:
-            if st.button("🔄 Actualiser", key="refresh_commandes_paiement", width='stretch'):
+            if st.button("🔄 Actualiser", key="refresh_commandes_paiement", use_container_width=True):
                 st.rerun()
         
         st.markdown("---")

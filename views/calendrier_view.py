@@ -56,7 +56,7 @@ def afficher_page_calendrier(onglet_admin: bool = False):
     with col_rappel_a:
         st.caption("Les rappels sont declenches automatiquement 1 fois/jour par session.")
     with col_rappel_b:
-        if st.button("🔔 Relancer les rappels", width="stretch", key="btn_relancer_rappels"):
+        if st.button("🔔 Relancer les rappels", use_container_width=True, key="btn_relancer_rappels"):
             nb_rappels, msg_rappels = executer_rappels_automatiques(st.session_state.db_connection)
             if msg_rappels:
                 if nb_rappels > 0:

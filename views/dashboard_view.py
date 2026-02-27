@@ -111,7 +111,7 @@ def afficher_page_dashboard():
         
         with col_date3:
             ajouter_espace_vertical()
-            if st.button("🔄 Mois en cours", width='stretch', key="btn_reset_dashboard_dates"):
+            if st.button("🔄 Mois en cours", use_container_width=True, key="btn_reset_dashboard_dates"):
                 # Marquer pour supprimer les clés des widgets au prochain rerun
                 st.session_state.reset_dashboard_dates = True
                 st.rerun()
@@ -291,22 +291,22 @@ def afficher_page_dashboard():
         col1, col2, col3, col4 = st.columns(4)
         
         with col1:
-            if st.button("➕ Nouvelle commande", width='stretch'):
+            if st.button("➕ Nouvelle commande", use_container_width=True):
                 st.session_state.page = 'nouvelle_commande'
                 st.rerun()
         
         with col2:
-            if st.button("📜 Mes commandes", width='stretch'):
+            if st.button("📜 Mes commandes", use_container_width=True):
                 st.session_state.page = 'liste_commandes'
                 st.rerun()
         
         with col3:
-            if st.button("💰 Comptabilité", width='stretch'):
+            if st.button("💰 Comptabilité", use_container_width=True):
                 st.session_state.page = 'comptabilite'
                 st.rerun()
         
         with col4:
-            if st.button("📄 Mes charges", width='stretch'):
+            if st.button("📄 Mes charges", use_container_width=True):
                 st.session_state.page = 'charges'
                 st.rerun()
         
@@ -369,7 +369,7 @@ def afficher_page_dashboard():
                 st.markdown("#### Répartition par modèle")
                 df_display = df_modeles[['modele', 'categorie', 'sexe', 'nb_commandes', 'CA (FCFA)']].copy()
                 df_display.columns = ['Modèle', 'Catégorie', 'Sexe', 'Nombre', 'CA (FCFA)']
-                st.dataframe(df_display, hide_index=True, width='stretch')
+                st.dataframe(df_display, hide_index=True, use_container_width=True)
                 
                 col_g1, col_g2 = st.columns(2)
                 with col_g1:

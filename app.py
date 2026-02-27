@@ -913,7 +913,7 @@ def afficher_sidebar():
             if est_super_admin():
                 st.markdown("### 🔧 SUPER ADMINISTRATION")
                 
-                if st.button("📊 Dashboard Super Admin", width='stretch'):
+                if st.button("📊 Dashboard Super Admin", use_container_width=True):
                     st.session_state.page = 'super_admin_dashboard'
                     st.rerun()
                 
@@ -924,31 +924,31 @@ def afficher_sidebar():
                 st.markdown("### 📋 Navigation")
             
             # Boutons de navigation standard (pour tous)
-            if st.button("📊 Tableau de bord", width='stretch'):
+            if st.button("📊 Tableau de bord", use_container_width=True):
                 st.session_state.page = 'dashboard'
                 st.rerun()
             
-            if st.button("➕ Nouvelle commande", width='stretch'):
+            if st.button("➕ Nouvelle commande", use_container_width=True):
                 st.session_state.page = 'nouvelle_commande'
                 st.rerun()
             
-            if st.button("📜 Mes commandes", width='stretch'):
+            if st.button("📜 Mes commandes", use_container_width=True):
                 st.session_state.page = 'liste_commandes'
                 st.rerun()
             
-            if st.button("💰 Comptabilité", width='stretch'):
+            if st.button("💰 Comptabilité", use_container_width=True):
                 st.session_state.page = 'comptabilite'
                 st.rerun()
             
-            if st.button("📄 Mes charges", width='stretch'):
+            if st.button("📄 Mes charges", use_container_width=True):
                 st.session_state.page = 'charges'
                 st.rerun()
             
-            if st.button("🔒 Fermer mes commandes", width='stretch'):
+            if st.button("🔒 Fermer mes commandes", use_container_width=True):
                 st.session_state.page = 'fermer_commandes'
                 st.rerun()
             
-            if st.button("📋 Modèles & Calendrier", width='stretch'):
+            if st.button("📋 Modèles & Calendrier", use_container_width=True):
                 st.session_state.page = 'calendrier'
                 st.rerun()
             
@@ -956,14 +956,14 @@ def afficher_sidebar():
             if est_admin(st.session_state.couturier_data) and not est_super_admin():
                 st.markdown("---")
                 st.markdown("### 👑 Administration")
-                if st.button("👑 Administration", width='stretch'):
+                if st.button("👑 Administration", use_container_width=True):
                     st.session_state.page = 'administration'
                     st.rerun()
             
             st.markdown("---")
             
             # Bouton de déconnexion avec approche simplifiée
-            if st.button("🚪 Déconnexion", width='stretch', key="btn_deconnexion"):
+            if st.button("🚪 Déconnexion", use_container_width=True, key="btn_deconnexion"):
                 logout_user()
                 # Rediriger vers la page de connexion
                 st.rerun()

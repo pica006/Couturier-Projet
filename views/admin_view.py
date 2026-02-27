@@ -1702,7 +1702,7 @@ def afficher_liste_utilisateurs(couturier_model: CouturierModel, admin_data: Dic
         
         with col_r2:
             ajouter_espace_vertical()
-            if st.button("💾 Modifier le rôle", type="primary", width='stretch', key="btn_modif_role"):
+            if st.button("💾 Modifier le rôle", type="primary", use_container_width=True, key="btn_modif_role"):
                 if nouveau_role != role_actuel:
                     if couturier_model.modifier_role(user_id, nouveau_role):
                         st.success("✅ Rôle modifié avec succès !")
@@ -2024,7 +2024,7 @@ def afficher_gestion_logo(admin_data: Dict):
             st.markdown("---")
             
             # Bouton de confirmation
-            if st.button("💾 Enregistrer le nouveau logo", type="primary", width='stretch', key="btn_save_logo"):
+            if st.button("💾 Enregistrer le nouveau logo", type="primary", use_container_width=True, key="btn_save_logo"):
                 try:
                     # Lire le contenu du fichier
                     file_bytes = uploaded_file.read()
@@ -2130,7 +2130,7 @@ def afficher_gestion_commandes_admin(commande_model: CommandeModel, admin_data: 
         # Bouton de rafraîchissement
         col_refresh, _ = st.columns([1, 5])
         with col_refresh:
-            if st.button("🔄 Actualiser", width='stretch', key="refresh_demandes"):
+            if st.button("🔄 Actualiser", use_container_width=True, key="refresh_demandes"):
                 st.rerun()
         
         st.markdown("---")
