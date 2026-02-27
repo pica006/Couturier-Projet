@@ -460,7 +460,7 @@ def afficher_vue_360(couturier_model: CouturierModel, charges_model: ChargesMode
             if not df_charges_cout.empty:
                 st.dataframe(
                     df_charges_cout[['date_charge', 'type', 'categorie', 'description', 'montant']],
-                    width='stretch',
+                    use_container_width=True,
                     hide_index=True
                 )
             else:
@@ -487,7 +487,7 @@ def afficher_vue_360(couturier_model: CouturierModel, charges_model: ChargesMode
                 colonnes_existantes = [col for col in colonnes_afficher if col in df_cmd_cout.columns]
                 st.dataframe(
                     df_cmd_cout[colonnes_existantes],
-                    width='stretch',
+                    use_container_width=True,
                     hide_index=True
                 )
             else:
@@ -637,7 +637,7 @@ def afficher_vue_360(couturier_model: CouturierModel, charges_model: ChargesMode
             st.markdown("##### 📋 Tableau récapitulatif des couturiers")
             st.dataframe(
                 df_couturiers,
-                width='stretch',
+                use_container_width=True,
                 hide_index=True
             )
             
@@ -666,7 +666,7 @@ def afficher_vue_360(couturier_model: CouturierModel, charges_model: ChargesMode
             with col_ch_tab:
                 st.dataframe(
                     df_couturiers[['Code', 'Nom', 'Charges (FCFA)']],
-                    width='stretch',
+                    use_container_width=True,
                     hide_index=True
                 )
 
@@ -707,7 +707,7 @@ def afficher_vue_360(couturier_model: CouturierModel, charges_model: ChargesMode
             with col_ca_tab:
                 st.dataframe(
                     df_couturiers[['Code', 'Nom', 'CA (FCFA)', 'Commandes']],
-                    width='stretch',
+                    use_container_width=True,
                     hide_index=True
                 )
 
@@ -742,7 +742,7 @@ def afficher_vue_360(couturier_model: CouturierModel, charges_model: ChargesMode
             with col_av_tab:
                 st.dataframe(
                     df_couturiers[['Code', 'Nom', 'Avances (FCFA)', 'Encaissé (FCFA)']],
-                    width='stretch',
+                    use_container_width=True,
                     hide_index=True
                 )
 
@@ -766,7 +766,7 @@ def afficher_vue_360(couturier_model: CouturierModel, charges_model: ChargesMode
             with col_cl_tab:
                 st.dataframe(
                     df_couturiers[['Code', 'Nom', 'Clients distincts']],
-                    width='stretch',
+                    use_container_width=True,
                     hide_index=True
                 )
 
@@ -965,7 +965,7 @@ def afficher_toutes_charges(charges_model: ChargesModel, salon_id_admin: str):
 
             st.dataframe(
                 df_emp_display,
-                width='stretch',
+                use_container_width=True,
                 hide_index=True
             )
 
@@ -981,7 +981,7 @@ def afficher_toutes_charges(charges_model: ChargesModel, salon_id_admin: str):
                     data=pdf_emp["content"],
                     file_name=pdf_emp["filename"],
                     mime="application/pdf",
-                    width='stretch',
+                    use_container_width=True,
                 )
     
     st.markdown("---")
@@ -1002,7 +1002,7 @@ def afficher_toutes_charges(charges_model: ChargesModel, salon_id_admin: str):
     # Tableau global (affiché) + export CSV + PDF
     st.dataframe(
         df_display,
-        width='stretch',
+        use_container_width=True,
         hide_index=True
     )
 
@@ -1015,7 +1015,7 @@ def afficher_toutes_charges(charges_model: ChargesModel, salon_id_admin: str):
             data=csv,
             file_name=f"toutes_charges_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
             mime="text/csv",
-            width='stretch'
+            use_container_width=True
         )
 
     with col_exp2:
@@ -1030,7 +1030,7 @@ def afficher_toutes_charges(charges_model: ChargesModel, salon_id_admin: str):
                 data=pdf_global["content"],
                 file_name=pdf_global["filename"],
                 mime="application/pdf",
-                width='stretch'
+                use_container_width=True
             )
 
 
@@ -1446,7 +1446,7 @@ def afficher_calcul_impots_admin(charges_model: ChargesModel, commande_model: Co
         
         st.dataframe(
             df_display,
-            width='stretch',
+            use_container_width=True,
             hide_index=True,
             height=300
         )
@@ -1469,7 +1469,7 @@ def afficher_calcul_impots_admin(charges_model: ChargesModel, commande_model: Co
                 data=pdf_data["content"],
                 file_name=pdf_data["filename"],
                 mime="application/pdf",
-                width='stretch'
+                use_container_width=True
             )
     else:
         st.info("Aucune charge enregistrée pour cette période.")
@@ -1662,7 +1662,7 @@ def afficher_liste_utilisateurs(couturier_model: CouturierModel, admin_data: Dic
     
     st.dataframe(
         df_display,
-        width='stretch',
+        use_container_width=True,
         hide_index=True,
         height=400
     )
