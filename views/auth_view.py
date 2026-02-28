@@ -26,7 +26,7 @@ import logging
 import streamlit as st
 from controllers.auth_controller import AuthController
 from config import DATABASE_CONFIG, APP_CONFIG, BRANDING, VISUAL_SAFE_MODE, IS_RENDER
-from utils.bottom_nav import load_site_content
+from utils.bottom_nav import load_site_content, render_app_footer
 from utils.theme import get_login_css, LOGIN_DISPLAY_TITLE_1, LOGIN_DISPLAY_TITLE_2, LOGIN_DISPLAY_SUBTITLE
 from services.db_bootstrap_service import connect_and_initialize, validate_required_config
 from utils.ui import (
@@ -451,7 +451,7 @@ def afficher_page_connexion():
     # COMMENT ? L'user entre son code + password, on vérifie dans la base de données
     st.markdown('<div class="login-scope">', unsafe_allow_html=True)
     
-    _, form_col, _ = st.columns([1, 1.3, 1], gap="large")
+    _, form_col, _ = st.columns([0.5, 2, 0.5], gap="large")
 
     with form_col:
         # Carte d'authentification style SpiritStitch (thème depuis utils.theme)
@@ -574,6 +574,9 @@ def afficher_page_connexion():
         st.markdown("</div><!-- login-theme-card -->", unsafe_allow_html=True)
     
     st.markdown("</div>", unsafe_allow_html=True)
+
+    # Footer : informations de l'entreprise sur la page de connexion aussi
+    render_app_footer()
 
     # Fond d'écran après le formulaire (réduit risque de réponse tronquée en prod)
     # En production (Render) : pas de data URI pour éviter payload lourd / timeout

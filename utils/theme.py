@@ -46,10 +46,10 @@ def _login_css_premium_glass() -> str:
     .main .block-container {
         background: transparent !important;
         padding-top: 1.5rem; padding-bottom: 2rem;
-        max-width: 520px;
+        max-width: 680px;
         margin-left: auto; margin-right: auto;
     }
-    /* CARTE: glass réel, flottante */
+    /* CARTE: glass réel, flottante - largeur confortable pour la saisie */
     .login-theme-card {
         background: rgba(255, 255, 255, 0.75) !important;
         backdrop-filter: blur(25px); -webkit-backdrop-filter: blur(25px);
@@ -58,7 +58,8 @@ def _login_css_premium_glass() -> str:
         border-radius: 20px !important;
         padding: 2.5rem !important;
         margin: 0 auto;
-        max-width: 480px;
+        max-width: 560px;
+        min-width: 420px;
     }
     /* TITRE: 42px, 800, letter-spacing 1px, dégradé #7B61FF → #00D4C7 */
     .login-theme-title {
@@ -183,8 +184,8 @@ def _login_css_ultra_minimal() -> str:
         box-shadow: 0 4px 24px rgba(0, 0, 0, 0.06);
         padding: 2.75rem 2.5rem;
         margin: 0 auto;
-        max-width: 520px;
-        min-width: 380px;
+        max-width: 560px;
+        min-width: 420px;
     }
     .login-theme-title {
         font-weight: 800; font-size: 2rem; letter-spacing: 0.02em;

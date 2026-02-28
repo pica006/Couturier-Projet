@@ -20,7 +20,7 @@ if load_dotenv is not None:
         pass
 
 from utils.role_utils import est_admin
-from utils.bottom_nav import render_bottom_nav
+from utils.bottom_nav import render_app_footer
 from utils.permissions import est_super_admin
 from config import APP_CONFIG, PAGE_BACKGROUND_IMAGES, VISUAL_SAFE_MODE
 from services.session_service import initialize_session_state, sanitize_session_state, logout_user
@@ -1079,10 +1079,8 @@ def main():
             f"{APP_CONFIG.get('subtitle', 'Systeme de gestion d atelier')}"
         )
     else:
-        render_bottom_nav({
-            "app_name": APP_CONFIG.get("name", ""),
-            "app_subtitle": APP_CONFIG.get("subtitle", "")
-        })
+        # Footer avec informations de l'entreprise sur toutes les pages
+        render_app_footer()
 
 
 if __name__ == "__main__":
