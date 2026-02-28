@@ -34,45 +34,105 @@ def get_login_css() -> str:
 
 
 def _login_css_premium_glass() -> str:
-    """Version Premium (effet glass). Fond #E9E4F0 → #E3F4F4, carte glassmorphism plus grande et soignée."""
+    """Prompt strict: SaaS haut de gamme, glass réel, dégradé #7B61FF → #00D4C7."""
     return """
     <style>
-    /* Fond diagonal doux */
-    .stApp { background: linear-gradient(135deg, #E9E4F0 0%, #E3F4F4 100%) !important; min-height: 100vh; }
-    .main .block-container { background: transparent !important; padding-top: 1.5rem; padding-bottom: 2rem; max-width: 680px; }
-    /* Carte login : plus grande, glassmorphism soigné */
-    .login-theme-card {
-        background: rgba(255, 255, 255, 0.82) !important;
-        backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
-        border: 1px solid rgba(255, 255, 255, 0.98);
-        border-radius: 24px;
-        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.08), 0 0 0 1px rgba(255,255,255,0.5) inset;
-        padding: 2.75rem 2.5rem;
-        margin: 0 auto;
+    /* FOND: grand dégradé + overlay blanc 60% pour adoucir, profondeur */
+    .stApp {
+        background: linear-gradient(180deg, rgba(255,255,255,0.6) 0%, rgba(255,255,255,0.5) 100%),
+                    linear-gradient(135deg, #B19CD9 0%, #40E0D0 100%) !important;
+        min-height: 100vh;
+    }
+    .main .block-container {
+        background: transparent !important;
+        padding-top: 1.5rem; padding-bottom: 2rem;
         max-width: 520px;
-        min-width: 380px;
+        margin-left: auto; margin-right: auto;
     }
-    /* Titre SpiritStitch : deux tons, plus lisible */
+    /* CARTE: glass réel, flottante */
+    .login-theme-card {
+        background: rgba(255, 255, 255, 0.75) !important;
+        backdrop-filter: blur(25px); -webkit-backdrop-filter: blur(25px);
+        border: 1px solid rgba(255, 255, 255, 0.4) !important;
+        box-shadow: 0 30px 60px rgba(0, 0, 0, 0.15) !important;
+        border-radius: 20px !important;
+        padding: 2.5rem !important;
+        margin: 0 auto;
+        max-width: 480px;
+    }
+    /* TITRE: 42px, 800, letter-spacing 1px, dégradé #7B61FF → #00D4C7 */
     .login-theme-title {
-        font-weight: 700; font-size: 2.1rem; letter-spacing: 0.03em;
-        text-align: center; margin-bottom: 0.35rem;
+        font-size: 42px !important;
+        font-weight: 800 !important;
+        letter-spacing: 1px !important;
+        text-align: center;
+        margin-bottom: 0.25rem;
+        background: linear-gradient(90deg, #7B61FF 0%, #00D4C7 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
     }
-    .login-theme-title-tone1 { color: #B19CD9 !important; }
-    .login-theme-title-tone2 { color: #40E0D0 !important; }
-    .login-theme-subtitle { color: #6B7280; font-size: 0.95rem; text-align: center; margin-bottom: 1.5rem; letter-spacing: 0.01em; }
+    .login-theme-title-tone1, .login-theme-title-tone2 { display: none; }
+    .login-theme-subtitle {
+        color: #555 !important;
+        font-size: 0.95rem;
+        text-align: center;
+        margin-bottom: 1.5rem;
+    }
+    .login-theme-card h3 {
+        text-align: center;
+        margin-bottom: 1rem;
+        color: #333 !important;
+        font-weight: 700;
+    }
+    /* INPUTS: fond blanc légèrement transparent, bordure fine, focus #7B61FF */
     .login-theme-card [data-testid="stForm"] { margin-top: 0.75rem; }
-    .login-theme-card .stTextInput > div > div input { border-radius: 12px; border: 1px solid #E5E7EB; padding: 0.7rem 0.9rem; font-size: 1rem; }
-    .login-theme-card .stButton > button, .login-theme-card button[kind="primary"] {
-        background: linear-gradient(90deg, #B19CD9 0%, #40E0D0 100%) !important;
-        color: #FFFFFF !important; border: none !important;
-        border-radius: 14px !important; box-shadow: 0 4px 14px rgba(177, 156, 217, 0.3);
-        font-weight: 600 !important; font-size: 1rem !important; width: 100%; padding: 0.75rem 1.25rem;
+    .login-theme-card .stTextInput > div > div input,
+    .login-theme-card .stPasswordInput > div > div input {
+        background: rgba(255,255,255,0.9) !important;
+        border: 1px solid rgba(0,0,0,0.12) !important;
+        border-radius: 10px;
+        padding: 0.65rem 0.85rem;
+        font-size: 1rem;
+        transition: border-color 0.2s ease, box-shadow 0.2s ease;
     }
-    .login-theme-card .stButton > button:hover { opacity: 0.96; box-shadow: 0 6px 20px rgba(177, 156, 217, 0.4); }
+    .login-theme-card .stTextInput > div > div input:focus,
+    .login-theme-card .stPasswordInput > div > div input:focus {
+        border-color: #7B61FF !important;
+        box-shadow: 0 0 0 3px rgba(123, 97, 255, 0.15) !important;
+        outline: none !important;
+    }
+    /* BOUTON: 100%, padding 14px, radius 14px, dégradé intense, hover scale + ombre */
+    .login-theme-card .stButton > button,
+    .login-theme-card button[kind="primary"] {
+        width: 100% !important;
+        padding: 14px 1.25rem !important;
+        border-radius: 14px !important;
+        background: linear-gradient(90deg, #7B61FF 0%, #00D4C7 100%) !important;
+        color: #FFFFFF !important;
+        border: none !important;
+        font-weight: 700 !important;
+        font-size: 1rem !important;
+        box-shadow: 0 8px 24px rgba(123, 97, 255, 0.35);
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+    .login-theme-card .stButton > button:hover,
+    .login-theme-card button[kind="primary"]:hover {
+        transform: scale(1.03);
+        box-shadow: 0 12px 32px rgba(123, 97, 255, 0.45);
+    }
     .login-theme-forgot { text-align: center; margin-top: 0.75rem; }
-    .login-theme-forgot a { color: #40E0D0; font-size: 0.875rem; text-decoration: none; }
-    .login-theme-forgot a:hover { color: #2db8aa; }
-    .login-theme-support { color: #6B7280; font-size: 0.8rem; text-align: center; margin-top: 1.25rem; line-height: 1.4; padding-top: 1rem; border-top: 1px solid rgba(0,0,0,0.06); }
+    .login-theme-forgot a { color: #00D4C7; font-size: 0.875rem; text-decoration: none; }
+    .login-theme-forgot a:hover { color: #00b8ad; }
+    .login-theme-support {
+        color: #555;
+        font-size: 0.8rem;
+        text-align: center;
+        margin-top: 1.25rem;
+        line-height: 1.4;
+        padding-top: 1rem;
+        border-top: 1px solid rgba(0,0,0,0.08);
+    }
     #MainMenu { visibility: hidden; } footer { visibility: hidden; } header { visibility: hidden; }
     [data-testid="stForm"] .stAlert { margin-top: 0.5rem; }
     </style>
@@ -95,11 +155,12 @@ def _login_css_ultra_minimal() -> str:
         min-width: 380px;
     }
     .login-theme-title {
-        font-weight: 700; font-size: 2rem; letter-spacing: 0.02em;
+        font-weight: 800; font-size: 2rem; letter-spacing: 0.02em;
         text-align: center; margin-bottom: 0.35rem;
+        background: linear-gradient(90deg, #8E7AB5 0%, #36CFC9 100%);
+        -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+        background-clip: text;
     }
-    .login-theme-title-tone1 { color: #8E7AB5 !important; }
-    .login-theme-title-tone2 { color: #36CFC9 !important; }
     .login-theme-subtitle { color: #6B7280; font-size: 0.9rem; text-align: center; margin-bottom: 1.5rem; }
     .login-theme-card [data-testid="stForm"] { margin-top: 0.75rem; }
     .login-theme-card .stTextInput > div > div input { border-radius: 12px; border: 1px solid #E5E7EB; padding: 0.7rem 0.9rem; font-size: 1rem; }

@@ -457,12 +457,9 @@ def afficher_page_connexion():
         # Carte d'authentification style SpiritStitch (thème depuis utils.theme)
         st.markdown(
             f'<div class="login-theme-card">'
-            f'<div class="login-theme-title">'
-            f'<span class="login-theme-title-tone1">{LOGIN_DISPLAY_TITLE_1}</span>'
-            f'<span class="login-theme-title-tone2">{LOGIN_DISPLAY_TITLE_2}</span>'
-            f'</div>'
+            f'<div class="login-theme-title">{LOGIN_DISPLAY_TITLE_1}{LOGIN_DISPLAY_TITLE_2}</div>'
             f'<div class="login-theme-subtitle">{LOGIN_DISPLAY_SUBTITLE}</div>'
-            f'<h3 style="text-align:center;margin-bottom:1rem;color:#374151;">Authentification</h3>',
+            f'<h3>Authentification</h3>',
             unsafe_allow_html=True
         )
         
