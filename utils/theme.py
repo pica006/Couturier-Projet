@@ -85,22 +85,50 @@ def _login_css_premium_glass() -> str:
         color: #333 !important;
         font-weight: 700;
     }
-    /* INPUTS: fond blanc légèrement transparent, bordure fine, focus #7B61FF */
+    /* INPUTS: zones de saisie premium, bien visibles et interactives */
     .login-theme-card [data-testid="stForm"] { margin-top: 0.75rem; }
-    .login-theme-card .stTextInput > div > div input,
-    .login-theme-card .stPasswordInput > div > div input {
-        background: rgba(255,255,255,0.9) !important;
-        border: 1px solid rgba(0,0,0,0.12) !important;
-        border-radius: 10px;
-        padding: 0.65rem 0.85rem;
-        font-size: 1rem;
-        transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    .login-theme-card [data-testid="stTextInput"] > div,
+    .login-theme-card [data-testid="stPasswordInput"] > div {
+        background: transparent !important;
     }
-    .login-theme-card .stTextInput > div > div input:focus,
-    .login-theme-card .stPasswordInput > div > div input:focus {
+    .login-theme-card .stTextInput > div > div,
+    .login-theme-card .stPasswordInput > div > div {
+        background: rgba(255,255,255,0.95) !important;
+        border: 1px solid rgba(0,0,0,0.1) !important;
+        border-radius: 12px !important;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.04) !important;
+        transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+    }
+    .login-theme-card .stTextInput > div > div:focus-within,
+    .login-theme-card .stPasswordInput > div > div:focus-within {
         border-color: #7B61FF !important;
-        box-shadow: 0 0 0 3px rgba(123, 97, 255, 0.15) !important;
+        box-shadow: 0 0 0 3px rgba(123, 97, 255, 0.2) !important;
+        background: #fff !important;
+    }
+    .login-theme-card .stTextInput input,
+    .login-theme-card .stPasswordInput input {
+        background: transparent !important;
+        border: none !important;
+        border-radius: 12px !important;
+        padding: 0.85rem 1rem !important;
+        font-size: 1rem !important;
+        min-height: 48px !important;
+        color: #1f2937 !important;
+    }
+    .login-theme-card .stTextInput input::placeholder,
+    .login-theme-card .stPasswordInput input::placeholder {
+        color: #9CA3AF !important;
+    }
+    .login-theme-card .stTextInput input:focus,
+    .login-theme-card .stPasswordInput input:focus {
         outline: none !important;
+        box-shadow: none !important;
+    }
+    .login-theme-card [data-testid="stForm"] label,
+    .login-theme-card [data-testid="stForm"] label p {
+        font-weight: 500 !important;
+        color: #374151 !important;
+        font-size: 0.9375rem !important;
     }
     /* BOUTON: 100%, padding 14px, radius 14px, dégradé intense, hover scale + ombre */
     .login-theme-card .stButton > button,
@@ -163,7 +191,36 @@ def _login_css_ultra_minimal() -> str:
     }
     .login-theme-subtitle { color: #6B7280; font-size: 0.9rem; text-align: center; margin-bottom: 1.5rem; }
     .login-theme-card [data-testid="stForm"] { margin-top: 0.75rem; }
-    .login-theme-card .stTextInput > div > div input { border-radius: 12px; border: 1px solid #E5E7EB; padding: 0.7rem 0.9rem; font-size: 1rem; }
+    .login-theme-card [data-testid="stTextInput"] > div,
+    .login-theme-card [data-testid="stPasswordInput"] > div { background: transparent !important; }
+    .login-theme-card .stTextInput > div > div,
+    .login-theme-card .stPasswordInput > div > div {
+        background: #fff !important;
+        border: 1px solid #E5E7EB !important;
+        border-radius: 12px !important;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.04) !important;
+        transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    }
+    .login-theme-card .stTextInput > div > div:focus-within,
+    .login-theme-card .stPasswordInput > div > div:focus-within {
+        border-color: #8E7AB5 !important;
+        box-shadow: 0 0 0 3px rgba(142, 122, 181, 0.18) !important;
+    }
+    .login-theme-card .stTextInput input,
+    .login-theme-card .stPasswordInput input {
+        background: transparent !important;
+        border: none !important;
+        padding: 0.85rem 1rem !important;
+        font-size: 1rem !important;
+        min-height: 48px !important;
+        color: #1f2937 !important;
+    }
+    .login-theme-card .stTextInput input::placeholder,
+    .login-theme-card .stPasswordInput input::placeholder { color: #9CA3AF !important; }
+    .login-theme-card .stTextInput input:focus,
+    .login-theme-card .stPasswordInput input:focus { outline: none !important; box-shadow: none !important; }
+    .login-theme-card [data-testid="stForm"] label,
+    .login-theme-card [data-testid="stForm"] label p { font-weight: 500 !important; color: #374151 !important; font-size: 0.9375rem !important; }
     .login-theme-card .stButton > button, .login-theme-card button[kind="primary"] {
         background: linear-gradient(90deg, #8E7AB5 0%, #36CFC9 100%) !important;
         color: #FFFFFF !important; border: none !important;
