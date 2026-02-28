@@ -20,7 +20,7 @@ if THEME_ACTIVE not in ("premium_glass", "ultra_minimal"):
 # Deux tons : partie 1 = violet, partie 2 = turquoise
 LOGIN_DISPLAY_TITLE_1 = "Spirit"
 LOGIN_DISPLAY_TITLE_2 = "Stitch"
-LOGIN_DISPLAY_SUBTITLE = "Gestion intelligente de couture"
+#LOGIN_DISPLAY_SUBTITLE = "Gestion intelligente de couture"
 
 
 def get_login_css() -> str:
