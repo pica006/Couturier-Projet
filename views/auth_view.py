@@ -436,12 +436,6 @@ def afficher_page_connexion():
 
     content = load_site_content()
 
-    # Message DB avant le formulaire (formulaire rendu en premier pour éviter timeout en prod)
-    if st.session_state.get("db_connection") is None:
-        afficher_info_minimale(
-            "La connexion base de données sera établie uniquement au clic sur « Se connecter »."
-        )
-    
     # ========================================================================
     # AUTHENTIFICATION DU COUTURIER
     # ========================================================================

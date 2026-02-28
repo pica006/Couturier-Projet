@@ -37,38 +37,40 @@ def _login_css_premium_glass() -> str:
     <style>
     /* Fond diagonal doux */
     .stApp { background: linear-gradient(135deg, #E9E4F0 0%, #E3F4F4 100%) !important; min-height: 100vh; }
-    .main .block-container { background: transparent !important; padding-top: 2rem; max-width: 1200px; }
+    .main .block-container { background: transparent !important; padding-top: 1.5rem; max-width: 1200px; }
     /* Carte login : glassmorphism */
     .login-theme-card {
-        background: rgba(255, 255, 255, 0.72) !important;
-        backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
-        border: 1px solid rgba(255, 255, 255, 0.9);
-        border-radius: 18px;
-        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
-        padding: 2rem;
+        background: rgba(255, 255, 255, 0.78) !important;
+        backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+        border: 1px solid rgba(255, 255, 255, 0.95);
+        border-radius: 20px;
+        box-shadow: 0 12px 40px rgba(0, 0, 0, 0.06);
+        padding: 2.25rem 2rem;
         margin: 0 auto;
-        max-width: 420px;
+        max-width: 400px;
     }
     /* Titre SpiritStitch dégradé */
     .login-theme-title {
-        font-weight: 700; font-size: 2rem; letter-spacing: 0.02em;
+        font-weight: 700; font-size: 1.85rem; letter-spacing: 0.03em;
         background: linear-gradient(90deg, #B19CD9 0%, #40E0D0 100%);
         -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-        background-clip: text; text-align: center; margin-bottom: 0.25rem;
+        background-clip: text; text-align: center; margin-bottom: 0.2rem;
     }
-    .login-theme-subtitle { color: #6B7280; font-size: 0.95rem; text-align: center; margin-bottom: 1.5rem; }
-    /* Bouton Se connecter */
+    .login-theme-subtitle { color: #6B7280; font-size: 0.9rem; text-align: center; margin-bottom: 1.25rem; letter-spacing: 0.01em; }
+    .login-theme-card [data-testid="stForm"] { margin-top: 0.5rem; }
+    .login-theme-card .stTextInput > div > div input { border-radius: 10px; border: 1px solid #E5E7EB; padding: 0.6rem 0.75rem; }
     .login-theme-card .stButton > button, .login-theme-card button[kind="primary"] {
         background: linear-gradient(90deg, #B19CD9 0%, #40E0D0 100%) !important;
         color: #FFFFFF !important; border: none !important;
-        border-radius: 12px !important; box-shadow: 0 2px 8px rgba(177, 156, 217, 0.3);
-        font-weight: 600 !important; width: 100%;
+        border-radius: 12px !important; box-shadow: 0 3px 10px rgba(177, 156, 217, 0.25);
+        font-weight: 600 !important; width: 100%; padding: 0.65rem 1rem;
     }
-    .login-theme-card .stButton > button:hover { opacity: 0.95; box-shadow: 0 4px 12px rgba(177, 156, 217, 0.4); }
-    .login-theme-forgot { text-align: center; margin-top: 0.75rem; }
-    .login-theme-forgot a { color: #9CA3AF; font-size: 0.875rem; text-decoration: none; }
+    .login-theme-card .stButton > button:hover { opacity: 0.95; box-shadow: 0 5px 16px rgba(177, 156, 217, 0.35); }
+    .login-theme-forgot { text-align: center; margin-top: 0.6rem; }
+    .login-theme-forgot a { color: #9CA3AF; font-size: 0.8125rem; text-decoration: none; }
     .login-theme-forgot a:hover { color: #6B7280; }
     #MainMenu { visibility: hidden; } footer { visibility: hidden; } header { visibility: hidden; }
+    [data-testid="stForm"] .stAlert { margin-top: 0.5rem; }
     </style>
     """
 
@@ -78,33 +80,36 @@ def _login_css_ultra_minimal() -> str:
     return """
     <style>
     .stApp { background: #F8F9FA !important; min-height: 100vh; }
-    .main .block-container { background: transparent !important; padding-top: 2rem; max-width: 1200px; }
+    .main .block-container { background: transparent !important; padding-top: 1.5rem; max-width: 1200px; }
     .login-theme-card {
         background: #FFFFFF !important;
-        border-radius: 14px;
-        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
-        padding: 2rem;
+        border-radius: 16px;
+        box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
+        padding: 2.25rem 2rem;
         margin: 0 auto;
-        max-width: 420px;
+        max-width: 400px;
     }
     .login-theme-title {
-        font-weight: 700; font-size: 1.75rem; letter-spacing: 0.01em;
+        font-weight: 700; font-size: 1.7rem; letter-spacing: 0.02em;
         background: linear-gradient(90deg, #8E7AB5 0%, #36CFC9 100%);
         -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-        background-clip: text; text-align: center; margin-bottom: 0.25rem;
+        background-clip: text; text-align: center; margin-bottom: 0.2rem;
     }
-    .login-theme-subtitle { color: #6B7280; font-size: 0.9rem; text-align: center; margin-bottom: 1.5rem; }
+    .login-theme-subtitle { color: #6B7280; font-size: 0.875rem; text-align: center; margin-bottom: 1.25rem; }
+    .login-theme-card [data-testid="stForm"] { margin-top: 0.5rem; }
+    .login-theme-card .stTextInput > div > div input { border-radius: 10px; border: 1px solid #E5E7EB; padding: 0.6rem 0.75rem; }
     .login-theme-card .stButton > button, .login-theme-card button[kind="primary"] {
         background: linear-gradient(90deg, #8E7AB5 0%, #36CFC9 100%) !important;
         color: #FFFFFF !important; border: none !important;
-        border-radius: 10px !important; box-shadow: 0 1px 4px rgba(142, 122, 181, 0.25);
-        font-weight: 600 !important; width: 100%;
+        border-radius: 10px !important; box-shadow: 0 2px 8px rgba(142, 122, 181, 0.2);
+        font-weight: 600 !important; width: 100%; padding: 0.65rem 1rem;
     }
     .login-theme-card .stButton > button:hover { opacity: 0.92; }
-    .login-theme-forgot { text-align: center; margin-top: 0.75rem; }
-    .login-theme-forgot a { color: #9CA3AF; font-size: 0.875rem; text-decoration: none; }
+    .login-theme-forgot { text-align: center; margin-top: 0.6rem; }
+    .login-theme-forgot a { color: #9CA3AF; font-size: 0.8125rem; text-decoration: none; }
     .login-theme-forgot a:hover { color: #6B7280; }
     #MainMenu { visibility: hidden; } footer { visibility: hidden; } header { visibility: hidden; }
+    [data-testid="stForm"] .stAlert { margin-top: 0.5rem; }
     </style>
     """
 
