@@ -44,14 +44,18 @@ def _login_css_premium_glass() -> str:
     <style>
     /* Cacher la sidebar Streamlit pour un écran plein login */
     [data-testid="stSidebar"] { display: none !important; }
+    /* Zone principale : occupe tout l'écran et centre la carte, sans grand espace vide en haut */
     .main .block-container {
         max-width: 520px !important;
-        padding-top: 3rem !important;
-        padding-bottom: 3rem !important;
-        margin-left: auto !important;
-        margin-right: auto !important;
+        min-height: 100vh !important;
+        padding: 0 1.5rem !important;
+        margin: 0 auto !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        background: transparent !important;
     }
-    /* FOND GLOBAL : dégradé doux lavande → cyan */
+    /* FOND GLOBAL : dégradé doux lavande → cyan, visible derrière la carte glass */
     .stApp {
         background: linear-gradient(135deg, #E0C3FC 0%, #8EC5FC 100%) !important;
         min-height: 100vh;
@@ -79,10 +83,6 @@ def _login_css_premium_glass() -> str:
         position: relative;
         z-index: 1;
         width: 100%;
-        min-height: 100vh;
-        display: flex;
-        align-items: center;
-        justify-content: center;
     }
     /* CARTE LOGIN : glass centrée comme sur la maquette */
     .login-theme-card {
