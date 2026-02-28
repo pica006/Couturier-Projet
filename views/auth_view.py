@@ -448,39 +448,19 @@ def afficher_page_connexion():
     # ====================================================================
     
     # POURQUOI ? Pour vérifier l'identité du couturier
-    # COMMENT ? Layout 40% branding / 60% carte login (responsive)
+    # COMMENT ? Une seule carte glass centrée (design maquette SpiritStitch)
     st.markdown('<div class="login-page-wrapper">', unsafe_allow_html=True)
+
+    # Carte login centrée : titre gradient, label Authentification, formulaire
+    st.markdown(
+        f'<div class="login-theme-card">'
+        f'<div class="login-theme-title">{LOGIN_DISPLAY_TITLE_1}{LOGIN_DISPLAY_TITLE_2}</div>'
+        f'<div class="login-theme-subtitle">{LOGIN_DISPLAY_SUBTITLE}</div>'
+        f'<div class="login-theme-label">Authentification</div>',
+        unsafe_allow_html=True
+    )
     
-    col_branding, col_form = st.columns([2, 3], gap="small")  # 40% / 60%
-
-    with col_branding:
-        # Sidebar branding : logo, sous-titre, description, élément visuel (icône couture)
-        st.markdown(
-            f'<div class="login-branding-logo">{LOGIN_DISPLAY_TITLE_1}{LOGIN_DISPLAY_TITLE_2}</div>'
-            f'<div class="login-branding-subtitle">{LOGIN_DISPLAY_SUBTITLE}</div>'
-            '<div class="login-branding-desc">'
-            'Connectez-vous pour accéder à votre atelier, gérer vos commandes et suivre votre activité.'
-            '</div>'
-            '<div class="login-branding-icon">'
-            '<svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" stroke="rgba(255,255,255,0.7)" stroke-width="1.5" stroke-linecap="round">'
-            '<path d="M32 8v48M12 24l20 8 20-8M12 40l20 8 20-8M8 32h48"/>'
-            '<circle cx="32" cy="32" r="4" fill="rgba(255,255,255,0.3)"/>'
-            '</svg>'
-            '</div>',
-            unsafe_allow_html=True
-        )
-
-    with col_form:
-        # Carte login centrée : titre gradient, label Authentification, formulaire
-        st.markdown(
-            f'<div class="login-theme-card">'
-            f'<div class="login-theme-title">{LOGIN_DISPLAY_TITLE_1}{LOGIN_DISPLAY_TITLE_2}</div>'
-            f'<div class="login-theme-subtitle">{LOGIN_DISPLAY_SUBTITLE}</div>'
-            f'<div class="login-theme-label">Authentification</div>',
-            unsafe_allow_html=True
-        )
-        
-        with st.form("auth_form", clear_on_submit=False):
+    with st.form("auth_form", clear_on_submit=False):
             # Champ de saisie du code couturier
             code_couturier = st.text_input(
                 "Code Couturier *",
@@ -504,7 +484,7 @@ def afficher_page_connexion():
                 type="primary"
             )
             
-            # Lien "Mot de passe oublié ?" (présentation modèle SpiritStitch)
+            # Lien "Mot de passe oublié ?"
             st.markdown(
                 '<div class="login-theme-forgot"><a href="#">Mot de passe oublié ?</a></div>',
                 unsafe_allow_html=True
@@ -582,14 +562,14 @@ def afficher_page_connexion():
                         "Une erreur inattendue est survenue pendant la connexion. Veuillez reessayer."
                     )
         
-        support_text = content.get("support_text", "")
-        if support_text:
-            st.markdown(
-                f'<div class="login-theme-support">{support_text}</div>',
-                unsafe_allow_html=True,
-            )
-        st.markdown("</div><!-- login-theme-card -->", unsafe_allow_html=True)
-    
+    support_text = content.get("support_text", "")
+    if support_text:
+        st.markdown(
+            f'<div class="login-theme-support">{support_text}</div>',
+            unsafe_allow_html=True,
+        )
+    st.markdown("</div><!-- login-theme-card -->", unsafe_allow_html=True)
+
     st.markdown("</div><!-- login-page-wrapper -->", unsafe_allow_html=True)
 
     # Footer : informations de l'entreprise sur la page de connexion aussi

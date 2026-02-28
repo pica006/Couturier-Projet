@@ -34,19 +34,26 @@ def get_login_css() -> str:
 
 
 def _login_css_premium_glass() -> str:
-    """SpiritStitch refonte: layout 40/60, fond premium #6C63FF→#00C9A7, glass, CTA dominant (Stripe/Linear)."""
+    """
+    Thème login type maquette SpiritStitch :
+    - Fond dégradé pastel lavande → cyan
+    - Une seule carte glass centrée
+    - Bouton principal dégradé violet → turquoise
+    """
     return """
     <style>
-    /* ========== CACHER SIDEBAR STREAMLIT POUR PLEINE LARGEUR LOGIN ========== */
+    /* Cacher la sidebar Streamlit pour un écran plein login */
     [data-testid="stSidebar"] { display: none !important; }
     .main .block-container {
-        max-width: 100% !important;
-        padding: 0 !important;
-        margin: 0 !important;
+        max-width: 520px !important;
+        padding-top: 3rem !important;
+        padding-bottom: 3rem !important;
+        margin-left: auto !important;
+        margin-right: auto !important;
     }
-    /* ========== FOND GLOBAL : premium, profondeur (pas pastel) ========== */
+    /* FOND GLOBAL : dégradé doux lavande → cyan */
     .stApp {
-        background: linear-gradient(135deg, #6C63FF 0%, #00C9A7 100%) !important;
+        background: linear-gradient(135deg, #E0C3FC 0%, #8EC5FC 100%) !important;
         min-height: 100vh;
         position: relative;
     }
@@ -54,8 +61,9 @@ def _login_css_premium_glass() -> str:
         content: '';
         position: fixed;
         inset: 0;
-        background: radial-gradient(ellipse 70% 60% at 70% 50%, rgba(108, 99, 255, 0.35) 0%, transparent 55%),
-                    radial-gradient(ellipse 50% 50% at 30% 80%, rgba(0, 201, 167, 0.2) 0%, transparent 50%);
+        background:
+            radial-gradient(circle at 20% 0%, rgba(255, 255, 255, 0.55) 0%, transparent 55%),
+            radial-gradient(circle at 80% 100%, rgba(255, 255, 255, 0.35) 0%, transparent 55%);
         pointer-events: none;
         z-index: 0;
     }
@@ -63,69 +71,33 @@ def _login_css_premium_glass() -> str:
         content: '';
         position: fixed;
         inset: 0;
-        background: rgba(255, 255, 255, 0.05);
+        background: rgba(255, 255, 255, 0.06);
         pointer-events: none;
         z-index: 0;
     }
-    .login-page-wrapper { position: relative; z-index: 1; min-height: 100vh; width: 100%; }
-    /* ========== LAYOUT 40% / 60% ========== */
-    .login-page-wrapper [data-testid="column"]:first-child {
-        background: rgba(255, 255, 255, 0.15) !important;
-        backdrop-filter: blur(30px); -webkit-backdrop-filter: blur(30px);
-        border-right: 1px solid rgba(255, 255, 255, 0.12);
-        min-height: 100vh;
-        display: flex !important;
-        flex-direction: column !important;
-        justify-content: center !important;
-        padding: 2.5rem 2rem !important;
-    }
-    .login-page-wrapper [data-testid="column"]:last-child {
-        display: flex !important;
-        align-items: center !important;
-        justify-content: center !important;
-        min-height: 100vh;
-        padding: 2rem !important;
-    }
-    /* ========== SIDEBAR BRANDING (gauche) ========== */
-    .login-branding-logo {
-        font-size: 40px !important;
-        font-weight: 800 !important;
-        background: linear-gradient(180deg, #FFFFFF 0%, #E0E0FF 100%);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        background-clip: text;
-        margin-bottom: 0.5rem;
-        letter-spacing: -0.02em;
-    }
-    .login-branding-subtitle {
-        color: rgba(255, 255, 255, 0.8) !important;
-        font-size: 1rem;
-        margin-bottom: 1.25rem;
-        font-weight: 500;
-    }
-    .login-branding-desc {
-        color: rgba(255, 255, 255, 0.7) !important;
-        font-size: 0.9375rem;
-        line-height: 1.5;
-        max-width: 280px;
-    }
-    .login-branding-icon {
-        margin-top: 2.5rem;
-        opacity: 0.9;
-    }
-    /* ========== CARTE LOGIN (droite) : flottante, glass ========== */
-    .login-theme-card {
-        background: rgba(255, 255, 255, 0.85) !important;
-        backdrop-filter: blur(25px); -webkit-backdrop-filter: blur(25px);
-        border-radius: 22px !important;
-        box-shadow: 0 40px 80px rgba(0, 0, 0, 0.25) !important;
-        padding: 3rem !important;
-        margin: 0 auto;
-        max-width: 420px;
+    .login-page-wrapper {
+        position: relative;
+        z-index: 1;
         width: 100%;
-        border: 1px solid rgba(255, 255, 255, 0.5);
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
     }
-    /* ========== TITRE CARTE : SpiritStitch 38px gradient, Authentification #333 ========== */
+    /* CARTE LOGIN : glass centrée comme sur la maquette */
+    .login-theme-card {
+        background: rgba(255, 255, 255, 0.88) !important;
+        backdrop-filter: blur(26px); -webkit-backdrop-filter: blur(26px);
+        border-radius: 26px !important;
+        box-shadow:
+            0 18px 45px rgba(15, 23, 42, 0.25),
+            0 0 0 1px rgba(255, 255, 255, 0.55) !important;
+        padding: 2.75rem 2.5rem !important;
+        margin: 0 auto;
+        max-width: 460px;
+        width: 100%;
+    }
+    /* TITRE CARTE : SpiritStitch 38px gradient, Authentification #333 */
     .login-theme-title {
         font-size: 38px !important;
         font-weight: 800 !important;
@@ -138,17 +110,17 @@ def _login_css_premium_glass() -> str:
         background-clip: text;
     }
     .login-theme-title-tone1, .login-theme-title-tone2 { display: none; }
-    .login-theme-subtitle { display: none; }
+    .login-theme-subtitle { color: #6B7280 !important; font-size: 0.95rem; text-align: center; margin-bottom: 1.5rem; }
     .login-theme-card .login-theme-label {
         text-align: center;
-        margin-bottom: 1.5rem;
-        color: #333 !important;
+        margin-bottom: 1.1rem;
+        color: #374151 !important;
         font-size: 1rem !important;
         font-weight: 600 !important;
     }
     .login-theme-card h3 { display: none; }
-    /* ========== INPUTS : fond blanc, border #E5E7EB, focus #6C63FF glow ========== */
-    .login-theme-card [data-testid="stForm"] { margin-top: 0.5rem; }
+    /* INPUTS : fond blanc, border #E5E7EB, focus #6C63FF glow */
+    .login-theme-card [data-testid="stForm"] { margin-top: 0.75rem; }
     .login-theme-card [data-testid="stTextInput"] > div,
     .login-theme-card [data-testid="stPasswordInput"] > div { background: transparent !important; }
     .login-theme-card .stTextInput > div > div,
@@ -225,8 +197,10 @@ def _login_css_premium_glass() -> str:
         }
         .login-theme-card { max-width: 100%; padding: 2rem !important; }
     }
-    #MainMenu { visibility: hidden; } footer { visibility: hidden; } header { visibility: hidden; }
     [data-testid="stForm"] .stAlert { margin-top: 0.5rem; }
+    #MainMenu { visibility: hidden; } header { visibility: hidden; }
+    footer:not(.app-footer) { visibility: hidden; }
+    .app-footer { visibility: visible !important; }
     </style>
     """
 

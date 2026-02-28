@@ -505,46 +505,138 @@ def _sidebar_styles_css(sidebar_bg_css, is_authenticated=False):
     if is_authenticated:
         return f"""
         <style>
+        /* Fond sidebar après connexion : même univers pastel que l'écran de login */
         [data-testid="stSidebar"] {{
             {sidebar_bg_css}
-            border-right: 1px solid rgba(255, 255, 255, 0.06) !important;
+            padding: 1.5rem 1rem !important;
         }}
         [data-testid="stSidebar"] [data-testid="stSidebarContent"] {{
             background: transparent !important;
-            padding: 1.25rem 0.75rem !important;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
         }}
-        [data-testid="stSidebar"] .stMarkdown h3 {{
-            color: #CBD5E1 !important;
-            font-size: 0.8rem !important;
-            font-weight: 600 !important;
-            letter-spacing: 0.05em !important;
-            margin-bottom: 0.75rem !important;
+
+        /* Carte verre (glass) centrée dans la sidebar - modèle SpiritStitch */
+        .sidebar-glass-card {{
+            background: rgba(255, 255, 255, 0.88) !important;
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
+            border-radius: 24px;
+            box-shadow:
+                0 18px 45px rgba(15, 23, 42, 0.25),
+                0 0 0 1px rgba(255, 255, 255, 0.55);
+            padding: 1.75rem 1.5rem;
+            width: 100%;
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
         }}
-        [data-testid="stSidebar"] .stButton > button {{
+
+        .sidebar-brand-title {{
+            font-size: 1.25rem;
+            font-weight: 800;
+            letter-spacing: -0.02em;
+            background: linear-gradient(135deg, #6C63FF 0%, #00C9A7 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 0.1rem;
+        }}
+
+        .sidebar-brand-subtitle {{
+            font-size: 0.8rem;
+            color: #6B7280;
+        }}
+
+        .sidebar-user {{
+            margin-top: 0.9rem;
+            font-size: 0.8rem;
+            color: #6B7280;
+        }}
+
+        .sidebar-user-name {{
+            font-weight: 600;
+            color: #374151;
+        }}
+
+        .sidebar-user-role {{
+            display: block;
+            color: #9CA3AF;
+            margin-top: 0.15rem;
+        }}
+
+        /* Navigation verticale : items comme sur la maquette */
+        .sidebar-nav {{
+            display: flex;
+            flex-direction: column;
+            gap: 0.4rem;
+        }}
+
+        .sidebar-nav button {{
             background: transparent !important;
-            color: #CBD5E1 !important;
+            border-radius: 999px !important;
             border: none !important;
-            border-radius: 10px !important;
-            padding: 0.75rem 1rem !important;
-            font-weight: 500 !important;
-            text-align: left !important;
+            padding: 0.55rem 0.9rem !important;
             width: 100% !important;
-            transition: background 0.2s ease !important;
+            display: flex !important;
+            align-items: center;
+            justify-content: flex-start;
+            gap: 0.6rem;
+            color: #374151 !important;
+            font-size: 0.9rem !important;
+            font-weight: 500 !important;
+            box-shadow: none !important;
         }}
-        [data-testid="stSidebar"] .stButton > button:hover {{
-            background: rgba(255, 255, 255, 0.05) !important;
-            color: #F1F5F9 !important;
+
+        .sidebar-nav button:hover {{
+            background: rgba(148, 163, 184, 0.13) !important;
+            color: #111827 !important;
         }}
-        [data-testid="stSidebar"] .stButton > button.sidebar-btn-active {{
-            background: linear-gradient(135deg, rgba(108, 99, 255, 0.2) 0%, rgba(0, 201, 167, 0.15) 100%) !important;
-            color: #F1F5F9 !important;
-            border-radius: 10px !important;
+
+        .sidebar-nav button::before {{
+            content: '';
+            flex-shrink: 0;
+            width: 26px;
+            height: 26px;
+            border-radius: 999px;
+            background: linear-gradient(135deg, #E0C3FC 0%, #8EC5FC 100%);
+            opacity: 0.95;
         }}
-        [data-testid="stSidebar"] .stSuccess, [data-testid="stSidebar"] .stInfo {{
-            background: rgba(255, 255, 255, 0.06) !important;
-            color: #CBD5E1 !important;
-            border: 1px solid rgba(255, 255, 255, 0.08) !important;
-            border-radius: 10px !important;
+
+        .sidebar-nav button:nth-of-type(1)::before {{
+            background: linear-gradient(135deg, #818CF8 0%, #C4B5FD 100%);
+        }}
+        .sidebar-nav button:nth-of-type(2)::before {{
+            background: linear-gradient(135deg, #34D399 0%, #6EE7B7 100%);
+        }}
+        .sidebar-nav button:nth-of-type(3)::before {{
+            background: linear-gradient(135deg, #F97316 0%, #FDBA74 100%);
+        }}
+        .sidebar-nav button:nth-of-type(4)::before {{
+            background: linear-gradient(135deg, #EC4899 0%, #F9A8D4 100%);
+        }}
+        .sidebar-nav button:nth-of-type(5)::before {{
+            background: linear-gradient(135deg, #0EA5E9 0%, #7DD3FC 100%);
+        }}
+        .sidebar-nav button:nth-of-type(6)::before {{
+            background: linear-gradient(135deg, #6B7280 0%, #9CA3AF 100%);
+        }}
+
+        .sidebar-logout button {{
+            margin-top: 0.75rem;
+            width: 100% !important;
+            border-radius: 999px !important;
+            background: #FFFFFF !important;
+            color: #EF4444 !important;
+            border: 1px solid rgba(239, 68, 68, 0.2) !important;
+            font-weight: 600 !important;
+            box-shadow: none !important;
+        }}
+
+        .sidebar-logout button:hover {{
+            background: #FEF2F2 !important;
         }}
         </style>
         """
