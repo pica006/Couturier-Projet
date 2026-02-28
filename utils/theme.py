@@ -98,6 +98,7 @@ def _login_css_premium_glass() -> str:
         border-radius: 12px !important;
         box-shadow: 0 1px 3px rgba(0,0,0,0.04) !important;
         transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+        min-height: 52px !important;
     }
     .login-theme-card .stTextInput > div > div:focus-within,
     .login-theme-card .stPasswordInput > div > div:focus-within {
@@ -110,9 +111,10 @@ def _login_css_premium_glass() -> str:
         background: transparent !important;
         border: none !important;
         border-radius: 12px !important;
-        padding: 0.85rem 1rem !important;
-        font-size: 1rem !important;
-        min-height: 48px !important;
+        padding: 1rem 1.2rem !important;
+        font-size: 1.0625rem !important;
+        min-height: 52px !important;
+        line-height: 1.4 !important;
         color: #1f2937 !important;
     }
     .login-theme-card .stTextInput input::placeholder,
@@ -128,8 +130,10 @@ def _login_css_premium_glass() -> str:
     .login-theme-card [data-testid="stForm"] label p {
         font-weight: 500 !important;
         color: #374151 !important;
-        font-size: 0.9375rem !important;
+        font-size: 1rem !important;
     }
+    .login-theme-card [data-testid="stTextInput"],
+    .login-theme-card [data-testid="stPasswordInput"] { margin-bottom: 1rem !important; }
     /* BOUTON: 100%, padding 14px, radius 14px, dégradé intense, hover scale + ombre */
     .login-theme-card .stButton > button,
     .login-theme-card button[kind="primary"] {
@@ -200,6 +204,7 @@ def _login_css_ultra_minimal() -> str:
         border-radius: 12px !important;
         box-shadow: 0 1px 2px rgba(0,0,0,0.04) !important;
         transition: border-color 0.2s ease, box-shadow 0.2s ease;
+        min-height: 52px !important;
     }
     .login-theme-card .stTextInput > div > div:focus-within,
     .login-theme-card .stPasswordInput > div > div:focus-within {
@@ -210,9 +215,10 @@ def _login_css_ultra_minimal() -> str:
     .login-theme-card .stPasswordInput input {
         background: transparent !important;
         border: none !important;
-        padding: 0.85rem 1rem !important;
-        font-size: 1rem !important;
-        min-height: 48px !important;
+        padding: 1rem 1.2rem !important;
+        font-size: 1.0625rem !important;
+        min-height: 52px !important;
+        line-height: 1.4 !important;
         color: #1f2937 !important;
     }
     .login-theme-card .stTextInput input::placeholder,
@@ -220,7 +226,9 @@ def _login_css_ultra_minimal() -> str:
     .login-theme-card .stTextInput input:focus,
     .login-theme-card .stPasswordInput input:focus { outline: none !important; box-shadow: none !important; }
     .login-theme-card [data-testid="stForm"] label,
-    .login-theme-card [data-testid="stForm"] label p { font-weight: 500 !important; color: #374151 !important; font-size: 0.9375rem !important; }
+    .login-theme-card [data-testid="stForm"] label p { font-weight: 500 !important; color: #374151 !important; font-size: 1rem !important; }
+    .login-theme-card [data-testid="stTextInput"],
+    .login-theme-card [data-testid="stPasswordInput"] { margin-bottom: 1rem !important; }
     .login-theme-card .stButton > button, .login-theme-card button[kind="primary"] {
         background: linear-gradient(90deg, #8E7AB5 0%, #36CFC9 100%) !important;
         color: #FFFFFF !important; border: none !important;
