@@ -27,7 +27,7 @@ import streamlit as st
 from controllers.auth_controller import AuthController
 from config import DATABASE_CONFIG, APP_CONFIG, BRANDING, VISUAL_SAFE_MODE, IS_RENDER
 from utils.bottom_nav import load_site_content
-from utils.theme import get_login_css, LOGIN_DISPLAY_TITLE, LOGIN_DISPLAY_SUBTITLE
+from utils.theme import get_login_css, LOGIN_DISPLAY_TITLE_1, LOGIN_DISPLAY_TITLE_2, LOGIN_DISPLAY_SUBTITLE
 from services.db_bootstrap_service import connect_and_initialize, validate_required_config
 from utils.ui import (
     appliquer_style_pages_critiques,
@@ -457,7 +457,10 @@ def afficher_page_connexion():
         # Carte d'authentification style SpiritStitch (thème depuis utils.theme)
         st.markdown(
             f'<div class="login-theme-card">'
-            f'<div class="login-theme-title">{LOGIN_DISPLAY_TITLE}</div>'
+            f'<div class="login-theme-title">'
+            f'<span class="login-theme-title-tone1">{LOGIN_DISPLAY_TITLE_1}</span>'
+            f'<span class="login-theme-title-tone2">{LOGIN_DISPLAY_TITLE_2}</span>'
+            f'</div>'
             f'<div class="login-theme-subtitle">{LOGIN_DISPLAY_SUBTITLE}</div>'
             f'<h3 style="text-align:center;margin-bottom:1rem;color:#374151;">Authentification</h3>',
             unsafe_allow_html=True

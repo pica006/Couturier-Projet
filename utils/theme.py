@@ -17,7 +17,9 @@ if THEME_ACTIVE not in ("premium_glass", "ultra_minimal"):
     THEME_ACTIVE = "premium_glass"
 
 # Libellés affichés sur la page de connexion (identiques au modèle SpiritStitch)
-LOGIN_DISPLAY_TITLE = "SpiritStitch"
+# Deux tons : partie 1 = violet, partie 2 = turquoise
+LOGIN_DISPLAY_TITLE_1 = "Spirit"
+LOGIN_DISPLAY_TITLE_2 = "Stitch"
 LOGIN_DISPLAY_SUBTITLE = "Gestion intelligente de couture"
 
 
@@ -49,13 +51,13 @@ def _login_css_premium_glass() -> str:
         margin: 0 auto;
         max-width: 400px;
     }
-    /* Titre SpiritStitch dégradé */
+    /* Titre SpiritStitch : deux tons (Spirit = violet, Stitch = turquoise) */
     .login-theme-title {
         font-weight: 700; font-size: 1.85rem; letter-spacing: 0.03em;
-        background: linear-gradient(90deg, #B19CD9 0%, #40E0D0 100%);
-        -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-        background-clip: text; text-align: center; margin-bottom: 0.2rem;
+        text-align: center; margin-bottom: 0.2rem;
     }
+    .login-theme-title-tone1 { color: #B19CD9 !important; }
+    .login-theme-title-tone2 { color: #40E0D0 !important; }
     .login-theme-subtitle { color: #6B7280; font-size: 0.9rem; text-align: center; margin-bottom: 1.25rem; letter-spacing: 0.01em; }
     .login-theme-card [data-testid="stForm"] { margin-top: 0.5rem; }
     .login-theme-card .stTextInput > div > div input { border-radius: 10px; border: 1px solid #E5E7EB; padding: 0.6rem 0.75rem; }
@@ -91,10 +93,10 @@ def _login_css_ultra_minimal() -> str:
     }
     .login-theme-title {
         font-weight: 700; font-size: 1.7rem; letter-spacing: 0.02em;
-        background: linear-gradient(90deg, #8E7AB5 0%, #36CFC9 100%);
-        -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-        background-clip: text; text-align: center; margin-bottom: 0.2rem;
+        text-align: center; margin-bottom: 0.2rem;
     }
+    .login-theme-title-tone1 { color: #8E7AB5 !important; }
+    .login-theme-title-tone2 { color: #36CFC9 !important; }
     .login-theme-subtitle { color: #6B7280; font-size: 0.875rem; text-align: center; margin-bottom: 1.25rem; }
     .login-theme-card [data-testid="stForm"] { margin-top: 0.5rem; }
     .login-theme-card .stTextInput > div > div input { border-radius: 10px; border: 1px solid #E5E7EB; padding: 0.6rem 0.75rem; }
