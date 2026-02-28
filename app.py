@@ -44,6 +44,8 @@ st.set_page_config(
 # Aucun JavaScript personnalisé n'est utilisé pour éviter d'aggraver le problème
 
 SIDEBAR_BG_PLAIN = "background: #FAFAFA !important;"
+# Sidebar après connexion : dark navy premium (Linear / Stripe)
+SIDEBAR_BG_DARK = "background: #0F172A !important;"
 
 
 @st.cache_data(show_spinner=False)
@@ -476,9 +478,9 @@ if (not VISUAL_SAFE_MODE) and (not _apply_rich_theme):
         unsafe_allow_html=True,
     )
 
-# Surcharge du fond de la sidebar + harmonisation des boutons (palette atelier couture)
-# Note: le fond avec image (nav.png) est injecté dans main() uniquement pour la page de connexion
-def _sidebar_styles_css(sidebar_bg_css):
+# Surcharge du fond de la sidebar + harmonisation des boutons
+# Après connexion : dark navy premium (Linear / Stripe). Avant : plain ou image.
+def _sidebar_styles_css(sidebar_bg_css, is_authenticated=False):
     if VISUAL_SAFE_MODE:
         return f"""
         <style>
@@ -493,14 +495,56 @@ def _sidebar_styles_css(sidebar_bg_css):
             color: #2C2C2C !important;
             border: 1px solid #D8CCE9 !important;
             border-radius: 10px !important;
-            box-shadow: none !important;
-            transition: none !important;
-            transform: none !important;
-            opacity: 1 !important;
         }}
         [data-testid="stSidebar"] .stButton > button:hover {{
             background: #ECE4F8 !important;
-            color: #2C2C2C !important;
+        }}
+        </style>
+        """
+
+    if is_authenticated:
+        return f"""
+        <style>
+        [data-testid="stSidebar"] {{
+            {sidebar_bg_css}
+            border-right: 1px solid rgba(255, 255, 255, 0.06) !important;
+        }}
+        [data-testid="stSidebar"] [data-testid="stSidebarContent"] {{
+            background: transparent !important;
+            padding: 1.25rem 0.75rem !important;
+        }}
+        [data-testid="stSidebar"] .stMarkdown h3 {{
+            color: #CBD5E1 !important;
+            font-size: 0.8rem !important;
+            font-weight: 600 !important;
+            letter-spacing: 0.05em !important;
+            margin-bottom: 0.75rem !important;
+        }}
+        [data-testid="stSidebar"] .stButton > button {{
+            background: transparent !important;
+            color: #CBD5E1 !important;
+            border: none !important;
+            border-radius: 10px !important;
+            padding: 0.75rem 1rem !important;
+            font-weight: 500 !important;
+            text-align: left !important;
+            width: 100% !important;
+            transition: background 0.2s ease !important;
+        }}
+        [data-testid="stSidebar"] .stButton > button:hover {{
+            background: rgba(255, 255, 255, 0.05) !important;
+            color: #F1F5F9 !important;
+        }}
+        [data-testid="stSidebar"] .stButton > button.sidebar-btn-active {{
+            background: linear-gradient(135deg, rgba(108, 99, 255, 0.2) 0%, rgba(0, 201, 167, 0.15) 100%) !important;
+            color: #F1F5F9 !important;
+            border-radius: 10px !important;
+        }}
+        [data-testid="stSidebar"] .stSuccess, [data-testid="stSidebar"] .stInfo {{
+            background: rgba(255, 255, 255, 0.06) !important;
+            color: #CBD5E1 !important;
+            border: 1px solid rgba(255, 255, 255, 0.08) !important;
+            border-radius: 10px !important;
         }}
         </style>
         """
@@ -513,55 +557,24 @@ def _sidebar_styles_css(sidebar_bg_css):
     [data-testid="stSidebar"] [data-testid="stSidebarContent"] {{
         background: transparent !important;
     }}
-
-    /* ========================================================================
-       BOUTONS SIDEBAR - Palette pastel harmonisée (beige, bleu pastel, violet doux)
-       Cohérence avec l'image de fond atelier couture, tons chauds, ambiance textile
-       ======================================================================== */
     [data-testid="stSidebar"] .stButton > button {{
-        background: linear-gradient(180deg, rgba(246, 239, 232, 0.9) 0%, rgba(143, 186, 217, 0.88) 50%, rgba(154, 143, 216, 0.87) 100%) !important;
-        background-color: transparent !important;
+        background: linear-gradient(135deg, rgba(246, 239, 232, 0.9) 0%, rgba(143, 186, 217, 0.88) 50%, rgba(154, 143, 216, 0.87) 100%) !important;
         color: #3B2F4A !important;
         border: 1px solid rgba(59, 47, 74, 0.12) !important;
         border-radius: 12px !important;
         padding: 0.7rem 1rem !important;
         font-weight: 500 !important;
-        opacity: 0.88 !important;
-        transition: all 0.25s ease !important;
-        box-shadow: 0 1px 3px rgba(59, 47, 74, 0.08) !important;
-        filter: saturate(0.92);
     }}
     [data-testid="stSidebar"] .stButton > button:hover {{
-        opacity: 0.92 !important;
         background: linear-gradient(175deg, rgba(246, 239, 232, 0.95) 0%, rgba(143, 186, 217, 0.9) 45%, rgba(154, 143, 216, 0.9) 100%) !important;
-        box-shadow: 0 2px 8px rgba(59, 47, 74, 0.12) !important;
-        border-color: rgba(59, 47, 74, 0.18) !important;
     }}
-    [data-testid="stSidebar"] .stButton > button:active,
-    [data-testid="stSidebar"] .stButton > button:focus {{
-        outline: none !important;
-        border-color: rgba(59, 47, 74, 0.2) !important;
-    }}
-    /* Bouton actif (page courante) - dégradé plus marqué, ombre douce, bordure fine */
     [data-testid="stSidebar"] .stButton > button.sidebar-btn-active {{
         background: linear-gradient(175deg, rgba(246, 239, 232, 0.98) 0%, rgba(143, 186, 217, 0.92) 40%, rgba(154, 143, 216, 0.92) 100%) !important;
-        color: #3B2F4A !important;
-        opacity: 0.95 !important;
-        box-shadow: 0 3px 12px rgba(59, 47, 74, 0.15) !important;
-        border: 1px solid rgba(59, 47, 74, 0.22) !important;
     }}
-    /* Texte et icônes sidebar - tons doux */
-    [data-testid="stSidebar"] .stButton > button,
-    [data-testid="stSidebar"] .stButton > button span {{
-        color: #3B2F4A !important;
-    }}
-    [data-testid="stSidebar"] .stMarkdown h3 {{
-        color: #3B2F4A !important;
-    }}
+    [data-testid="stSidebar"] .stMarkdown h3 { color: #3B2F4A !important; }
     [data-testid="stSidebar"] .stSuccess, [data-testid="stSidebar"] .stInfo {{
         background: rgba(246, 239, 232, 0.85) !important;
         color: #3B2F4A !important;
-        border-color: rgba(107, 100, 122, 0.3) !important;
     }}
     </style>
     """
@@ -901,9 +914,19 @@ def afficher_header_app():
 
 
 def afficher_sidebar():
-    """Affiche la barre latérale avec navigation"""
+    """Affiche la barre latérale avec navigation (branding + menu premium après connexion)."""
     with st.sidebar:
         if st.session_state.authentifie:
+            # Logo SpiritStitch en haut (premium dark sidebar)
+            from utils.theme import LOGIN_DISPLAY_TITLE_1, LOGIN_DISPLAY_TITLE_2
+            st.markdown(
+                f'<div style="margin-bottom: 1.5rem;">'
+                f'<span style="font-size: 1.35rem; font-weight: 800; letter-spacing: -0.02em; '
+                f'background: linear-gradient(135deg, #E0E0FF 0%, #00C9A7 100%); '
+                f'-webkit-background-clip: text; -webkit-text-fill-color: transparent; '
+                f'background-clip: text;">{LOGIN_DISPLAY_TITLE_1}{LOGIN_DISPLAY_TITLE_2}</span></div>',
+                unsafe_allow_html=True,
+            )
             # Informations du couturier connecté
             st.success(f"**Connecté:** {st.session_state.couturier_data['prenom']} {st.session_state.couturier_data['nom']}")
             role_display = st.session_state.couturier_data.get('role', 'employe')
@@ -1008,9 +1031,9 @@ def main():
     sidebar_bg_css = (
         theme_sidebar_bg_css()
         if VISUAL_SAFE_MODE
-        else (_get_sidebar_bg_css_with_image() if not st.session_state.authentifie else SIDEBAR_BG_PLAIN)
+        else (SIDEBAR_BG_DARK if st.session_state.authentifie else _get_sidebar_bg_css_with_image())
     )
-    st.markdown(_sidebar_styles_css(sidebar_bg_css), unsafe_allow_html=True)
+    st.markdown(_sidebar_styles_css(sidebar_bg_css, is_authenticated=st.session_state.authentifie), unsafe_allow_html=True)
     
     # Afficher la sidebar
     afficher_sidebar()

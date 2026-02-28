@@ -448,18 +448,35 @@ def afficher_page_connexion():
     # ====================================================================
     
     # POURQUOI ? Pour vérifier l'identité du couturier
-    # COMMENT ? L'user entre son code + password, on vérifie dans la base de données
-    st.markdown('<div class="login-scope">', unsafe_allow_html=True)
+    # COMMENT ? Layout 40% branding / 60% carte login (responsive)
+    st.markdown('<div class="login-page-wrapper">', unsafe_allow_html=True)
     
-    _, form_col, _ = st.columns([0.5, 2, 0.5], gap="large")
+    col_branding, col_form = st.columns([2, 3], gap="small")  # 40% / 60%
 
-    with form_col:
-        # Carte d'authentification style SpiritStitch (thème depuis utils.theme)
+    with col_branding:
+        # Sidebar branding : logo, sous-titre, description, élément visuel (icône couture)
+        st.markdown(
+            f'<div class="login-branding-logo">{LOGIN_DISPLAY_TITLE_1}{LOGIN_DISPLAY_TITLE_2}</div>'
+            f'<div class="login-branding-subtitle">{LOGIN_DISPLAY_SUBTITLE}</div>'
+            '<div class="login-branding-desc">'
+            'Connectez-vous pour accéder à votre atelier, gérer vos commandes et suivre votre activité.'
+            '</div>'
+            '<div class="login-branding-icon">'
+            '<svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" stroke="rgba(255,255,255,0.7)" stroke-width="1.5" stroke-linecap="round">'
+            '<path d="M32 8v48M12 24l20 8 20-8M12 40l20 8 20-8M8 32h48"/>'
+            '<circle cx="32" cy="32" r="4" fill="rgba(255,255,255,0.3)"/>'
+            '</svg>'
+            '</div>',
+            unsafe_allow_html=True
+        )
+
+    with col_form:
+        # Carte login centrée : titre gradient, label Authentification, formulaire
         st.markdown(
             f'<div class="login-theme-card">'
             f'<div class="login-theme-title">{LOGIN_DISPLAY_TITLE_1}{LOGIN_DISPLAY_TITLE_2}</div>'
             f'<div class="login-theme-subtitle">{LOGIN_DISPLAY_SUBTITLE}</div>'
-            f'<h3>Authentification</h3>',
+            f'<div class="login-theme-label">Authentification</div>',
             unsafe_allow_html=True
         )
         
@@ -573,7 +590,7 @@ def afficher_page_connexion():
             )
         st.markdown("</div><!-- login-theme-card -->", unsafe_allow_html=True)
     
-    st.markdown("</div>", unsafe_allow_html=True)
+    st.markdown("</div><!-- login-page-wrapper -->", unsafe_allow_html=True)
 
     # Footer : informations de l'entreprise sur la page de connexion aussi
     render_app_footer()
