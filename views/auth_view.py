@@ -570,11 +570,10 @@ def afficher_page_connexion():
         
         support_text = content.get("support_text", "")
         if support_text:
-            st.markdown(f"""
-                <div class="login-support">
-                    {support_text}
-                </div>
-            """, unsafe_allow_html=True)
+            st.markdown(
+                f'<div class="login-theme-support">{support_text}</div>',
+                unsafe_allow_html=True,
+            )
         st.markdown("</div><!-- login-theme-card -->", unsafe_allow_html=True)
     
     st.markdown("</div>", unsafe_allow_html=True)

@@ -969,9 +969,22 @@ def afficher_sidebar():
                 # Rediriger vers la page de connexion
                 st.rerun()
         else:
-            # Afficher au moins un bloc vide pour forcer l'affichage de la sidebar
+            # Sidebar page de connexion : branding SpiritStitch (deux tons, plus vide)
+            from utils.theme import LOGIN_DISPLAY_TITLE_1, LOGIN_DISPLAY_TITLE_2, LOGIN_DISPLAY_SUBTITLE
             st.markdown(
-                "<div style='height: 100vh;'></div>",
+                "<div style='padding: 2rem 1rem; text-align: center;'>"
+                f"<p style='font-size: 1.5rem; font-weight: 700; margin-bottom: 0.2rem;'>"
+                f"<span style='color: #B19CD9;'>{LOGIN_DISPLAY_TITLE_1}</span>"
+                f"<span style='color: #40E0D0;'>{LOGIN_DISPLAY_TITLE_2}</span>"
+                "</p>"
+                f"<p style='color: #6B7280; font-size: 0.9rem; margin-bottom: 1.5rem; line-height: 1.4;'>{LOGIN_DISPLAY_SUBTITLE}</p>"
+                "<p style='color: #9CA3AF; font-size: 0.85rem; line-height: 1.5;'>"
+                "Connectez-vous pour accéder à votre atelier et gérer vos commandes."
+                "</p>"
+                "<p style='color: #B19CD9; font-size: 0.8rem; margin-top: 1.5rem;'>"
+                "— Votre espace couture —"
+                "</p>"
+                "</div>",
                 unsafe_allow_html=True,
             )
 
