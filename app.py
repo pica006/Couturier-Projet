@@ -1012,9 +1012,9 @@ def afficher_sidebar():
             # Logo SpiritStitch en haut (premium dark sidebar)
             from utils.theme import LOGIN_DISPLAY_TITLE_1, LOGIN_DISPLAY_TITLE_2
             st.markdown(
-                f'<div style="margin-bottom: 1.8rem;">'
-                f'<span style="font-size: 1.9rem; font-weight: 800; letter-spacing: -0.03em; '
-                f'background: linear-gradient(135deg, #6C63FF 0%, #00C9A7 100%); '
+                f'<div style="margin-bottom: 1.5rem;">'
+                f'<span style="font-size: 1.35rem; font-weight: 800; letter-spacing: -0.02em; '
+                f'background: linear-gradient(135deg, #E0E0FF 0%, #00C9A7 100%); '
                 f'-webkit-background-clip: text; -webkit-text-fill-color: transparent; '
                 f'background-clip: text;">{LOGIN_DISPLAY_TITLE_1}{LOGIN_DISPLAY_TITLE_2}</span></div>',
                 unsafe_allow_html=True,
