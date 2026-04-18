@@ -8,7 +8,7 @@
 """
 import streamlit as st
 from models.salon_model import SalonModel
-from models.database import CouturierModel, CommandeModel
+from models.database import CouturierModel, CommandeModel, AppLogoModel
 from controllers.super_admin_controller import SuperAdminController
 from utils.permissions import est_super_admin
 import pandas as pd
@@ -455,6 +455,24 @@ def afficher_gestion_salons(salon_model):
             f"Code admin: {created_salon_flash.get('code_admin')}"
         )
 
+    logo_saved_flash = st.session_state.pop("super_admin_logo_saved", None)
+    if logo_saved_flash:
+        st.success(
+            f"✅ Logo enregistré en base pour le salon {logo_saved_flash} (affichage app et PDFs)."
+        )
+
+    logo_warn_flash = st.session_state.pop("super_admin_logo_warn", None)
+    if logo_warn_flash:
+        if logo_warn_flash is True:
+            st.warning(
+                "⚠️ Salon créé, mais l’enregistrement du logo a échoué. "
+                "Ajoutez-le depuis l’admin du salon (onglet Gestion du logo)."
+            )
+        else:
+            st.warning(
+                f"⚠️ Salon créé, mais le logo n’a pas pu être enregistré : {logo_warn_flash}"
+            )
+
     updated_salon_flash = st.session_state.pop("super_admin_updated_salon", None)
     if updated_salon_flash:
         st.success(f"✅ Salon modifié avec succès : {updated_salon_flash}")
@@ -555,6 +573,20 @@ def afficher_gestion_salons(salon_model):
         
         # Prévisualiser l'ID du prochain salon (readonly pour l'utilisateur)
         next_id_preview = salon_model.obtenir_prochain_salon_id() or "Jaind_000"
+
+        st.markdown("##### 🖼️ Logo du salon (optionnel)")
+        st.caption(
+            "Le logo est enregistré en base (`app_logo`), comme sur Render : en-tête de l’app et PDFs pour ce salon. "
+            "Formats : PNG, JPG, JPEG. Choisissez le fichier avant de valider le formulaire ci‑dessous."
+        )
+        uploaded_logo = st.file_uploader(
+            "Fichier logo",
+            type=["png", "jpg", "jpeg"],
+            key="super_admin_create_salon_logo",
+            help="Stocké dans PostgreSQL (même mécanisme que la gestion du logo côté admin salon).",
+        )
+        if uploaded_logo is not None:
+            st.image(uploaded_logo, caption="Aperçu", width=160)
         
         with st.form("form_creer_salon", clear_on_submit=True):
             st.markdown("#### 🏢 Informations du salon")
@@ -651,6 +683,32 @@ def afficher_gestion_salons(salon_model):
                         )
                         
                         if result and result.get('success'):
+                            salon_id_new = result.get("salon_id")
+                            if uploaded_logo is not None and salon_id_new:
+                                try:
+                                    logo_model = AppLogoModel(st.session_state.db_connection)
+                                    logo_model.creer_tables()
+                                    file_bytes = uploaded_logo.getvalue()
+                                    file_ext = uploaded_logo.name.split(".")[-1].lower()
+                                    mime_map = {
+                                        "png": "image/png",
+                                        "jpg": "image/jpeg",
+                                        "jpeg": "image/jpeg",
+                                    }
+                                    mime_type = mime_map.get(file_ext, "image/png")
+                                    if logo_model.sauvegarder_logo(
+                                        salon_id=salon_id_new,
+                                        logo_data=file_bytes,
+                                        logo_name=uploaded_logo.name,
+                                        mime_type=mime_type,
+                                        uploaded_by=None,
+                                        description="Logo défini à la création du salon (Super Admin)",
+                                    ):
+                                        st.session_state["super_admin_logo_saved"] = salon_id_new
+                                    else:
+                                        st.session_state["super_admin_logo_warn"] = True
+                                except Exception as logo_err:
+                                    st.session_state["super_admin_logo_warn"] = str(logo_err)
                             st.balloons()
                             st.session_state["super_admin_created_salon"] = {
                                 "salon_id": result.get("salon_id"),

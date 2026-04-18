@@ -217,6 +217,13 @@ class SalonModel:
         """
         try:
             conn = self.db.get_connection()
+            # PostgreSQL (ex. Render) : une requête antérieure peut avoir laissé la connexion
+            # en état « transaction abandonnée » sans rollback explicite.
+            if self.db.db_type != "mysql":
+                try:
+                    conn.rollback()
+                except Exception:
+                    pass
             cursor = conn.cursor()
             
             # ÉTAPE 0 : Générer le prochain salon_id (format Jaind_000, Jaind_001, ...)
@@ -307,15 +314,26 @@ class SalonModel:
         Utilise la fonction SQL generer_prochain_salon_id (sans dépendance au code_admin).
         Retourne None en cas d'erreur.
         """
+        conn = self.db.get_connection()
+        cursor = None
         try:
-            cursor = self.db.get_connection().cursor()
+            cursor = conn.cursor()
             cursor.execute("SELECT generer_prochain_salon_id() AS id")
             res = cursor.fetchone()
-            cursor.close()
             return res[0] if res and res[0] else "Jaind_000"
         except Exception as e:
             print(f"Erreur prévisualisation salon_id : {e}")
+            try:
+                conn.rollback()
+            except Exception:
+                pass
             return None
+        finally:
+            if cursor:
+                try:
+                    cursor.close()
+                except Exception:
+                    pass
 
     def diagnostiquer_table_salons(self) -> Dict:
         """

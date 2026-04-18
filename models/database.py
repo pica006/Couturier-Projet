@@ -2732,6 +2732,10 @@ class AppLogoModel:
             return True
         except (MySQLError, PGError, Exception) as e:
             print(f"Erreur sauvegarde logo: {e}")
+            try:
+                self.db.get_connection().rollback()
+            except Exception:
+                pass
             return False
     
     def recuperer_logo(self, salon_id: str) -> Optional[Dict]:
@@ -2768,4 +2772,8 @@ class AppLogoModel:
             return None
         except (MySQLError, PGError, Exception) as e:
             print(f"Erreur récupération logo: {e}")
+            try:
+                self.db.get_connection().rollback()
+            except Exception:
+                pass
             return None
