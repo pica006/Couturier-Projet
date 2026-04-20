@@ -44,6 +44,28 @@ TRANCHES_IMPOTS = [
 ]
 
 
+def _resoudre_salon_id_admin(admin_data: Dict) -> Optional[str]:
+    """
+    Résout de manière robuste le salon_id de l'admin connecté.
+    1) via session (obtenir_salon_id)
+    2) fallback via code_admin -> salons.code_admin
+    """
+    salon_id = obtenir_salon_id(admin_data)
+    if salon_id:
+        return salon_id
+    try:
+        db_connection = st.session_state.get("db_connection")
+        code_admin = (admin_data or {}).get("code_couturier")
+        if db_connection and code_admin:
+            salon_model = SalonModel(db_connection)
+            salon = salon_model.obtenir_salon_by_code_admin(code_admin)
+            if salon and salon.get("salon_id"):
+                return salon.get("salon_id")
+    except Exception:
+        pass
+    return None
+
+
 def afficher_page_administration():
     """
     Page d'administration - Vue 360° de l'entreprise
@@ -75,7 +97,7 @@ def afficher_page_administration():
     couturier_model = CouturierModel(st.session_state.db_connection)
     client_model = ClientModel(st.session_state.db_connection)
     salon_model = SalonModel(st.session_state.db_connection)
-    salon_id_admin = obtenir_salon_id(couturier_data)
+    salon_id_admin = _resoudre_salon_id_admin(couturier_data)
     
     # Récupérer les informations du salon
     salon_info = None
@@ -1661,10 +1683,16 @@ def afficher_liste_utilisateurs(couturier_model: CouturierModel, admin_data: Dic
     
     st.markdown("#### 📋 Liste de tous les utilisateurs")
     st.markdown("---")
+
+    flash_success = st.session_state.pop("admin_users_success", None)
+    flash_error = st.session_state.pop("admin_users_error", None)
+    if flash_success:
+        st.success(flash_success)
+    if flash_error:
+        st.error(flash_error)
     
     # Récupérer tous les utilisateurs du salon de l'admin (source fiable)
-    from utils.role_utils import obtenir_salon_id
-    salon_id = obtenir_salon_id(admin_data)
+    salon_id = _resoudre_salon_id_admin(admin_data)
     if not salon_id:
         st.error("❌ Impossible de déterminer votre salon. Déconnectez-vous puis reconnectez-vous.")
         return
@@ -1739,12 +1767,64 @@ def afficher_liste_utilisateurs(couturier_model: CouturierModel, admin_data: Dic
             if st.button("💾 Modifier le rôle", type="primary", use_container_width=True, key="btn_modif_role"):
                 if nouveau_role != role_actuel:
                     if couturier_model.modifier_role(user_id, nouveau_role):
-                        st.success("✅ Rôle modifié avec succès !")
+                        st.session_state["admin_users_success"] = "✅ Rôle modifié avec succès !"
                         st.rerun()
                     else:
-                        st.error("❌ Erreur lors de la modification du rôle")
+                        st.session_state["admin_users_error"] = "❌ Erreur lors de la modification du rôle"
+                        st.rerun()
                 else:
                     st.info("ℹ️ Le rôle est déjà défini à cette valeur")
+
+    st.markdown("---")
+    st.markdown("#### 🔒 Activer / Désactiver / Supprimer un utilisateur")
+
+    admin_id = admin_data.get("id")
+    action_options = {
+        f"{u['code_couturier']} - {u['prenom']} {u['nom']} ({'👑 Admin' if u.get('role') == 'admin' else '👤 Employé'})": u
+        for u in utilisateurs
+    }
+    selected_user_label = st.selectbox(
+        "Utilisateur ciblé",
+        options=list(action_options.keys()),
+        key="select_user_actions_admin",
+    )
+    selected_user = action_options[selected_user_label]
+
+    col_a, col_b, col_c = st.columns(3)
+    with col_a:
+        if st.button("⛔ Désactiver", use_container_width=True, key="btn_disable_user_admin"):
+            if selected_user.get("id") == admin_id:
+                st.session_state["admin_users_error"] = "❌ Vous ne pouvez pas désactiver votre propre compte."
+            else:
+                ok = couturier_model.mettre_a_jour_statut_actif(selected_user["id"], False)
+                st.session_state["admin_users_success" if ok else "admin_users_error"] = (
+                    f"✅ Utilisateur {selected_user.get('code_couturier')} désactivé."
+                    if ok else "❌ Erreur lors de la désactivation de l'utilisateur."
+                )
+            st.rerun()
+    with col_b:
+        if st.button("✅ Réactiver", use_container_width=True, key="btn_enable_user_admin"):
+            ok = couturier_model.mettre_a_jour_statut_actif(selected_user["id"], True)
+            st.session_state["admin_users_success" if ok else "admin_users_error"] = (
+                f"✅ Utilisateur {selected_user.get('code_couturier')} réactivé."
+                if ok else "❌ Erreur lors de la réactivation de l'utilisateur."
+            )
+            st.rerun()
+    with col_c:
+        if st.button("🗑️ Supprimer", use_container_width=True, key="btn_delete_user_admin"):
+            if selected_user.get("id") == admin_id:
+                st.session_state["admin_users_error"] = "❌ Vous ne pouvez pas supprimer votre propre compte."
+            elif selected_user.get("role") == "admin":
+                st.session_state["admin_users_error"] = (
+                    "❌ Suppression d'un autre admin bloquée. Changez d'abord son rôle en employé."
+                )
+            else:
+                ok = couturier_model.supprimer_utilisateur(selected_user["id"])
+                st.session_state["admin_users_success" if ok else "admin_users_error"] = (
+                    f"✅ Utilisateur {selected_user.get('code_couturier')} supprimé."
+                    if ok else "❌ Erreur lors de la suppression de l'utilisateur."
+                )
+            st.rerun()
 
 
 def afficher_gestion_mots_de_passe(couturier_model: CouturierModel, admin_data: Dict):
@@ -1753,10 +1833,16 @@ def afficher_gestion_mots_de_passe(couturier_model: CouturierModel, admin_data: 
     st.markdown("#### 🔐 Gestion des mots de passe")
     st.info("Réinitialisez le mot de passe d'un utilisateur")
     st.markdown("---")
+
+    flash_success = st.session_state.pop("admin_pwd_success", None)
+    flash_error = st.session_state.pop("admin_pwd_error", None)
+    if flash_success:
+        st.success(flash_success)
+    if flash_error:
+        st.error(flash_error)
     
     # Récupérer tous les utilisateurs du salon de l'admin (source fiable)
-    from utils.role_utils import obtenir_salon_id
-    salon_id = obtenir_salon_id(admin_data)
+    salon_id = _resoudre_salon_id_admin(admin_data)
     if not salon_id:
         st.error("❌ Impossible de déterminer votre salon. Déconnectez-vous puis reconnectez-vous.")
         return
@@ -1829,12 +1915,15 @@ def afficher_gestion_mots_de_passe(couturier_model: CouturierModel, admin_data: 
             else:
                 # Réinitialiser le mot de passe
                 if couturier_model.reinitialiser_mot_de_passe(user_id, nouveau_password):
-                    st.success("✅ Mot de passe réinitialisé avec succès !")
-                    st.info("💡 L'utilisateur devra utiliser ce nouveau mot de passe pour se connecter.")
+                    st.session_state["admin_pwd_success"] = (
+                        "✅ Mot de passe réinitialisé avec succès ! "
+                        "L'utilisateur devra utiliser ce nouveau mot de passe pour se connecter."
+                    )
                     st.balloons()
                     st.rerun()
                 else:
-                    st.error("❌ Erreur lors de la réinitialisation du mot de passe")
+                    st.session_state["admin_pwd_error"] = "❌ Erreur lors de la réinitialisation du mot de passe"
+                    st.rerun()
 
 
 def afficher_reinitialisation_mot_de_passe(couturier_model: CouturierModel, admin_data: Dict):
@@ -1845,8 +1934,7 @@ def afficher_reinitialisation_mot_de_passe(couturier_model: CouturierModel, admi
     st.markdown("---")
     
     # Récupérer tous les utilisateurs du salon de l'admin (source fiable)
-    from utils.role_utils import obtenir_salon_id
-    salon_id = obtenir_salon_id(admin_data)
+    salon_id = _resoudre_salon_id_admin(admin_data)
     if not salon_id:
         st.error("❌ Impossible de déterminer votre salon. Déconnectez-vous puis reconnectez-vous.")
         return

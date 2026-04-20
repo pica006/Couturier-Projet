@@ -303,6 +303,11 @@ class CouturierModel:
     def lister_tous_couturiers(self, salon_id: Optional[str] = None) -> List[Dict]:
         """Liste tous les couturiers (optionnellement filtrés par salon)"""
         try:
+            if self.db.db_type != 'mysql':
+                try:
+                    self.db.get_connection().rollback()
+                except Exception:
+                    pass
             cursor = self.db.get_connection().cursor()
             if salon_id:
                 query = """
@@ -339,6 +344,10 @@ class CouturierModel:
             return couturiers
         except (MySQLError, PGError, Exception) as e:
             print(f"Erreur liste couturiers: {e}")
+            try:
+                self.db.get_connection().rollback()
+            except Exception:
+                pass
             return []
     
     def creer_utilisateur(self, code_couturier: str, password: str, nom: str, prenom: str,
@@ -451,6 +460,11 @@ class CouturierModel:
             actif: True pour activer, False pour désactiver
         """
         try:
+            if self.db.db_type != 'mysql':
+                try:
+                    self.db.get_connection().rollback()
+                except Exception:
+                    pass
             cursor = self.db.get_connection().cursor()
             if self.db.db_type == 'mysql':
                 query = "UPDATE couturiers SET actif = %s WHERE id = %s"
@@ -464,6 +478,10 @@ class CouturierModel:
             return True
         except (MySQLError, PGError, Exception) as e:
             print(f"Erreur mise à jour statut actif utilisateur {user_id}: {e}")
+            try:
+                self.db.get_connection().rollback()
+            except Exception:
+                pass
             return False
     
     def reinitialiser_mot_de_passe(self, couturier_id: int, nouveau_password: str) -> bool:
@@ -478,6 +496,11 @@ class CouturierModel:
             True si succès, False sinon
         """
         try:
+            if self.db.db_type != 'mysql':
+                try:
+                    self.db.get_connection().rollback()
+                except Exception:
+                    pass
             cursor = self.db.get_connection().cursor()
             query = "UPDATE couturiers SET password = %s WHERE id = %s"
             cursor.execute(query, (hash_password(nouveau_password), couturier_id))
@@ -486,6 +509,10 @@ class CouturierModel:
             return True
         except (MySQLError, PGError, Exception) as e:
             print(f"Erreur réinitialisation mot de passe: {e}")
+            try:
+                self.db.get_connection().rollback()
+            except Exception:
+                pass
             return False
     
     def modifier_role(self, couturier_id: int, nouveau_role: str) -> bool:
@@ -503,6 +530,11 @@ class CouturierModel:
             # Vérifier que le rôle est valide
             if nouveau_role not in ['admin', 'employe']:
                 return False
+            if self.db.db_type != 'mysql':
+                try:
+                    self.db.get_connection().rollback()
+                except Exception:
+                    pass
             
             cursor = self.db.get_connection().cursor()
             query = "UPDATE couturiers SET role = %s WHERE id = %s"
@@ -512,6 +544,10 @@ class CouturierModel:
             return True
         except (MySQLError, PGError, Exception) as e:
             print(f"Erreur modification rôle: {e}")
+            try:
+                self.db.get_connection().rollback()
+            except Exception:
+                pass
             return False
     
     def supprimer_utilisateur(self, couturier_id: int) -> bool:
@@ -525,6 +561,11 @@ class CouturierModel:
             True si succès, False sinon
         """
         try:
+            if self.db.db_type != 'mysql':
+                try:
+                    self.db.get_connection().rollback()
+                except Exception:
+                    pass
             cursor = self.db.get_connection().cursor()
             query = "DELETE FROM couturiers WHERE id = %s"
             cursor.execute(query, (couturier_id,))
@@ -533,6 +574,10 @@ class CouturierModel:
             return True
         except (MySQLError, PGError, Exception) as e:
             print(f"Erreur suppression utilisateur: {e}")
+            try:
+                self.db.get_connection().rollback()
+            except Exception:
+                pass
             return False
 
 
