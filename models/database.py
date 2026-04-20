@@ -1272,8 +1272,8 @@ class CommandeModel:
             print(f"Erreur modification prix commande: {e}")
             return False
     
-    def demander_fermeture(self, commande_id: int, couturier_id: int, 
-                          commentaire: Optional[str] = None) -> Optional[int]:
+    def demander_fermeture(self, commande_id: int, couturier_id: int,
+                         commentaire: Optional[str] = None) -> Optional[dict]:
         """
         Demande la fermeture d'une commande (création d'une entrée en attente de validation)
         
@@ -1283,7 +1283,7 @@ class CommandeModel:
             commentaire: Commentaire optionnel
             
         Returns:
-            ID de l'entrée d'historique créée ou None si erreur
+            dict: {"id": <id>, "created": <bool>} ou None si erreur
         """
         try:
             connection = self.db.get_connection()
@@ -1353,6 +1353,11 @@ class CommandeModel:
             error_details = traceback.format_exc()
             print(f"❌ Erreur demande fermeture: {e}")
             print(f"Détails: {error_details}")
+            try:
+                if getattr(self.db, "db_type", "") == "postgresql":
+                    self.db.get_connection().rollback()
+            except Exception:
+                pass
             try:
                 cursor.close()
             except:

@@ -144,20 +144,13 @@ def afficher_page_fermer_commandes():
 
     def _bandeau_urgence(commande):
         meta = _meta_urgence(commande)
-        couleurs = {
-            "rouge": ("#7f1d1d", "#fecaca"),
-            "orange": ("#7c2d12", "#fed7aa"),
-            "vert": ("#14532d", "#bbf7d0"),
-        }
-        txt, bg = couleurs.get(meta["niveau"], ("#1e3a8a", "#bfdbfe"))
-        st.markdown(
-            f"""
-            <div style="border-left: 6px solid {txt}; background: {bg}; padding: 0.6rem 0.8rem; border-radius: 0.5rem; margin-bottom: 0.8rem;">
-                <strong>{meta["emoji"]} Priorité {meta["niveau"].upper()}</strong> — {meta["label"]}
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
+        message = f"{meta['emoji']} **Priorité {meta['niveau'].upper()}** — {meta['label']}"
+        if meta["niveau"] == "rouge":
+            st.error(message)
+        elif meta["niveau"] == "orange":
+            st.warning(message)
+        else:
+            st.success(message)
     
     # ========================================================================
     # ONGLET 1 : MODIFIER LES PAIEMENTS (Commandes avec avance)
@@ -571,13 +564,11 @@ def afficher_page_fermer_commandes():
                             st.caption("📊 Aucune demande de fermeture envoyée pour cette commande.")
 
                         if demande_existante:
-                            # Demande déjà envoyée - afficher en orange
-                            st.markdown("""
-                                <div style='background-color: #FFA500; padding: 1rem; border-radius: 8px; color: white; text-align: center;'>
-                                    <strong>🟠 Demande de livraison en attente de confirmation</strong><br>
-                                    Votre demande a été envoyée et est en attente de validation par l'administrateur.
-                                </div>
-                            """, unsafe_allow_html=True)
+                            # Demande déjà envoyée
+                            st.warning(
+                                "🟠 Demande de livraison en attente de confirmation. "
+                                "Votre demande est en attente de validation par l'administrateur."
+                            )
                             if demande_existante.get('date_creation'):
                                 st.caption(f"📅 Demande envoyée le : {demande_existante.get('date_creation')}")
                         else:
@@ -601,20 +592,55 @@ def afficher_page_fermer_commandes():
                                                 couturier_id,
                                                 "Demande de livraison de la commande"
                                             )
-                                            
-                                            if result and result.get("id"):
-                                                if result.get("created", False):
-                                                    st.success(f"🟢 Demande envoyée avec succès (ID: {result['id']}) pour la commande {commande['id']}")
+
+                                            result_id = None
+                                            created = True
+                                            if isinstance(result, dict):
+                                                result_id = result.get("id")
+                                                created = bool(result.get("created", False))
+                                            elif isinstance(result, int):
+                                                result_id = result
+                                                created = True
+
+                                            if result_id:
+                                                if created:
+                                                    st.success(
+                                                        f"🟢 Demande envoyée avec succès (ID: {result_id}) "
+                                                        f"pour la commande {commande['id']}"
+                                                    )
                                                     st.caption("État : envoyée, la ligne va disparaître.")
                                                     st.balloons()
-                                                    st.rerun()
                                                 else:
-                                                    st.warning(f"⚠️ Une demande de fermeture existe déjà pour la commande {commande['id']} (ID demande: {result['id']})")
+                                                    st.warning(
+                                                        f"⚠️ Une demande de fermeture existe déjà pour la commande "
+                                                        f"{commande['id']} (ID demande: {result_id})"
+                                                    )
                                                     st.caption("État : déjà envoyée, la ligne va disparaître.")
-                                                    st.rerun()
-                                            else:
-                                                st.error("❌ Demande non envoyée (aucun ID retourné).")
-                                                st.caption("État : échec")
+                                                st.rerun()
+
+                                            # Fallback robuste : vérifier si une demande en attente existe maintenant
+                                            demandes_apres = commande_model.lister_demandes_validation() or []
+                                            deja_en_attente = next(
+                                                (
+                                                    d for d in demandes_apres
+                                                    if d.get("commande_id") == commande["id"]
+                                                    and d.get("type_action") == "fermeture_demande"
+                                                    and d.get("statut_validation") == "en_attente"
+                                                ),
+                                                None,
+                                            )
+                                            if deja_en_attente:
+                                                st.warning(
+                                                    f"⚠️ Une demande existe déjà (ID: {deja_en_attente.get('id')})."
+                                                )
+                                                st.caption("État : déjà envoyée, la ligne va disparaître.")
+                                                st.rerun()
+
+                                            st.error(
+                                                "❌ Demande non envoyée. Vérifiez que la commande est totalement soldée "
+                                                "et réessayez."
+                                            )
+                                            st.caption("État : échec")
                                         except Exception as e:
                                             st.error(f"❌ Erreur : {e}")
                                 else:
