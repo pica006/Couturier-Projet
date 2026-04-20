@@ -159,6 +159,14 @@ class CouturierModel:
         IMPORTANT : On récupère aussi le PASSWORD pour le vérifier après !
         """
         try:
+            # PostgreSQL: nettoyer une transaction potentiellement abandonnée
+            # avant d'exécuter de nouvelles requêtes.
+            if self.db.db_type != 'mysql':
+                try:
+                    self.db.get_connection().rollback()
+                except Exception:
+                    pass
+
             # Créer un curseur pour exécuter la requête SQL
             cursor = self.db.get_connection().cursor()
             
@@ -207,6 +215,10 @@ class CouturierModel:
         except (MySQLError, PGError, Exception) as e:
             # En cas d'erreur SQL
             print(f"Erreur vérification: {e}")
+            try:
+                self.db.get_connection().rollback()
+            except Exception:
+                pass
             return False, None
     
     def creer_tables(self) -> bool:
@@ -351,6 +363,13 @@ class CouturierModel:
         cursor = None
         self.last_error = None
         try:
+            # PostgreSQL: repartir d'un état transactionnel propre.
+            if self.db.db_type != 'mysql':
+                try:
+                    self.db.get_connection().rollback()
+                except Exception:
+                    pass
+
             # Vérifier que le code n'existe pas déjà
             existe, _ = self.verifier_code(code_couturier)
             if existe:
