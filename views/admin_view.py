@@ -1508,6 +1508,14 @@ def afficher_formulaire_creation_utilisateur(couturier_model: CouturierModel, ad
     st.markdown("#### ➕ Créer un nouvel utilisateur")
     st.info("Créez un nouveau compte utilisateur avec attribution de rôle. L'utilisateur sera automatiquement assigné à votre salon.")
     st.markdown("---")
+
+    # Flash messages persistants après rerun
+    flash_success = st.session_state.pop("admin_create_user_success", None)
+    flash_error = st.session_state.pop("admin_create_user_error", None)
+    if flash_success:
+        st.success(flash_success)
+    if flash_error:
+        st.error(flash_error)
     
     with st.form("form_creer_utilisateur", clear_on_submit=True):
         col1, col2 = st.columns(2)
@@ -1625,18 +1633,27 @@ def afficher_formulaire_creation_utilisateur(couturier_model: CouturierModel, ad
                         )
 
                         if user_id is not None:
-                            st.success(f"✅ Utilisateur '{code_couturier}' créé avec succès !")
+                            st.session_state["admin_create_user_success"] = (
+                                f"✅ Utilisateur '{code_couturier.strip().upper()}' créé avec succès !"
+                            )
                             st.balloons()
                             st.rerun()
                         else:
                             detail = getattr(couturier_model, "last_error", None)
                             if detail:
-                                st.error(f"❌ Erreur lors de la création de l'utilisateur : {detail}")
+                                st.session_state["admin_create_user_error"] = (
+                                    f"❌ Erreur lors de la création de l'utilisateur : {detail}"
+                                )
                             else:
-                                st.error("❌ Erreur lors de la création de l'utilisateur")
+                                st.session_state["admin_create_user_error"] = (
+                                    "❌ Erreur lors de la création de l'utilisateur"
+                                )
+                            st.rerun()
                     except Exception as e:
-                        st.error(f"❌ Exception inattendue pendant la création : {e}")
-                        st.exception(e)
+                        st.session_state["admin_create_user_error"] = (
+                            f"❌ Exception inattendue pendant la création : {e}"
+                        )
+                        st.rerun()
 
 
 def afficher_liste_utilisateurs(couturier_model: CouturierModel, admin_data: Dict):
