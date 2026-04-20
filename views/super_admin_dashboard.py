@@ -564,6 +564,39 @@ def afficher_gestion_salons(salon_model):
                     st.write(f"**Téléphone** : {salon.get('telephone', 'N/A')}")
                     st.write(f"**Email** : {salon.get('email', 'N/A')}")
                     st.write(f"**Code Admin** : {salon.get('code_admin', 'N/A')}")
+                    statut_salon = "✅ Actif" if salon.get('actif', True) else "⛔ Désactivé"
+                    st.write(f"**Statut** : {statut_salon}")
+
+                st.markdown("---")
+                st.markdown("#### ⚙️ Actions rapides")
+                col_action_1, col_action_2 = st.columns(2)
+
+                if salon.get('actif', True):
+                    with col_action_1:
+                        if st.button("⛔ Désactiver ce salon", key=f"deactivate_salon_{salon['salon_id']}"):
+                            try:
+                                ok = salon_model.modifier_salon(salon_id=salon['salon_id'], actif=False)
+                                if ok:
+                                    st.success(f"Salon {salon['salon_id']} désactivé avec succès.")
+                                    st.rerun()
+                                else:
+                                    st.error("Échec de la désactivation du salon.")
+                            except Exception as e:
+                                st.error(f"Erreur pendant la désactivation : {e}")
+                                st.exception(e)
+                else:
+                    with col_action_1:
+                        if st.button("✅ Réactiver ce salon", key=f"activate_salon_{salon['salon_id']}"):
+                            try:
+                                ok = salon_model.modifier_salon(salon_id=salon['salon_id'], actif=True)
+                                if ok:
+                                    st.success(f"Salon {salon['salon_id']} réactivé avec succès.")
+                                    st.rerun()
+                                else:
+                                    st.error("Échec de la réactivation du salon.")
+                            except Exception as e:
+                                st.error(f"Erreur pendant la réactivation : {e}")
+                                st.exception(e)
     
     # ========================================================================
     # CRÉER UN SALON
@@ -926,6 +959,66 @@ def afficher_gestion_utilisateurs(super_admin_ctrl, salon_model, couturier_model
                                 st.rerun()
                             else:
                                 st.error("Erreur lors de l'activation de l'utilisateur.")
+
+            st.markdown("---")
+            st.markdown("### 🔑 Réinitialiser le mot de passe d'un employé")
+            employes = [u for u in users if u.get('role') == 'employe']
+
+            if not employes:
+                st.info("ℹ️ Aucun employé disponible pour une réinitialisation de mot de passe.")
+            else:
+                employe_options = {
+                    f"{u['code_couturier']} - {u.get('prenom', '')} {u.get('nom', '')} ({u.get('salon_id', 'N/A')})": u
+                    for u in employes
+                }
+
+                with st.form("form_reset_password_employe"):
+                    selected_employe_label = st.selectbox(
+                        "Employé *",
+                        options=list(employe_options.keys()),
+                        help="Choisissez l'employé dont vous voulez réinitialiser le mot de passe."
+                    )
+                    nouveau_password = st.text_input(
+                        "Nouveau mot de passe *",
+                        type="password",
+                        help="Minimum recommandé : 6 caractères."
+                    )
+                    confirmer_password = st.text_input(
+                        "Confirmer le nouveau mot de passe *",
+                        type="password"
+                    )
+
+                    submitted_reset = st.form_submit_button("🔄 Réinitialiser le mot de passe")
+
+                    if submitted_reset:
+                        employe_data = employe_options[selected_employe_label]
+                        employe_id = employe_data.get("id")
+
+                        if not nouveau_password or not confirmer_password:
+                            st.error("❌ Veuillez renseigner les deux champs de mot de passe.")
+                        elif nouveau_password != confirmer_password:
+                            st.error("❌ Les mots de passe ne correspondent pas.")
+                        elif len(nouveau_password) < 6:
+                            st.error("❌ Le mot de passe doit contenir au moins 6 caractères.")
+                        elif not employe_id:
+                            st.error("❌ Impossible d'identifier l'employé sélectionné.")
+                        else:
+                            try:
+                                ok = couturier_model.reinitialiser_mot_de_passe(
+                                    couturier_id=employe_id,
+                                    nouveau_password=nouveau_password
+                                )
+                                if ok:
+                                    st.success(
+                                        f"✅ Mot de passe réinitialisé pour {employe_data.get('code_couturier')}."
+                                    )
+                                else:
+                                    st.error(
+                                        "❌ Échec de la réinitialisation du mot de passe (vérifiez l'état de la base)."
+                                    )
+                            except Exception as e:
+                                st.error(f"❌ Exception pendant la réinitialisation : {e}")
+                                st.exception(e)
     
     # ========================================================================
     # CRÉER UN ADMIN
@@ -976,29 +1069,36 @@ def afficher_gestion_utilisateurs(super_admin_ctrl, salon_model, couturier_model
                         st.error("❌ Veuillez remplir tous les champs obligatoires (*)")
                     else:
                         salon_id = salon_options[selected_salon]
-                        
-                        user_id = couturier_model.creer_utilisateur(
-                            code_couturier=code_couturier,
-                            password=password,
-                            nom=nom,
-                            prenom=prenom,
-                            role='admin',
-                            email=email,
-                            telephone=telephone,
-                            salon_id=salon_id
-                        )
-                        
-                        if user_id:
-                            st.success(f"""
-                            ✅ Admin créé avec succès !
+                        try:
+                            user_id = couturier_model.creer_utilisateur(
+                                code_couturier=code_couturier,
+                                password=password,
+                                nom=nom,
+                                prenom=prenom,
+                                role='admin',
+                                email=email,
+                                telephone=telephone,
+                                salon_id=salon_id
+                            )
                             
-                            **ID** : {user_id}  
-                            **Code** : {code_couturier}  
-                            **Salon** : {salon_id}
-                            """)
-                            st.balloons()
-                        else:
-                            st.error("❌ Erreur lors de la création (code déjà existant ?)")
+                            if user_id:
+                                st.success(f"""
+                                ✅ Admin créé avec succès !
+                                
+                                **ID** : {user_id}  
+                                **Code** : {code_couturier}  
+                                **Salon** : {salon_id}
+                                """)
+                                st.balloons()
+                            else:
+                                detail = getattr(couturier_model, "last_error", None)
+                                if detail:
+                                    st.error(f"❌ Création admin impossible : {detail}")
+                                else:
+                                    st.error("❌ Erreur lors de la création (cause non remontée par le modèle).")
+                        except Exception as e:
+                            st.error(f"❌ Exception inattendue pendant la création admin : {e}")
+                            st.exception(e)
     
     # ========================================================================
     # CRÉER UN EMPLOYÉ
@@ -1053,32 +1153,39 @@ def afficher_gestion_utilisateurs(super_admin_ctrl, salon_model, couturier_model
                         st.error("❌ Veuillez remplir tous les champs obligatoires (*)")
                     else:
                         salon_id = salon_options[selected_salon]
-                        
-                        user_id = couturier_model.creer_utilisateur(
-                            code_couturier=code_couturier,
-                            password=password,
-                            nom=nom,
-                            prenom=prenom,
-                            role='employe',
-                            email=email,
-                            telephone=telephone,
-                            salon_id=salon_id
-                        )
-                        
-                        if user_id:
-                            st.success(f"""
-                            ✅ Employé créé avec succès !
+                        try:
+                            user_id = couturier_model.creer_utilisateur(
+                                code_couturier=code_couturier,
+                                password=password,
+                                nom=nom,
+                                prenom=prenom,
+                                role='employe',
+                                email=email,
+                                telephone=telephone,
+                                salon_id=salon_id
+                            )
                             
-                            **ID** : {user_id}  
-                            **Code** : {code_couturier}  
-                            **Salon** : {salon_id}
-                            **Role** : Employé
-                            
-                            L'employé peut maintenant se connecter avec ce code.
-                            """)
-                            st.balloons()
-                        else:
-                            st.error("❌ Erreur lors de la création (code déjà existant ?)")
+                            if user_id:
+                                st.success(f"""
+                                ✅ Employé créé avec succès !
+                                
+                                **ID** : {user_id}  
+                                **Code** : {code_couturier}  
+                                **Salon** : {salon_id}
+                                **Role** : Employé
+                                
+                                L'employé peut maintenant se connecter avec ce code.
+                                """)
+                                st.balloons()
+                            else:
+                                detail = getattr(couturier_model, "last_error", None)
+                                if detail:
+                                    st.error(f"❌ Création employé impossible : {detail}")
+                                else:
+                                    st.error("❌ Erreur lors de la création (cause non remontée par le modèle).")
+                        except Exception as e:
+                            st.error(f"❌ Exception inattendue pendant la création employé : {e}")
+                            st.exception(e)
 
 
 def afficher_toutes_commandes(super_admin_ctrl, salon_model):

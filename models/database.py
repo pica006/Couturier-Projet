@@ -139,6 +139,7 @@ class CouturierModel:
     
     def __init__(self, db_connection: DatabaseConnection):
         self.db = db_connection
+        self.last_error: Optional[str] = None
     
     def verifier_code(self, code_couturier: str) -> Tuple[bool, Optional[Dict]]:
         """
@@ -347,17 +348,30 @@ class CouturierModel:
         Returns:
             ID de l'utilisateur créé ou None si erreur
         """
+        cursor = None
+        self.last_error = None
         try:
             # Vérifier que le code n'existe pas déjà
             existe, _ = self.verifier_code(code_couturier)
             if existe:
+                self.last_error = f"Le code de connexion '{code_couturier}' existe déjà."
                 return None  # Code déjà existant
             
             # Vérifier que le rôle est valide
             if role not in ['admin', 'employe']:
+                self.last_error = f"Rôle invalide '{role}', basculement automatique vers 'employe'."
                 role = 'employe'
             
             cursor = self.db.get_connection().cursor()
+
+            # Vérifier l'existence du salon cible (si fourni)
+            if salon_id:
+                cursor.execute("SELECT 1 FROM salons WHERE salon_id = %s", (salon_id,))
+                salon_exists = cursor.fetchone()
+                if not salon_exists:
+                    self.last_error = f"Le salon '{salon_id}' est introuvable."
+                    cursor.close()
+                    return None
             
             # Hasher le mot de passe avant stockage
             password_hash = hash_password(password)
@@ -387,6 +401,16 @@ class CouturierModel:
             return user_id
         except (MySQLError, PGError, Exception) as e:
             print(f"Erreur création utilisateur: {e}")
+            self.last_error = str(e)
+            try:
+                self.db.get_connection().rollback()
+            except Exception:
+                pass
+            if cursor:
+                try:
+                    cursor.close()
+                except Exception:
+                    pass
             return None
 
     def mettre_a_jour_statut_actif(self, user_id: int, actif: bool) -> bool:

@@ -15,15 +15,25 @@ def _safe_format(template: str, values: dict) -> str:
 
 
 @st.cache_data(show_spinner=False)
-def load_site_content() -> dict:
-    project_root = os.path.dirname(os.path.dirname(__file__))
-    content_path = os.path.join(project_root, "assets", "site_content.json")
-
+def _load_site_content_cached(content_path: str, cache_key: float) -> dict:
+    # cache_key (mtime) force l'invalidation du cache quand le fichier change.
+    _ = cache_key
     try:
         with open(content_path, "r", encoding="utf-8") as file:
             return json.load(file)
     except Exception:
         return {}
+
+
+def load_site_content() -> dict:
+    project_root = os.path.dirname(os.path.dirname(__file__))
+    content_path = os.path.join(project_root, "assets", "site_content.json")
+    try:
+        cache_key = os.path.getmtime(content_path)
+    except OSError:
+        cache_key = 0.0
+
+    return _load_site_content_cached(content_path, cache_key)
 
 
 def _build_bottom_nav_html(content: dict, app_values: dict) -> str:
