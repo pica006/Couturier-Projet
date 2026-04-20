@@ -187,9 +187,25 @@ def _afficher_galerie_photos(commande_model, couturier_id_filtre, salon_id, date
         col_img, _ = st.columns([2, 1])
         with col_img:
             try:
-                st.image(img_data['bytes'], caption=img_data['label'], use_container_width=True)
+                raw_image = img_data.get('bytes')
+                if raw_image is None:
+                    st.warning("⚠️ Image vide ou indisponible pour cette commande.")
+                else:
+                    # PostgreSQL peut renvoyer BYTEA en memoryview selon le driver.
+                    if isinstance(raw_image, memoryview):
+                        raw_image = raw_image.tobytes()
+                    elif isinstance(raw_image, bytearray):
+                        raw_image = bytes(raw_image)
+                    elif not isinstance(raw_image, bytes):
+                        # Fallback défensif pour formats inattendus.
+                        raw_image = bytes(raw_image)
+
+                    st.image(raw_image, caption=img_data['label'], use_container_width=True)
             except Exception:
-                st.image(io.BytesIO(img_data['bytes']), caption=img_data['label'], use_container_width=True)
+                try:
+                    st.image(io.BytesIO(raw_image), caption=img_data['label'], use_container_width=True)
+                except Exception as e:
+                    st.error(f"❌ Impossible d'afficher l'image : {e}")
 
         st.caption(f"Photo {idx + 1} / {nb_photos}")
 
