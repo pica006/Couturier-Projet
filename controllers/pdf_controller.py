@@ -72,46 +72,51 @@ class PDFController:
                 return None
         return None
 
-    def _build_footer_lines(self, salon_id: Optional[str]) -> Optional[list]:
-        """
-        Construit les lignes de pied de page pour un salon donné.
-        Les informations proviennent exclusivement de la table salons.
-        """
+    def _charger_salon(self, salon_id: Optional[str]) -> Optional[Dict]:
+        """Charge la fiche salon (une seule requête pour en-tête + pied de page)."""
         if not (self.db_connection and salon_id):
             return None
         try:
             from models.salon_model import SalonModel
-            salon_model = SalonModel(self.db_connection)
-            salon = salon_model.obtenir_salon_by_id(str(salon_id))
-            if not salon:
-                return None
-
-            nom = salon.get('nom_salon') or salon_id
-            quartier = salon.get('quartier') or ''
-            responsable = salon.get('responsable') or ''
-            telephone = salon.get('telephone') or ''
-            email = salon.get('email') or ''
-
-            line1 = f"{nom} ({salon_id})"
-
-            parts = []
-            if quartier:
-                parts.append(quartier)
-            if responsable:
-                parts.append(f"Resp.: {responsable}")
-            if telephone:
-                parts.append(f"Tél: {telephone}")
-            if email:
-                parts.append(f"Email: {email}")
-
-            line2 = " | ".join(parts) if parts else ""
-
-            lines = [line1]
-            if line2:
-                lines.append(line2)
-            return lines
+            return SalonModel(self.db_connection).obtenir_salon_by_id(str(salon_id))
         except Exception as e:
-            print(f"Erreur construction pied de page PDF pour salon {salon_id}: {e}")
+            print(f"Erreur chargement salon PDF {salon_id}: {e}")
+            return None
+
+    def _build_footer_lines(self, salon: Optional[Dict]) -> Optional[list]:
+        """
+        Pied de page professionnel : nom du salon + coordonnées, sans code technique (salon_id).
+        """
+        if not salon:
+            return None
+        try:
+            nom = (salon.get('nom_salon') or '').strip() or 'Salon de couture'
+            responsable = (salon.get('responsable') or '').strip()
+            telephone = (salon.get('telephone') or '').strip()
+            email = (salon.get('email') or '').strip()
+
+            segments = [nom]
+            if responsable:
+                segments.append(f"Resp.: {responsable}")
+            if telephone:
+                segments.append(f"Tél: {telephone}")
+            if email:
+                segments.append(f"Email: {email}")
+
+            line = " | ".join(segments)
+            # Ligne unique ou couper si trop longue pour le canvas
+            if len(line) <= 118:
+                return [line]
+            row2_parts = []
+            if responsable:
+                row2_parts.append(f"Resp.: {responsable}")
+            if telephone:
+                row2_parts.append(f"Tél: {telephone}")
+            if email:
+                row2_parts.append(f"Email: {email}")
+            return [nom, " | ".join(row2_parts)] if row2_parts else [nom]
+        except Exception as e:
+            print(f"Erreur construction pied de page PDF: {e}")
             return None
 
     def generer_pdf_commande(self, commande_data: Dict) -> Optional[str]:
@@ -195,8 +200,8 @@ class PDFController:
                 except Exception as e:
                     print(f"Erreur récupération logo filigrane depuis BDD: {e}")
             
-            # Préparer le pied de page (informations du salon)
-            footer_lines = self._build_footer_lines(salon_id)
+            salon_row = self._charger_salon(salon_id)
+            footer_lines = self._build_footer_lines(salon_row)
 
             def dessiner_filigrane(canvas_obj, doc_obj):
                 logo_img = None
@@ -241,23 +246,27 @@ class PDFController:
                 try:
                     canvas_obj.saveState()
                     page_width, _ = doc_obj.pagesize
-                    footer_height = 2 * cm
-                    # Bande de fond sur toute la largeur en bas de page
-                    canvas_obj.setFillColor(colors.HexColor('#1F4ED8'))
+                    footer_height = 2.2 * cm
+                    canvas_obj.setFillColor(colors.HexColor('#EEF2F7'))
                     canvas_obj.rect(0, 0, page_width, footer_height, fill=1, stroke=0)
+                    canvas_obj.setStrokeColor(colors.HexColor('#CBD5E1'))
+                    canvas_obj.setLineWidth(0.8)
+                    canvas_obj.line(0, footer_height, page_width, footer_height)
 
-                    # Texte du salon par-dessus la bande
                     font_name = "Helvetica"
-                    font_size = 8
-                    canvas_obj.setFont(font_name, font_size)
-                    canvas_obj.setFillColor(colors.white)
-                    base_y = 0.6 * cm
+                    max_w = page_width - 1.2 * cm
                     for idx, line in enumerate(footer_lines):
                         text = str(line)
-                        text_width = canvas_obj.stringWidth(text, font_name, font_size)
-                        x = (page_width - text_width) / 2
-                        y = base_y + idx * 0.35 * cm
-                        if y < footer_height - 0.2 * cm:
+                        fs = 8
+                        while text and canvas_obj.stringWidth(text, font_name, fs) > max_w and fs > 6:
+                            fs -= 1
+                        canvas_obj.setFont(font_name, fs)
+                        canvas_obj.setFillColor(colors.HexColor('#334155'))
+                        text_width = canvas_obj.stringWidth(text, font_name, fs)
+                        x = max(0.6 * cm, (page_width - text_width) / 2)
+                        base_y = 0.55 * cm
+                        y = base_y + idx * 0.38 * cm
+                        if y < footer_height - 0.15 * cm:
                             canvas_obj.drawString(x, y, text)
                     canvas_obj.restoreState()
                 except Exception as e:
@@ -269,8 +278,10 @@ class PDFController:
             doc = SimpleDocTemplate(
                 filepath,
                 pagesize=A4,
-                rightMargin=2*cm,
-                leftMargin=2*cm
+                rightMargin=2 * cm,
+                leftMargin=2 * cm,
+                topMargin=1.4 * cm,
+                bottomMargin=2.6 * cm,
             )
             elements = []
             styles = getSampleStyleSheet()
@@ -280,17 +291,36 @@ class PDFController:
                 'CustomTitle',
                 parent=styles['Heading1'],
                 fontSize=22,
-                textColor=colors.HexColor('#2C3E50'),
+                textColor=colors.HexColor('#0F766E'),
                 alignment=1,
-                spaceAfter=25
+                spaceAfter=12
             )
 
             heading_style = ParagraphStyle(
                 'CustomHeading',
                 parent=styles['Heading2'],
-                fontSize=14,
-                textColor=colors.HexColor('#34495E'),
+                fontSize=13,
+                textColor=colors.HexColor('#0D9488'),
                 spaceAfter=10
+            )
+
+            salon_name_style = ParagraphStyle(
+                'SalonBrand',
+                parent=styles['Normal'],
+                fontSize=14,
+                textColor=colors.HexColor('#115E59'),
+                alignment=1,
+                spaceAfter=4,
+                fontName='Helvetica-Bold',
+            )
+            salon_tagline_style = ParagraphStyle(
+                'SalonTagline',
+                parent=styles['Normal'],
+                fontSize=10,
+                textColor=colors.HexColor('#64748B'),
+                alignment=1,
+                spaceAfter=14,
+                fontName='Helvetica-Oblique',
             )
 
             # ---------------------------
@@ -336,6 +366,12 @@ class PDFController:
                 print("⚠️ Logo PDF non trouvé (ni en BDD ni dans les fichiers)")
             elements.append(Spacer(1, 0.5*cm))
 
+            if salon_row and (salon_row.get('nom_salon') or '').strip():
+                elements.append(Paragraph((salon_row.get('nom_salon') or '').strip(), salon_name_style))
+            elements.append(Paragraph(
+                "Salon de couture · vêtements sur mesure · document officiel de commande",
+                salon_tagline_style
+            ))
             elements.append(Paragraph("FICHE DE COMMANDE", title_style))
 
             # ---------------------------
@@ -389,8 +425,8 @@ class PDFController:
 
             info_table = Table(info_data, colWidths=[5*cm, 10*cm])
             info_table.setStyle(TableStyle([
-                ('BACKGROUND', (0, 0), (0, -1), colors.HexColor('#ECF0F1')),
-                ('GRID', (0, 0), (-1, -1), 0.4, colors.grey),
+                ('BACKGROUND', (0, 0), (0, -1), colors.HexColor('#F1F5F9')),
+                ('GRID', (0, 0), (-1, -1), 0.35, colors.HexColor('#E2E8F0')),
                 ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
             ]))
             elements.append(info_table)
@@ -409,8 +445,8 @@ class PDFController:
 
             client_table = Table(client_data, colWidths=[5*cm, 10*cm])
             client_table.setStyle(TableStyle([
-                ('BACKGROUND', (0, 0), (0, -1), colors.HexColor('#ECF0F1')),
-                ('GRID', (0, 0), (-1, -1), 0.4, colors.grey),
+                ('BACKGROUND', (0, 0), (0, -1), colors.HexColor('#F1F5F9')),
+                ('GRID', (0, 0), (-1, -1), 0.35, colors.HexColor('#E2E8F0')),
                 ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
             ]))
             elements.append(client_table)
@@ -429,8 +465,8 @@ class PDFController:
 
             vetement_table = Table(vetement_data, colWidths=[5*cm, 10*cm])
             vetement_table.setStyle(TableStyle([
-                ('BACKGROUND', (0, 0), (0, -1), colors.HexColor('#ECF0F1')),
-                ('GRID', (0, 0), (-1, -1), 0.4, colors.grey),
+                ('BACKGROUND', (0, 0), (0, -1), colors.HexColor('#F1F5F9')),
+                ('GRID', (0, 0), (-1, -1), 0.35, colors.HexColor('#E2E8F0')),
                 ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
             ]))
             elements.append(vetement_table)
@@ -473,7 +509,7 @@ class PDFController:
             images_table.setStyle(TableStyle([
                 ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
                 ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-                ('GRID', (0, 0), (-1, -1), 0.4, colors.grey),
+                ('GRID', (0, 0), (-1, -1), 0.35, colors.HexColor('#E2E8F0')),
             ]))
             elements.append(images_table)
             
@@ -505,10 +541,10 @@ class PDFController:
 
             mesures_table = Table(mesures_data, colWidths=[10*cm, 5*cm])
             mesures_table.setStyle(TableStyle([
-                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#3498DB')),
-                ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#CCFBF1')),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.HexColor('#134E4A')),
                 ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-                ('GRID', (0, 0), (-1, -1), 0.4, colors.grey)
+                ('GRID', (0, 0), (-1, -1), 0.35, colors.HexColor('#E2E8F0'))
             ]))
             elements.append(mesures_table)
             elements.append(Spacer(1, 0.4*cm))
@@ -530,9 +566,9 @@ class PDFController:
 
             finance_table = Table(finance_data, colWidths=[5*cm, 10*cm])
             finance_table.setStyle(TableStyle([
-                ('GRID', (0, 0), (-1, -1), 0.4, colors.grey),
-                ('BACKGROUND', (0, 2), (-1, 2), colors.HexColor('#E74C3C')),
-                ('TEXTCOLOR', (0, 2), (-1, 2), colors.white),
+                ('GRID', (0, 0), (-1, -1), 0.35, colors.HexColor('#E2E8F0')),
+                ('BACKGROUND', (0, 2), (-1, 2), colors.HexColor('#FECACA')),
+                ('TEXTCOLOR', (0, 2), (-1, 2), colors.HexColor('#991B1B')),
                 ('FONTNAME', (0, 2), (-1, 2), 'Helvetica-Bold'),
             ]))
             elements.append(finance_table)
@@ -662,9 +698,9 @@ class PDFController:
 
             couturier_table = Table(couturier_data, colWidths=[5*cm, 10*cm])
             couturier_table.setStyle(TableStyle([
-                ('BACKGROUND', (0, 0), (0, -1), colors.HexColor('#3498DB')),
-                ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
-                ('GRID', (0, 0), (-1, -1), 0.4, colors.grey),
+                ('BACKGROUND', (0, 0), (0, -1), colors.HexColor('#F1F5F9')),
+                ('TEXTCOLOR', (0, 0), (-1, -1), colors.HexColor('#1E293B')),
+                ('GRID', (0, 0), (-1, -1), 0.35, colors.HexColor('#E2E8F0')),
                 ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
             ]))
             elements.append(couturier_table)
@@ -793,8 +829,8 @@ class PDFController:
                 except Exception as e:
                     print(f"⚠️ Erreur récupération logo BDD (fallback salons.logo) pour PDF livraison: {e}")
 
-            # Préparer le pied de page (informations du salon)
-            footer_lines = self._build_footer_lines(salon_id)
+            salon_row = self._charger_salon(salon_id)
+            footer_lines = self._build_footer_lines(salon_row)
 
             # Filigrane
             def dessiner_filigrane(canvas_obj, doc_obj):
@@ -820,23 +856,27 @@ class PDFController:
                 try:
                     canvas_obj.saveState()
                     page_width, _ = doc_obj.pagesize
-                    footer_height = 2 * cm
-                    # Bande de fond sur toute la largeur en bas de page
-                    canvas_obj.setFillColor(colors.HexColor('#17BEBB'))
+                    footer_height = 2.2 * cm
+                    canvas_obj.setFillColor(colors.HexColor('#EEF2F7'))
                     canvas_obj.rect(0, 0, page_width, footer_height, fill=1, stroke=0)
+                    canvas_obj.setStrokeColor(colors.HexColor('#CBD5E1'))
+                    canvas_obj.setLineWidth(0.8)
+                    canvas_obj.line(0, footer_height, page_width, footer_height)
 
-                    # Texte du salon par-dessus la bande
                     font_name = "Helvetica"
-                    font_size = 8
-                    canvas_obj.setFont(font_name, font_size)
-                    canvas_obj.setFillColor(colors.white)
-                    base_y = 0.6 * cm
+                    max_w = page_width - 1.2 * cm
                     for idx, line in enumerate(footer_lines):
                         text = str(line)
-                        text_width = canvas_obj.stringWidth(text, font_name, font_size)
-                        x = (page_width - text_width) / 2
-                        y = base_y + idx * 0.35 * cm
-                        if y < footer_height - 0.2 * cm:
+                        fs = 8
+                        while text and canvas_obj.stringWidth(text, font_name, fs) > max_w and fs > 6:
+                            fs -= 1
+                        canvas_obj.setFont(font_name, fs)
+                        canvas_obj.setFillColor(colors.HexColor('#334155'))
+                        text_width = canvas_obj.stringWidth(text, font_name, fs)
+                        x = max(0.6 * cm, (page_width - text_width) / 2)
+                        base_y = 0.55 * cm
+                        y = base_y + idx * 0.38 * cm
+                        if y < footer_height - 0.15 * cm:
                             canvas_obj.drawString(x, y, text)
                     canvas_obj.restoreState()
                 except Exception as e:
@@ -846,8 +886,10 @@ class PDFController:
             doc = SimpleDocTemplate(
                 filepath,
                 pagesize=A4,
-                rightMargin=2*cm,
-                leftMargin=2*cm
+                rightMargin=2 * cm,
+                leftMargin=2 * cm,
+                topMargin=1.4 * cm,
+                bottomMargin=2.6 * cm,
             )
             elements = []
             styles = getSampleStyleSheet()
@@ -857,19 +899,44 @@ class PDFController:
                 'CustomTitle',
                 parent=styles['Heading1'],
                 fontSize=22,
-                textColor=colors.HexColor('#27AE60'),
+                textColor=colors.HexColor('#0F766E'),
                 alignment=1,
-                spaceAfter=25
+                spaceAfter=10
             )
 
             heading_style = ParagraphStyle(
                 'CustomHeading',
                 parent=styles['Heading2'],
-                fontSize=14,
-                textColor=colors.HexColor('#34495E'),
+                fontSize=13,
+                textColor=colors.HexColor('#0D9488'),
                 spaceAfter=10
             )
 
+            salon_tagline_style = ParagraphStyle(
+                'LivraisonTagline',
+                parent=styles['Normal'],
+                fontSize=10,
+                textColor=colors.HexColor('#64748B'),
+                alignment=1,
+                spaceAfter=14,
+                fontName='Helvetica-Oblique',
+            )
+
+            if salon_row and (salon_row.get('nom_salon') or '').strip():
+                sn = ParagraphStyle(
+                    'LivraisonSalon',
+                    parent=styles['Normal'],
+                    fontSize=14,
+                    textColor=colors.HexColor('#115E59'),
+                    alignment=1,
+                    spaceAfter=4,
+                    fontName='Helvetica-Bold',
+                )
+                elements.append(Paragraph((salon_row.get('nom_salon') or '').strip(), sn))
+            elements.append(Paragraph(
+                "Salon de couture · bon de livraison officiel",
+                salon_tagline_style
+            ))
             # Titre
             elements.append(Paragraph("🚚 BON DE LIVRAISON", title_style))
             elements.append(Spacer(1, 0.5*cm))
@@ -883,9 +950,9 @@ class PDFController:
             ]
             client_table = Table(client_data, colWidths=[5*cm, 10*cm])
             client_table.setStyle(TableStyle([
-                ('BACKGROUND', (0, 0), (0, -1), colors.HexColor('#27AE60')),
-                ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
-                ('GRID', (0, 0), (-1, -1), 0.4, colors.grey),
+                ('BACKGROUND', (0, 0), (0, -1), colors.HexColor('#F1F5F9')),
+                ('TEXTCOLOR', (0, 0), (-1, -1), colors.HexColor('#1E293B')),
+                ('GRID', (0, 0), (-1, -1), 0.35, colors.HexColor('#E2E8F0')),
                 ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
             ]))
             elements.append(client_table)
@@ -901,9 +968,9 @@ class PDFController:
             ]
             commande_table = Table(commande_info, colWidths=[5*cm, 10*cm])
             commande_table.setStyle(TableStyle([
-                ('BACKGROUND', (0, 0), (0, -1), colors.HexColor('#3498DB')),
-                ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
-                ('GRID', (0, 0), (-1, -1), 0.4, colors.grey),
+                ('BACKGROUND', (0, 0), (0, -1), colors.HexColor('#F1F5F9')),
+                ('TEXTCOLOR', (0, 0), (-1, -1), colors.HexColor('#1E293B')),
+                ('GRID', (0, 0), (-1, -1), 0.35, colors.HexColor('#E2E8F0')),
                 ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
             ]))
             elements.append(commande_table)

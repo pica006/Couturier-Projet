@@ -785,31 +785,44 @@ class SalonModel:
 
     def obtenir_config_email_salon(self, salon_id: str) -> Optional[Dict]:
         """
-        Récupère la configuration SMTP d'un salon pour l'envoi d'e-mails.
-        Retourne un dict compatible avec EmailController ou None si non configuré.
+        Récupère les surcharges SMTP d'un salon pour l'envoi d'e-mails.
+        Les identifiants (user / password) ne sont ajoutés que s'ils sont
+        tous les deux renseignés en base ; sinon les variables d'environnement
+        / EMAIL_CONFIG globales restent utilisées (évite « config incomplète »
+        quand le salon n'a pas encore saisi de mot de passe d'application).
         """
         try:
             salon = self.obtenir_salon_by_id(salon_id)
             if not salon:
                 return None
 
-            smtp_user = salon.get("smtp_user")
-            smtp_password = salon.get("smtp_password")
+            out: Dict = {"enabled": True}
 
-            # Si pas d'utilisateur ou mot de passe SMTP, on considère que la config n'est pas prête
-            if not smtp_user or not smtp_password:
-                return None
+            host = (salon.get("smtp_host") or "").strip()
+            if host:
+                out["host"] = host
 
-            return {
-                "enabled": True,
-                "host": salon.get("smtp_host") or "smtp.gmail.com",
-                "port": int(salon.get("smtp_port") or 587),
-                "user": smtp_user,
-                "password": smtp_password,
-                "from_email": salon.get("smtp_from") or smtp_user,
-                "use_tls": salon.get("smtp_use_tls") if salon.get("smtp_use_tls") is not None else True,
-                "use_ssl": salon.get("smtp_use_ssl") if salon.get("smtp_use_ssl") is not None else False,
-            }
+            port = salon.get("smtp_port")
+            if port is not None and str(port).strip() != "":
+                try:
+                    out["port"] = int(port)
+                except (TypeError, ValueError):
+                    pass
+
+            if salon.get("smtp_use_tls") is not None:
+                out["use_tls"] = bool(salon.get("smtp_use_tls"))
+            if salon.get("smtp_use_ssl") is not None:
+                out["use_ssl"] = bool(salon.get("smtp_use_ssl"))
+
+            su = (salon.get("smtp_user") or "").strip()
+            sp = salon.get("smtp_password")
+            if su and sp and str(sp).strip() != "":
+                out["user"] = su
+                out["password"] = sp
+                sf = (salon.get("smtp_from") or "").strip()
+                out["from_email"] = sf or su
+
+            return out
         except Exception as e:
             print(f"Erreur récupération config email salon: {e}")
             return None

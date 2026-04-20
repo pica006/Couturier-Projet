@@ -62,7 +62,11 @@ class EmailController:
         if not self.from_email:
             missing.append("from_email")
         if missing:
-            return False, f"Configuration email incomplète : {', '.join(missing)}."
+            return False, (
+                f"Configuration email incomplète : {', '.join(missing)}. "
+                "Ajoutez EMAIL_USER et EMAIL_PASSWORD (fichier .env ou variables d'environnement), "
+                "ou renseignez l'expéditeur SMTP et le mot de passe d'application du salon dans l'administration."
+            )
         return True, "Configuration email OK."
 
     def envoyer_email(self, to_email: str, subject: str, body: str,
