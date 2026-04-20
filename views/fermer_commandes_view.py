@@ -132,13 +132,19 @@ def afficher_page_fermer_commandes():
         }
 
     def _trier_commandes_urgentes(commandes):
+        def _safe_int(value, default=0):
+            try:
+                return int(value)
+            except Exception:
+                return default
+
         return sorted(
             commandes,
             key=lambda c: (
                 _meta_urgence(c)["priorite"],
                 _meta_urgence(c)["jours"],
                 -float(c.get("reste", 0) or 0),
-                int(c.get("id", 0) or 0),
+                _safe_int(c.get("id", 0) or 0),
             ),
         )
 
@@ -361,7 +367,7 @@ def afficher_page_fermer_commandes():
         if is_admin_user and salon_id_user:
             from models.database import CouturierModel
             couturier_model = CouturierModel(st.session_state.db_connection)
-            couturiers_salon = couturier_model.lister_tous_couturiers(salon_id=salon_id_user)
+            couturiers_salon = couturier_model.lister_tous_couturiers(salon_id=salon_id_user) or []
             
             options_couturiers = ["👥 Tous les couturiers"] + [
                 f"{c['code_couturier']} - {c['prenom']} {c['nom']}"
@@ -686,7 +692,7 @@ def afficher_page_fermer_commandes():
         if is_admin_user and salon_id_user:
             from models.database import CouturierModel
             couturier_model = CouturierModel(st.session_state.db_connection)
-            couturiers_salon = couturier_model.lister_tous_couturiers(salon_id=salon_id_user)
+            couturiers_salon = couturier_model.lister_tous_couturiers(salon_id=salon_id_user) or []
             
             options_couturiers = ["👥 Tous les couturiers"] + [
                 f"{c['code_couturier']} - {c['prenom']} {c['nom']}"

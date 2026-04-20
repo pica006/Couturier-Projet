@@ -17,6 +17,13 @@ from utils.role_utils import est_admin, obtenir_salon_id, obtenir_couturier_id
 from utils.page_header import afficher_header_page
 
 
+def _safe_float(value, default=0.0):
+    try:
+        return float(value or 0)
+    except Exception:
+        return default
+
+
 def afficher_page_calendrier(onglet_admin: bool = False):
     """
     Page unifiée : Modèles réalisés + Calendrier.
@@ -113,7 +120,7 @@ def _afficher_modeles_realises(commande_model, couturier_model, couturier_id, sa
 
     couturier_id_filtre = couturier_id
     if est_admin_user and salon_id:
-        tous_couturiers = couturier_model.lister_tous_couturiers(salon_id=salon_id)
+        tous_couturiers = couturier_model.lister_tous_couturiers(salon_id=salon_id) or []
         options = ["👥 Tous les couturiers"] + [
             f"{c['code_couturier']} - {c['prenom']} {c['nom']}"
             for c in tous_couturiers
@@ -257,7 +264,7 @@ def _afficher_calendrier(commande_model, couturier_model, couturier_id, salon_id
     with col3:
         couturier_id_filtre = couturier_id
         if est_admin_user and salon_id:
-            tous_couturiers = couturier_model.lister_tous_couturiers(salon_id=salon_id)
+            tous_couturiers = couturier_model.lister_tous_couturiers(salon_id=salon_id) or []
             options = ["👥 Tous les couturiers"] + [
                 f"{c['code_couturier']} - {c['prenom']} {c['nom']}"
                 for c in tous_couturiers
@@ -320,13 +327,23 @@ def _afficher_calendrier(commande_model, couturier_model, couturier_id, salon_id
             f"**{aujourd_hui.strftime('%d/%m/%Y')}** et **{date_cible_max.strftime('%d/%m/%Y')}**."
         )
         df_rappel = pd.DataFrame(commandes_a_rappeler)
-        df_rappel_display = df_rappel[
-            ['modele', 'client_prenom', 'client_nom', 'couturier_prenom', 'couturier_nom', 'jours_restants', 'prix_total']
-        ].copy()
-        df_rappel_display.columns = [
-            'Modèle', 'Prénom Client', 'Nom Client', 'Prénom Couturier', 'Nom Couturier', 'Jours restants', 'Prix (FCFA)'
+        colonnes_candidates = [
+            ('modele', 'Modèle'),
+            ('client_prenom', 'Prénom Client'),
+            ('client_nom', 'Nom Client'),
+            ('couturier_prenom', 'Prénom Couturier'),
+            ('couturier_nom', 'Nom Couturier'),
+            ('jours_restants', 'Jours restants'),
+            ('prix_total', 'Prix (FCFA)'),
         ]
-        df_rappel_display['Prix (FCFA)'] = df_rappel_display['Prix (FCFA)'].apply(lambda x: f"{x:,.0f}")
+        colonnes_existantes = [c for c, _ in colonnes_candidates if c in df_rappel.columns]
+        df_rappel_display = df_rappel[colonnes_existantes].copy()
+        rename_map = {c: label for c, label in colonnes_candidates if c in colonnes_existantes}
+        df_rappel_display.rename(columns=rename_map, inplace=True)
+        if 'Prix (FCFA)' in df_rappel_display.columns:
+            df_rappel_display['Prix (FCFA)'] = df_rappel_display['Prix (FCFA)'].apply(
+                lambda x: f"{_safe_float(x):,.0f}"
+            )
         st.dataframe(df_rappel_display, hide_index=True, use_container_width=True)
     else:
         st.success(f"✅ Aucune livraison critique dans les {int(nb_jours_rappel)} prochains jours.")
@@ -406,5 +423,5 @@ def _afficher_calendrier(commande_model, couturier_model, couturier_id, salon_id
                     f"- **{c.get('modele', 'N/A')}** — Client: {client} | "
                     f"Responsable: {resp} | "
                     f"{urgence_txt} | "
-                    f"💰 {c.get('prix_total', 0):,.0f} FCFA"
+                    f"💰 {_safe_float(c.get('prix_total', 0)):,.0f} FCFA"
                 )
