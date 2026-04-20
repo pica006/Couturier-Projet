@@ -124,9 +124,9 @@ BRANDING = {
 COMPANY_INFO = {
     'name': "An's Learning",
     'address': 'Douala - Kotto',
-    'manager': 'Sango Justin',
-    'phone': '698192507',
-    'email': 'andresgroup63@gmail.com'
+    'manager': 'Mr Sango Justin',
+    'phone': '+237 698 19 25 07',
+    'email': 'support@ans-learning.com'
 }
 
 # ============================================================================

@@ -145,7 +145,7 @@ class AuthController:
                     salon_info = salon_model.obtenir_salon_by_id(salon_id)
                     # Si le salon existe et est inactif (False)
                     if salon_info and salon_info.get('actif') is False:
-                        return False, None, "Ton salon a été désactivé. Contacte An's Learning  698192507."
+                        return False, None, "Ton salon a été désactivé. Contacte An's Learning au +237 698 19 25 07 ou support@ans-learning.com."
                 except Exception as e:
                     # En cas d'erreur de récupération du salon, on log mais on ne bloque pas la connexion
                     print(f"Erreur contrôle salon actif lors de l'authentification: {e}")
