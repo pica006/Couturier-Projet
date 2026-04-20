@@ -356,7 +356,7 @@ def afficher_page_liste_commandes():
                 # Afficher le tableau avec style
                 st.dataframe(
                     df,
-                    width='stretch',
+                    use_container_width=True,
                     hide_index=True,
                     height=400
                 )
@@ -476,7 +476,7 @@ def afficher_page_liste_commandes():
                                             data=pdf_bytes,
                                             file_name=nom_fichier,
                                             mime="application/pdf",
-                                            width='stretch',
+                                            use_container_width=True,
                                             key=f"download_pdf_liste_{commande_selectionnee}",
                                             type="primary"
                                         )
