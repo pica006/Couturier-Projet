@@ -1605,26 +1605,32 @@ def afficher_formulaire_creation_utilisateur(couturier_model: CouturierModel, ad
                     # Tous les nouveaux utilisateurs héritent du salon de l'admin créateur
                     user_salon_id = salon_id
                     
-                    # Créer l'utilisateur avec salon_id
-                    user_id = couturier_model.creer_utilisateur(
-                        code_couturier=code_couturier.strip().upper(),
-                        password=password,
-                        nom=nom.strip(),
-                        prenom=prenom.strip(),
-                        role=role,
-                        email=email.strip() if email else None,
-                        telephone=telephone.strip() if telephone else None,
-                        salon_id=user_salon_id  # None pour admin (créera son salon), salon_id pour employé
-                    )
-                    
-                    # Si c'est un admin créé, on garde le salon hérité (pas de nouveau salon auto)
-                    
-                    if user_id:
-                        st.success(f"✅ Utilisateur '{code_couturier}' créé avec succès !")
-                        st.balloons()
-                        st.rerun()
-                    else:
-                        st.error("❌ Erreur lors de la création de l'utilisateur")
+                    try:
+                        # Créer l'utilisateur avec salon_id
+                        user_id = couturier_model.creer_utilisateur(
+                            code_couturier=code_couturier.strip().upper(),
+                            password=password,
+                            nom=nom.strip(),
+                            prenom=prenom.strip(),
+                            role=role,
+                            email=email.strip() if email else None,
+                            telephone=telephone.strip() if telephone else None,
+                            salon_id=user_salon_id  # Tous les nouveaux comptes héritent du salon admin
+                        )
+
+                        if user_id is not None:
+                            st.success(f"✅ Utilisateur '{code_couturier}' créé avec succès !")
+                            st.balloons()
+                            st.rerun()
+                        else:
+                            detail = getattr(couturier_model, "last_error", None)
+                            if detail:
+                                st.error(f"❌ Erreur lors de la création de l'utilisateur : {detail}")
+                            else:
+                                st.error("❌ Erreur lors de la création de l'utilisateur")
+                    except Exception as e:
+                        st.error(f"❌ Exception inattendue pendant la création : {e}")
+                        st.exception(e)
 
 
 def afficher_liste_utilisateurs(couturier_model: CouturierModel, admin_data: Dict):
