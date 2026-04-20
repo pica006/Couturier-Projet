@@ -1662,8 +1662,13 @@ def afficher_liste_utilisateurs(couturier_model: CouturierModel, admin_data: Dic
     st.markdown("#### 📋 Liste de tous les utilisateurs")
     st.markdown("---")
     
-    # Récupérer tous les utilisateurs du salon de l'admin
-    salon_id = admin_data.get('salon_id')
+    # Récupérer tous les utilisateurs du salon de l'admin (source fiable)
+    from utils.role_utils import obtenir_salon_id
+    salon_id = obtenir_salon_id(admin_data)
+    if not salon_id:
+        st.error("❌ Impossible de déterminer votre salon. Déconnectez-vous puis reconnectez-vous.")
+        return
+
     utilisateurs = couturier_model.lister_tous_couturiers(salon_id=salon_id)
     
     if not utilisateurs:
@@ -1749,8 +1754,14 @@ def afficher_gestion_mots_de_passe(couturier_model: CouturierModel, admin_data: 
     st.info("Réinitialisez le mot de passe d'un utilisateur")
     st.markdown("---")
     
-    # Récupérer tous les utilisateurs
-    utilisateurs = couturier_model.lister_tous_couturiers(salon_id=admin_data.get('salon_id'))
+    # Récupérer tous les utilisateurs du salon de l'admin (source fiable)
+    from utils.role_utils import obtenir_salon_id
+    salon_id = obtenir_salon_id(admin_data)
+    if not salon_id:
+        st.error("❌ Impossible de déterminer votre salon. Déconnectez-vous puis reconnectez-vous.")
+        return
+
+    utilisateurs = couturier_model.lister_tous_couturiers(salon_id=salon_id)
     
     if not utilisateurs:
         st.info("💭 Aucun utilisateur enregistré")
@@ -1833,8 +1844,14 @@ def afficher_reinitialisation_mot_de_passe(couturier_model: CouturierModel, admi
     st.info("Réinitialisez le mot de passe d'un utilisateur ou le vôtre")
     st.markdown("---")
     
-    # Récupérer tous les utilisateurs
-    utilisateurs = couturier_model.lister_tous_couturiers(salon_id=admin_data.get('salon_id'))
+    # Récupérer tous les utilisateurs du salon de l'admin (source fiable)
+    from utils.role_utils import obtenir_salon_id
+    salon_id = obtenir_salon_id(admin_data)
+    if not salon_id:
+        st.error("❌ Impossible de déterminer votre salon. Déconnectez-vous puis reconnectez-vous.")
+        return
+
+    utilisateurs = couturier_model.lister_tous_couturiers(salon_id=salon_id)
     
     if not utilisateurs:
         st.info("💭 Aucun utilisateur enregistré")
