@@ -140,18 +140,18 @@ def afficher_page_fermer_commandes():
                     f"📦 Commande #{commande['id']} - {client_prenom} {client_nom} - {modele}",
                     expanded=False
                 ):
-                    # Affichage des informations de paiement comme dans "mes commandes"
-                    with st.expander("💰 Informations de Paiement", expanded=True):
-                        col_info1, col_info2, col_info3 = st.columns(3)
-                        
-                        with col_info1:
-                            st.metric("Prix total", f"{commande['prix_total']:,.0f} FCFA")
-                        with col_info2:
-                            st.metric("Avance", f"{commande['avance']:,.0f} FCFA")
-                        with col_info3:
-                            pourcentage_reste = ((commande['reste']/commande['prix_total'])*100) if commande['prix_total'] > 0 else 0
-                            st.metric("Reste à payer", f"{commande['reste']:,.0f} FCFA", 
-                                     delta=f"{pourcentage_reste:.1f}%")
+                    # NOTE: Streamlit n'autorise pas les expanders imbriqués.
+                    st.markdown("#### 💰 Informations de Paiement")
+                    col_info1, col_info2, col_info3 = st.columns(3)
+                    
+                    with col_info1:
+                        st.metric("Prix total", f"{commande['prix_total']:,.0f} FCFA")
+                    with col_info2:
+                        st.metric("Avance", f"{commande['avance']:,.0f} FCFA")
+                    with col_info3:
+                        pourcentage_reste = ((commande['reste']/commande['prix_total'])*100) if commande['prix_total'] > 0 else 0
+                        st.metric("Reste à payer", f"{commande['reste']:,.0f} FCFA", 
+                                 delta=f"{pourcentage_reste:.1f}%")
                     
                     st.markdown("---")
                     st.markdown("#### ✏️ Modifier les montants")
