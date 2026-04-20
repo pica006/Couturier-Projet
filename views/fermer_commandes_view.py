@@ -3,6 +3,7 @@ Vue pour permettre aux employés de fermer leurs commandes
 """
 import streamlit as st
 import os
+from datetime import date, datetime
 from controllers.commande_controller import CommandeController
 from controllers.email_controller import EmailController
 from models.salon_model import SalonModel
@@ -74,6 +75,89 @@ def afficher_page_fermer_commandes():
         if s == "supprimée":
             return "🗑️ Supprimée"
         return f"📌 {statut or 'Inconnu'}"
+
+    def _to_date(value):
+        if value is None:
+            return None
+        if isinstance(value, datetime):
+            return value.date()
+        if isinstance(value, date):
+            return value
+        if isinstance(value, str):
+            raw = value.strip()
+            for fmt in ("%Y-%m-%d", "%d/%m/%Y", "%Y-%m-%d %H:%M:%S", "%d-%m-%Y"):
+                try:
+                    return datetime.strptime(raw, fmt).date()
+                except ValueError:
+                    continue
+        return None
+
+    def _meta_urgence(commande):
+        # Priorité globale: rouge (0) > orange (1) > vert (2)
+        date_livraison = _to_date(commande.get("date_livraison"))
+        reste = float(commande.get("reste", 0) or 0)
+        today = date.today()
+        jours = None if date_livraison is None else (date_livraison - today).days
+
+        if jours is not None and jours < 0:
+            return {
+                "niveau": "rouge",
+                "emoji": "🔴",
+                "label": f"En retard de {abs(jours)} jour(s)",
+                "priorite": 0,
+                "jours": jours,
+            }
+        if jours is not None and jours <= 2:
+            return {
+                "niveau": "orange",
+                "emoji": "🟠",
+                "label": "Échéance proche (0-2 jours)",
+                "priorite": 1,
+                "jours": jours,
+            }
+        if reste > 0:
+            return {
+                "niveau": "orange",
+                "emoji": "🟠",
+                "label": "Paiement à finaliser",
+                "priorite": 1,
+                "jours": 9999 if jours is None else jours,
+            }
+        return {
+            "niveau": "vert",
+            "emoji": "🟢",
+            "label": "Situation stable",
+            "priorite": 2,
+            "jours": 9999 if jours is None else jours,
+        }
+
+    def _trier_commandes_urgentes(commandes):
+        return sorted(
+            commandes,
+            key=lambda c: (
+                _meta_urgence(c)["priorite"],
+                _meta_urgence(c)["jours"],
+                -float(c.get("reste", 0) or 0),
+                int(c.get("id", 0) or 0),
+            ),
+        )
+
+    def _bandeau_urgence(commande):
+        meta = _meta_urgence(commande)
+        couleurs = {
+            "rouge": ("#7f1d1d", "#fecaca"),
+            "orange": ("#7c2d12", "#fed7aa"),
+            "vert": ("#14532d", "#bbf7d0"),
+        }
+        txt, bg = couleurs.get(meta["niveau"], ("#1e3a8a", "#bfdbfe"))
+        st.markdown(
+            f"""
+            <div style="border-left: 6px solid {txt}; background: {bg}; padding: 0.6rem 0.8rem; border-radius: 0.5rem; margin-bottom: 0.8rem;">
+                <strong>{meta["emoji"]} Priorité {meta["niveau"].upper()}</strong> — {meta["label"]}
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
     
     # ========================================================================
     # ONGLET 1 : MODIFIER LES PAIEMENTS (Commandes avec avance)
@@ -123,11 +207,13 @@ def afficher_page_fermer_commandes():
         if not commandes_avec_reste:
             st.info("📭 Aucune commande avec avance versée et reste à payer pour le moment.")
         else:
+            commandes_avec_reste = _trier_commandes_urgentes(commandes_avec_reste)
             total_reste = sum(float(c.get("reste", 0) or 0) for c in commandes_avec_reste)
             st.info(
                 f"💡 **{len(commandes_avec_reste)} commande(s)** à compléter, "
                 f"pour un **reste total de {total_reste:,.0f} FCFA**."
             )
+            st.caption("Code couleur global: 🔴 urgence forte | 🟠 à traiter rapidement | 🟢 stable")
             st.markdown(f"#### 📋 Liste des commandes ({len(commandes_avec_reste)})")
             
             # Afficher chaque commande avec possibilité de modification
@@ -140,6 +226,7 @@ def afficher_page_fermer_commandes():
                     f"📦 Commande #{commande['id']} - {client_prenom} {client_nom} - {modele}",
                     expanded=False
                 ):
+                    _bandeau_urgence(commande)
                     # NOTE: Streamlit n'autorise pas les expanders imbriqués.
                     st.markdown("#### 💰 Informations de Paiement")
                     col_info1, col_info2, col_info3 = st.columns(3)
@@ -351,8 +438,10 @@ def afficher_page_fermer_commandes():
         if not commandes_terminees:
             st.info("📭 Aucune commande totalement payée pour le moment.")
         else:
+            commandes_terminees = _trier_commandes_urgentes(commandes_terminees)
             st.markdown(f"#### 📋 Commandes totalement payées ({len(commandes_terminees)})")
             st.info("💡 Cliquez sur le bouton pour demander la livraison. La commande passera en attente de confirmation par l'administrateur.")
+            st.caption("Tri automatique appliqué: les commandes les plus urgentes sont affichées en haut.")
             st.markdown("---")
             
             for commande in commandes_terminees:
@@ -370,6 +459,7 @@ def afficher_page_fermer_commandes():
                     f"📦 Commande #{commande['id']} - {client_prenom} {client_nom} - {modele}{couturier_info}",
                     expanded=True
                 ):
+                    _bandeau_urgence(commande)
                     col_d1, col_d2, col_d3 = st.columns(3)
                     
                     with col_d1:
@@ -617,9 +707,11 @@ def afficher_page_fermer_commandes():
             if date_debut or date_fin or nom_client_filter:
                 st.info(f"💡 Filtres appliqués : Date début={date_debut}, Date fin={date_fin}, Nom client='{nom_client_filter}'")
         else:
+            commandes_terminees = _trier_commandes_urgentes(commandes_terminees)
             total_ca_pdf = sum(float(c.get("prix_total", 0) or 0) for c in commandes_terminees)
             st.success(f"✅ {len(commandes_terminees)} commande(s) validée(s) trouvée(s)")
             st.info(f"📊 Montant cumulé des commandes listées : **{total_ca_pdf:,.0f} FCFA**")
+            st.caption("Tri automatique appliqué: priorité visuelle rouge/orange/vert.")
             st.markdown(f"#### 📋 Commandes validées (Livré et payé) ({len(commandes_terminees)})")
             
             for commande in commandes_terminees:
@@ -636,6 +728,7 @@ def afficher_page_fermer_commandes():
                     f"📦 Commande #{commande['id']} - {client_prenom} {client_nom} - {modele}{couturier_info}",
                     expanded=True
                 ):
+                    _bandeau_urgence(commande)
                     # Informations principales du client
                     st.markdown("### 👤 Informations Client")
                     col_client1, col_client2 = st.columns(2)
