@@ -383,14 +383,18 @@ class CouturierModel:
             
             cursor = self.db.get_connection().cursor()
 
-            # Vérifier l'existence du salon cible (si fourni)
-            if salon_id:
-                cursor.execute("SELECT 1 FROM salons WHERE salon_id = %s", (salon_id,))
-                salon_exists = cursor.fetchone()
-                if not salon_exists:
-                    self.last_error = f"Le salon '{salon_id}' est introuvable."
-                    cursor.close()
-                    return None
+            # En multi-tenant, un utilisateur doit toujours être rattaché à un salon existant.
+            if not salon_id:
+                self.last_error = "Salon non défini pour cet utilisateur. Reconnectez-vous puis réessayez."
+                cursor.close()
+                return None
+
+            cursor.execute("SELECT 1 FROM salons WHERE salon_id = %s", (salon_id,))
+            salon_exists = cursor.fetchone()
+            if not salon_exists:
+                self.last_error = f"Le salon '{salon_id}' est introuvable."
+                cursor.close()
+                return None
             
             # Hasher le mot de passe avant stockage
             password_hash = hash_password(password)
@@ -404,16 +408,22 @@ class CouturierModel:
                 cursor.execute(query, (code_couturier, password_hash, nom, prenom, role, email, telephone, salon_id))
                 user_id = cursor.lastrowid
             else:
+                # Séquence SERIAL potentiellement désynchronisée (import/seed manuel).
+                cursor.execute(
+                    """
+                    SELECT setval(
+                        pg_get_serial_sequence('couturiers', 'id'),
+                        COALESCE((SELECT MAX(id) FROM couturiers), 0) + 1,
+                        false
+                    )
+                    """
+                )
                 query = """
                     INSERT INTO couturiers (code_couturier, password, nom, prenom, role, email, telephone, salon_id, actif)
                     VALUES (%s, %s, %s, %s, %s, %s, %s, %s, TRUE) RETURNING id
                 """
                 cursor.execute(query, (code_couturier, password_hash, nom, prenom, role, email, telephone, salon_id))
                 user_id = cursor.fetchone()[0]
-            
-            # Si c'est un admin et qu'il n'a pas de salon_id, lui assigner son propre id
-            if role == 'admin' and not salon_id:
-                cursor.execute("UPDATE couturiers SET salon_id = %s WHERE id = %s", (user_id, user_id))
             
             self.db.get_connection().commit()
             cursor.close()

@@ -1601,6 +1601,12 @@ def afficher_formulaire_creation_utilisateur(couturier_model: CouturierModel, ad
                     # Récupérer le salon_id de l'admin (multi-tenant)
                     from utils.role_utils import obtenir_salon_id
                     salon_id = obtenir_salon_id(admin_data)
+                    if not salon_id:
+                        st.error(
+                            "❌ Impossible de déterminer le salon de votre compte admin. "
+                            "Déconnectez-vous puis reconnectez-vous."
+                        )
+                        return
                     
                     # Tous les nouveaux utilisateurs héritent du salon de l'admin créateur
                     user_salon_id = salon_id

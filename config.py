@@ -122,7 +122,7 @@ BRANDING = {
 #
 # Ces informations sont affichées sur la page de connexion.
 COMPANY_INFO = {
-    'name': "An's Learning",
+    'name': "Nom de l'application: SpiritStitch",
     'address': 'Douala - Kotto',
     'manager': 'Mr Sango Justin',
     'phone': '+237 698 19 25 07',
