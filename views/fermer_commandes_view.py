@@ -62,6 +62,18 @@ def afficher_page_fermer_commandes():
         "✅ Commandes terminées (en attente de livraison)", 
         "📄 Upload PDFs des commandes terminées"
     ])
+
+    def _badge_statut(statut: str) -> str:
+        s = (statut or "").strip().lower()
+        if s == "en cours":
+            return "⏳ En cours"
+        if s == "terminé":
+            return "✅ Terminé"
+        if s == "livré et payé":
+            return "🚚 Livré et payé"
+        if s == "supprimée":
+            return "🗑️ Supprimée"
+        return f"📌 {statut or 'Inconnu'}"
     
     # ========================================================================
     # ONGLET 1 : MODIFIER LES PAIEMENTS (Commandes avec avance)
@@ -69,6 +81,7 @@ def afficher_page_fermer_commandes():
     with tab1:
         st.markdown("### 💰 Modifier les paiements")
         st.markdown("Liste de vos commandes où une avance a été versée. Vous pouvez modifier directement le prix total, l'avance et le reste à payer.")
+        st.caption("Objectif : solder le reste à payer. Une commande soldée passe automatiquement au statut **Terminé**.")
         
         # Bouton de rafraîchissement
         col_refresh, _ = st.columns([1, 5])
@@ -110,6 +123,11 @@ def afficher_page_fermer_commandes():
         if not commandes_avec_reste:
             st.info("📭 Aucune commande avec avance versée et reste à payer pour le moment.")
         else:
+            total_reste = sum(float(c.get("reste", 0) or 0) for c in commandes_avec_reste)
+            st.info(
+                f"💡 **{len(commandes_avec_reste)} commande(s)** à compléter, "
+                f"pour un **reste total de {total_reste:,.0f} FCFA**."
+            )
             st.markdown(f"#### 📋 Liste des commandes ({len(commandes_avec_reste)})")
             
             # Afficher chaque commande avec possibilité de modification
@@ -360,6 +378,7 @@ def afficher_page_fermer_commandes():
                         st.metric("💵 Avance", f"{commande['avance']:,.0f} FCFA")
                     with col_d3:
                         st.metric("💸 Reste", f"{commande['reste']:,.0f} FCFA")
+                    st.caption(f"Statut actuel : **{_badge_statut(commande.get('statut', ''))}**")
                     
                     st.markdown("---")
                     
@@ -510,6 +529,8 @@ def afficher_page_fermer_commandes():
                                             st.error(f"❌ Erreur : {e}")
                                 else:
                                     st.info("💡 État actuel : demande non envoyée.")
+                    if commande.get("statut"):
+                        st.caption(f"État commande : **{_badge_statut(commande.get('statut'))}**")
     
     # ========================================================================
     # ONGLET 3 : TÉLÉCHARGER PDFs DES COMMANDES VALIDÉES
@@ -517,6 +538,7 @@ def afficher_page_fermer_commandes():
     with tab3:
         st.markdown("### 📄 Télécharger les PDFs des commandes validées")
         st.markdown("**Fonctionnalité :** Téléchargez les PDFs des commandes qui ont été **validées par l'administrateur** (statut : Livré et payé). Le PDF indique que la commande est **livrée et terminée**.")
+        st.caption("Seules les commandes au statut **Livré et payé** sont affichées ici.")
         st.markdown("---")
         
         # Filtres
@@ -595,7 +617,9 @@ def afficher_page_fermer_commandes():
             if date_debut or date_fin or nom_client_filter:
                 st.info(f"💡 Filtres appliqués : Date début={date_debut}, Date fin={date_fin}, Nom client='{nom_client_filter}'")
         else:
+            total_ca_pdf = sum(float(c.get("prix_total", 0) or 0) for c in commandes_terminees)
             st.success(f"✅ {len(commandes_terminees)} commande(s) validée(s) trouvée(s)")
+            st.info(f"📊 Montant cumulé des commandes listées : **{total_ca_pdf:,.0f} FCFA**")
             st.markdown(f"#### 📋 Commandes validées (Livré et payé) ({len(commandes_terminees)})")
             
             for commande in commandes_terminees:
@@ -654,7 +678,7 @@ def afficher_page_fermer_commandes():
                             else:
                                 st.markdown(f"**Date de commande:** {date_creation}")
                     with col_date2:
-                        st.markdown(f"**Statut:** ✅ {commande['statut']}")
+                        st.markdown(f"**Statut:** {_badge_statut(commande.get('statut', ''))}")
                     
                     st.markdown("---")
                     
@@ -671,39 +695,37 @@ def afficher_page_fermer_commandes():
                     
                     # Générer le PDF automatiquement et afficher le bouton de téléchargement
                     try:
-                        # Récupérer les données complètes de la commande
-                        commande_complete = commande_model.obtenir_commande(commande_id)
-                        
-                        if commande_complete:
+                        pdf_path = commande.get("pdf_path")
+                        if pdf_path and os.path.exists(pdf_path):
+                            with open(pdf_path, "rb") as pdf_file:
+                                pdf_bytes = pdf_file.read()
+                        else:
+                            # Fallback : régénération si le fichier n'est pas présent sur disque
+                            commande_complete = commande_model.obtenir_commande(commande_id)
+                            if not commande_complete:
+                                st.error("❌ Impossible de récupérer les données de la commande")
+                                continue
+
                             from controllers.pdf_controller import PDFController
                             pdf_controller = PDFController(st.session_state.db_connection)
-                            
-                            # S'assurer que le statut indique "Livré et payé" dans le PDF
-                            # Le PDF affichera toujours "Livré et payé" pour indiquer que la commande est livrée et terminée
                             commande_complete['statut'] = 'Livré et payé'
-                            
-                            # Générer le PDF
                             pdf_path = pdf_controller.generer_pdf_commande(commande_complete)
-                            
-                            if pdf_path and os.path.exists(pdf_path):
-                                with open(pdf_path, "rb") as pdf_file:
-                                    pdf_bytes = pdf_file.read()
-                                
-                                # Afficher le bouton de téléchargement
-                                st.download_button(
-                                    label="📥 Télécharger le PDF (Commande livrée et terminée)",
-                                    data=pdf_bytes,
-                                    file_name=f"Commande_{commande_id}_Livree_Terminee.pdf",
-                                    mime="application/pdf",
-                                    use_container_width=True,
-                                    key=f"download_pdf_terminée_{commande_id}",
-                                    type="primary"
-                                )
-                                st.caption("💡 Le PDF indique que la commande est **livrée et terminée**")
-                            else:
+                            if not pdf_path or not os.path.exists(pdf_path):
                                 st.error("❌ Erreur lors de la génération du PDF")
-                        else:
-                            st.error("❌ Impossible de récupérer les données de la commande")
+                                continue
+                            with open(pdf_path, "rb") as pdf_file:
+                                pdf_bytes = pdf_file.read()
+
+                        st.download_button(
+                            label="📥 Télécharger le PDF (Commande livrée et terminée)",
+                            data=pdf_bytes,
+                            file_name=f"Commande_{commande_id}_Livree_Terminee.pdf",
+                            mime="application/pdf",
+                            use_container_width=True,
+                            key=f"download_pdf_terminée_{commande_id}",
+                            type="primary"
+                        )
+                        st.caption("💡 Le PDF indique que la commande est **livrée et terminée**")
                     except Exception as e:
                         st.error(f"❌ Erreur lors de la génération du PDF : {e}")
                         import traceback

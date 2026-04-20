@@ -2161,6 +2161,11 @@ class CommandeModel:
         Liste les commandes avec avance > 0 et reste > 0 pour un couturier/salon.
         """
         try:
+            if self.db.db_type != 'mysql':
+                try:
+                    self.db.get_connection().rollback()
+                except Exception:
+                    pass
             cursor = self.db.get_connection().cursor()
             query = """
                 SELECT c.id, c.modele, c.prix_total, c.avance, c.reste, c.statut,
@@ -2171,6 +2176,7 @@ class CommandeModel:
                 JOIN couturiers co ON c.couturier_id = co.id
                 WHERE c.couturier_id = %s
                   AND co.salon_id = %s
+                  AND COALESCE(c.est_supprime, FALSE) = FALSE
                   AND c.statut != 'Fermé'
                   AND c.avance > 0
                   AND c.reste > 0
@@ -2238,6 +2244,11 @@ class CommandeModel:
         Liste les commandes terminées (reste <= 0, statut Terminé) prêtes pour demande/validation livraison.
         """
         try:
+            if self.db.db_type != 'mysql':
+                try:
+                    self.db.get_connection().rollback()
+                except Exception:
+                    pass
             cursor = self.db.get_connection().cursor()
             if vue_admin:
                 query = """
@@ -2249,6 +2260,7 @@ class CommandeModel:
                     JOIN clients cl ON c.client_id = cl.id
                     LEFT JOIN couturiers co ON c.couturier_id = co.id
                     WHERE co.salon_id = %s
+                      AND COALESCE(c.est_supprime, FALSE) = FALSE
                       AND c.reste <= 0
                       AND c.statut = 'Terminé'
                 """
@@ -2266,6 +2278,7 @@ class CommandeModel:
                     JOIN couturiers co ON c.couturier_id = co.id
                     WHERE c.couturier_id = %s
                       AND co.salon_id = %s
+                      AND COALESCE(c.est_supprime, FALSE) = FALSE
                       AND c.reste <= 0
                       AND c.statut = 'Terminé'
                 """
@@ -2383,6 +2396,11 @@ class CommandeModel:
         """
         try:
             connection = self.db.get_connection()
+            if self.db.db_type != 'mysql':
+                try:
+                    connection.rollback()
+                except Exception:
+                    pass
             cursor = connection.cursor()
             cursor.execute(
                 "UPDATE commandes SET statut = 'Livré et payé', date_fermeture = NOW() WHERE id = %s",
@@ -2409,6 +2427,11 @@ class CommandeModel:
         Liste les commandes validées (Livré et payé) pour téléchargement PDF.
         """
         try:
+            if self.db.db_type != 'mysql':
+                try:
+                    self.db.get_connection().rollback()
+                except Exception:
+                    pass
             cursor = self.db.get_connection().cursor()
             if vue_admin:
                 query = """
@@ -2421,6 +2444,7 @@ class CommandeModel:
                     JOIN clients cl ON c.client_id = cl.id
                     LEFT JOIN couturiers co ON c.couturier_id = co.id
                     WHERE co.salon_id = %s
+                      AND COALESCE(c.est_supprime, FALSE) = FALSE
                       AND c.statut = 'Livré et payé'
                 """
                 params = [salon_id]
@@ -2438,6 +2462,7 @@ class CommandeModel:
                     JOIN couturiers co ON c.couturier_id = co.id
                     WHERE c.couturier_id = %s
                       AND co.salon_id = %s
+                      AND COALESCE(c.est_supprime, FALSE) = FALSE
                       AND c.statut = 'Livré et payé'
                 """
                 params = [couturier_id, salon_id]
