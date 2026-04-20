@@ -336,6 +336,20 @@ class SalonModel:
                 cursor.execute(query_admin, (code_admin, admin_password_hash, nom_admin, prenom_admin, salon_id, email, telephone))
                 admin_id = cursor.lastrowid
             else:  # PostgreSQL
+                # Sécuriser la séquence SERIAL si elle est désynchronisée (cas fréquent après imports/seeds).
+                try:
+                    cursor.execute(
+                        """
+                        SELECT setval(
+                            pg_get_serial_sequence('couturiers', 'id'),
+                            COALESCE((SELECT MAX(id) FROM couturiers), 0) + 1,
+                            false
+                        )
+                        """
+                    )
+                except Exception:
+                    # Non bloquant: l'insert suivant remontera l'erreur réelle si la resynchro échoue.
+                    pass
                 query_admin += " RETURNING id"
                 cursor.execute(query_admin, (code_admin, admin_password_hash, nom_admin, prenom_admin, salon_id, email, telephone))
                 admin_id = cursor.fetchone()[0]
