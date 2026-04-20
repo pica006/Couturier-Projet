@@ -225,7 +225,7 @@ def afficher_page_comptabilite():
                     _place_legend(ax1, wedges1, legend_labels1, "Modèles")
                     ax1.set_title("Top modèles par volume")
                     plt.tight_layout()
-                    st.pyplot(fig1, width='stretch')
+                    st.pyplot(fig1, use_container_width=True)
                     plt.close(fig1)
                 else:
                     st.info("Aucune donnée disponible")
@@ -267,7 +267,7 @@ def afficher_page_comptabilite():
                     _place_legend(ax2, wedges2, legend_labels2, "Modèles")
                     ax2.set_title("Somme des avances par modèle")
                     plt.tight_layout()
-                    st.pyplot(fig2, width='stretch')
+                    st.pyplot(fig2, use_container_width=True)
                     plt.close(fig2)
                 else:
                     st.info("Aucune donnée disponible")
@@ -307,7 +307,7 @@ def afficher_page_comptabilite():
                     _place_legend(ax3, wedges3, legend_labels3, "Modèles")
                     ax3.set_title("Montants perçus par modèle")
                     plt.tight_layout()
-                    st.pyplot(fig3, width='stretch')
+                    st.pyplot(fig3, use_container_width=True)
                     plt.close(fig3)
                 else:
                     st.info("Aucune donnée disponible pour les modèles (montants perçus)")
@@ -344,7 +344,7 @@ def afficher_page_comptabilite():
                     _place_legend(ax4, wedges4, legend_labels4, "Modèles")
                     ax4.set_title("Reste à percevoir par modèle")
                     plt.tight_layout()
-                    st.pyplot(fig4, width='stretch')
+                    st.pyplot(fig4, use_container_width=True)
                     plt.close(fig4)
                 else:
                     st.info("Aucune donnée disponible pour les modèles (reste à percevoir)")
@@ -376,7 +376,7 @@ def afficher_page_comptabilite():
             # Afficher le tableau
             st.dataframe(
                 df_clients,
-                width='stretch',
+                use_container_width=True,
                 hide_index=True
             )
             
@@ -437,7 +437,7 @@ def afficher_page_comptabilite():
                     if st.button(
                         "📧 Envoyer un rappel par email",
                         key=f"relance_email_{cmd['id']}",
-                        width='stretch'
+                        use_container_width=True
                     ):
                         client_email = cmd.get('client_email')
                         if not client_email:
