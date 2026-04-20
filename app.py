@@ -1194,8 +1194,10 @@ def main():
             f"{APP_CONFIG.get('subtitle', 'Systeme de gestion d atelier')}"
         )
 
-    # Footer avec informations de l'entreprise sur toutes les pages
-    render_app_footer()
+    # Footer global uniquement sur pages authentifiées.
+    # La page de connexion gère déjà son propre footer.
+    if st.session_state.authentifie:
+        render_app_footer()
 
 
 if __name__ == "__main__":
