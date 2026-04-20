@@ -2530,6 +2530,68 @@ class ChargesModel:
 
     def __init__(self, db_connection: DatabaseConnection):
         self.db = db_connection
+        self.last_error: Optional[str] = None
+
+    def _ensure_charges_schema(self, cursor) -> None:
+        """Ajoute colonnes manquantes (anciennes BDD) pour aligner schéma et requêtes."""
+        try:
+            if self.db.db_type == "mysql":
+
+                def _mysql_col_exists(table: str, col: str) -> bool:
+                    cursor.execute(
+                        """
+                        SELECT COUNT(*) FROM information_schema.COLUMNS
+                        WHERE TABLE_SCHEMA = DATABASE()
+                          AND TABLE_NAME = %s
+                          AND COLUMN_NAME = %s
+                        """,
+                        (table, col),
+                    )
+                    row = cursor.fetchone()
+                    return bool(row and row[0] > 0)
+
+                if not _mysql_col_exists("charges", "reference"):
+                    cursor.execute(
+                        "ALTER TABLE charges ADD COLUMN reference VARCHAR(100) NULL"
+                    )
+
+                try:
+                    cursor.execute(
+                        "ALTER TABLE charge_documents MODIFY COLUMN file_path VARCHAR(500) NULL"
+                    )
+                except (MySQLError, PGError, Exception):
+                    pass
+
+                for col, ddl in (
+                    ("file_size", "BIGINT NULL"),
+                    ("file_data", "LONGBLOB NULL"),
+                    ("description", "VARCHAR(500) NULL"),
+                ):
+                    if not _mysql_col_exists("charge_documents", col):
+                        cursor.execute(
+                            f"ALTER TABLE charge_documents ADD COLUMN {col} {ddl}"
+                        )
+            else:
+                cursor.execute(
+                    "ALTER TABLE charges ADD COLUMN IF NOT EXISTS reference VARCHAR(100)"
+                )
+                try:
+                    cursor.execute(
+                        "ALTER TABLE charge_documents ALTER COLUMN file_path DROP NOT NULL"
+                    )
+                except (MySQLError, PGError, Exception):
+                    pass
+                cursor.execute(
+                    "ALTER TABLE charge_documents ADD COLUMN IF NOT EXISTS file_size BIGINT"
+                )
+                cursor.execute(
+                    "ALTER TABLE charge_documents ADD COLUMN IF NOT EXISTS file_data BYTEA"
+                )
+                cursor.execute(
+                    "ALTER TABLE charge_documents ADD COLUMN IF NOT EXISTS description TEXT"
+                )
+        except (MySQLError, PGError, Exception) as e:
+            print(f"Erreur migration schéma charges: {e}")
 
     def creer_tables(self) -> bool:
         """Crée les tables des charges et des documents liés"""
@@ -2601,7 +2663,9 @@ class ChargesModel:
                     )
                     """
                 )
-            
+
+            self._ensure_charges_schema(cursor)
+
             self.db.get_connection().commit()
             cursor.close()
             return True
@@ -2632,6 +2696,10 @@ class ChargesModel:
         Returns:
             ID de la charge créée ou None si erreur
         """
+        self.last_error = None
+        if couturier_id is None:
+            self.last_error = "Identifiant couturier manquant (impossible d'enregistrer la charge)."
+            return None
         try:
             cursor = self.db.get_connection().cursor()
             
@@ -2658,7 +2726,13 @@ class ChargesModel:
             cursor.close()
             return charge_id
         except (MySQLError, PGError, Exception) as e:
+            self.last_error = str(e)
             print(f"Erreur ajout charge: {e}")
+            try:
+                if getattr(self.db, "db_type", "") == "postgresql":
+                    self.db.get_connection().rollback()
+            except Exception:
+                pass
             return None
 
     def ajouter_document(self, charge_id: int, file_name: str, 
