@@ -490,3 +490,47 @@ def afficher_page_liste_commandes():
                                 if 'commandes_liste' in st.session_state:
                                     del st.session_state.commandes_liste
                                 st.rerun()
+
+                        st.markdown("---")
+                        st.markdown("#### 🗑️ Supprimer cette commande (employé)")
+                        st.warning(
+                            "Suppression logique stricte : uniquement vos propres commandes. "
+                            "La commande reste visible chez l'admin/superadmin comme supprimée et n'est plus comptabilisée."
+                        )
+                        with st.form(f"form_supprimer_commande_employe_{commande_selectionnee}", clear_on_submit=True):
+                            motif_suppression = st.text_area(
+                                "Motif de suppression *",
+                                placeholder="Ex: erreur de saisie / doublon",
+                                height=80,
+                            )
+                            confirmer_suppression = st.checkbox(
+                                "Je confirme la suppression de cette commande.",
+                                key=f"confirm_delete_emp_{commande_selectionnee}",
+                            )
+                            submit_delete = st.form_submit_button("🗑️ Supprimer la commande")
+
+                            if submit_delete:
+                                if not motif_suppression or len(motif_suppression.strip()) < 3:
+                                    st.error("❌ Veuillez renseigner un motif de suppression (au moins 3 caractères).")
+                                elif not confirmer_suppression:
+                                    st.error("❌ Veuillez confirmer la suppression.")
+                                else:
+                                    try:
+                                        employe_id = st.session_state.couturier_data.get("id")
+                                        ok = commande_controller.supprimer_commande_employe(
+                                            commande_id=commande_selectionnee,
+                                            employe_id=employe_id,
+                                            salon_id_employe=salon_id,
+                                            motif=motif_suppression.strip(),
+                                        )
+                                        if ok:
+                                            st.success("✅ Commande supprimée avec succès.")
+                                            if 'commandes_liste' in st.session_state:
+                                                del st.session_state.commandes_liste
+                                            st.rerun()
+                                        else:
+                                            st.error(
+                                                "❌ Suppression refusée : vous ne pouvez supprimer que vos propres commandes."
+                                            )
+                                    except Exception as e:
+                                        st.error(f"❌ Erreur pendant la suppression : {e}")

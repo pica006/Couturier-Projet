@@ -1360,10 +1360,15 @@ def afficher_toutes_commandes(super_admin_ctrl, salon_model):
         
         # Tableau des commandes
         df_cmd = pd.DataFrame(commandes)
+        if 'est_supprime' in df_cmd.columns:
+            df_cmd['statut'] = df_cmd.apply(
+                lambda row: "Supprimée (admin)" if bool(row.get('est_supprime', False)) else row.get('statut'),
+                axis=1
+            )
         
         colonnes = ['id', 'modele', 'prix_total', 'avance', 'reste', 'statut',
                    'date_creation', 'salon_id', 'client_nom', 'client_prenom',
-                   'couturier_code']
+                   'couturier_code', 'date_suppression', 'motif_suppression']
         colonnes_existantes = [c for c in colonnes if c in df_cmd.columns]
         
         st.dataframe(

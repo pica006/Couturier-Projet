@@ -551,7 +551,7 @@ class SalonModel:
                     try:
                         # Nombre de commandes
                         cursor.execute(
-                            "SELECT COUNT(*) FROM commandes WHERE salon_id = %s",
+                            "SELECT COUNT(*) FROM commandes WHERE salon_id = %s AND COALESCE(est_supprime, FALSE) = FALSE",
                             (salon_id,)
                         )
                         nb_commandes = cursor.fetchone()[0] or 0
@@ -561,7 +561,7 @@ class SalonModel:
                     # Calculer le CA total
                     try:
                         cursor.execute(
-                            "SELECT COALESCE(SUM(prix_total), 0) FROM commandes WHERE salon_id = %s",
+                            "SELECT COALESCE(SUM(prix_total), 0) FROM commandes WHERE salon_id = %s AND COALESCE(est_supprime, FALSE) = FALSE",
                             (salon_id,)
                         )
                         ca_total = float(cursor.fetchone()[0] or 0)

@@ -2303,6 +2303,57 @@ def afficher_gestion_commandes_admin(commande_model: CommandeModel, admin_data: 
             df_display['Reste'] = df_display['Reste'].apply(lambda x: f"{x:,.0f} FCFA")
             
             st.dataframe(df_display, use_container_width=True, hide_index=True, height=400)
+
+            st.markdown("---")
+            st.markdown("#### 🗑️ Supprimer une commande (admin)")
+            st.warning(
+                "Cette action effectue une suppression logique : la commande disparaît des vues admin/employé, "
+                "mais reste visible côté Super Admin avec le statut 'Supprimée'."
+            )
+
+            options_suppression = {
+                f"#{c['id']} - {c.get('modele', 'N/A')} - {c.get('client_prenom', '')} {c.get('client_nom', '')}": c['id']
+                for c in commandes_ouvertes
+            }
+
+            with st.form("form_supprimer_commande_admin", clear_on_submit=True):
+                commande_label = st.selectbox(
+                    "Commande à supprimer *",
+                    options=list(options_suppression.keys()),
+                )
+                motif_suppression = st.text_area(
+                    "Motif de suppression (optionnel)",
+                    placeholder="Ex: commande saisie en double",
+                    height=80,
+                )
+                confirmer_suppression = st.checkbox(
+                    "Je confirme la suppression logique de cette commande."
+                )
+                submitted_delete = st.form_submit_button("🗑️ Supprimer la commande")
+
+                if submitted_delete:
+                    if not confirmer_suppression:
+                        st.error("❌ Veuillez confirmer la suppression avant de continuer.")
+                    else:
+                        commande_id_a_supprimer = options_suppression.get(commande_label)
+                        if not commande_id_a_supprimer:
+                            st.error("❌ Commande invalide sélectionnée.")
+                        else:
+                            try:
+                                ok = commande_model.supprimer_commande(
+                                    commande_id=commande_id_a_supprimer,
+                                    admin_id=admin_id,
+                                    salon_id_admin=salon_id_admin,
+                                    motif=(motif_suppression or "").strip() or None,
+                                )
+                                if ok:
+                                    st.success(f"✅ Commande #{commande_id_a_supprimer} supprimée avec succès.")
+                                    st.rerun()
+                                else:
+                                    st.error("❌ Impossible de supprimer la commande (droits, état, ou base de données).")
+                            except Exception as e:
+                                st.error(f"❌ Erreur pendant la suppression : {e}")
+                                st.exception(e)
     
     # ========================================================================
     # ONGLET 3 : COMMANDES FERMÉES
@@ -2400,4 +2451,23 @@ def afficher_gestion_commandes_admin(commande_model: CommandeModel, admin_data: 
                 df_display['Date Fermeture'] = pd.to_datetime(df_display['Date Fermeture']).dt.strftime('%d/%m/%Y %H:%M')
             
             st.dataframe(df_display, use_container_width=True, hide_index=True, height=400)
+
+        st.markdown("---")
+        st.markdown("#### 🧾 Commandes supprimées (traçabilité)")
+        commandes_supprimees = commande_model.lister_commandes_supprimees(salon_id=salon_id_admin)
+        if not commandes_supprimees:
+            st.info("ℹ️ Aucune commande supprimée pour ce salon.")
+        else:
+            df_suppr = pd.DataFrame(commandes_supprimees)
+            colonnes_suppr = [
+                "id", "modele", "client_prenom", "client_nom", "couturier_code",
+                "prix_total", "statut", "date_creation", "date_suppression", "motif_suppression"
+            ]
+            colonnes_suppr_existantes = [c for c in colonnes_suppr if c in df_suppr.columns]
+            st.dataframe(
+                df_suppr[colonnes_suppr_existantes],
+                use_container_width=True,
+                hide_index=True,
+                height=280
+            )
 
