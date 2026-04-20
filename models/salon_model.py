@@ -2,6 +2,7 @@
 Modèle pour la gestion des salons (système multi-tenant)
 """
 from typing import Optional, Dict, List
+import re
 from utils.security import hash_password
 
 try:
@@ -26,6 +27,25 @@ class SalonModel:
             db_connection: Instance de DatabaseConnection
         """
         self.db = db_connection
+
+    def _next_salon_id_from_rows(self, rows: List) -> str:
+        """
+        Calcule le prochain salon_id au format Jaind_XXX à partir d'une liste d'IDs.
+        Fallback robuste si la fonction SQL n'est pas disponible.
+        """
+        max_num = -1
+        for row in rows or []:
+            raw_id = row[0] if isinstance(row, (tuple, list)) else row
+            salon_id = str(raw_id or "")
+            match = re.match(r"^Jaind_(\d+)$", salon_id)
+            if match:
+                try:
+                    num = int(match.group(1))
+                    if num > max_num:
+                        max_num = num
+                except ValueError:
+                    continue
+        return f"Jaind_{max_num + 1:03d}"
     
     def creer_salon_avec_admin(
         self,
@@ -229,10 +249,23 @@ class SalonModel:
             # ÉTAPE 0 : Générer le prochain salon_id (format Jaind_000, Jaind_001, ...)
             salon_id = salon_id_force
             if not salon_id:
-                query_gen_id = "SELECT generer_prochain_salon_id() AS nouveau_id"
-                cursor.execute(query_gen_id)
-                result = cursor.fetchone()
-                salon_id = result[0] if result and result[0] else "Jaind_000"
+                try:
+                    query_gen_id = "SELECT generer_prochain_salon_id() AS nouveau_id"
+                    cursor.execute(query_gen_id)
+                    result = cursor.fetchone()
+                    salon_id = result[0] if result and result[0] else None
+                except Exception:
+                    # Fonction SQL absente/invalide : fallback calculé depuis la table.
+                    try:
+                        conn.rollback()
+                    except Exception:
+                        pass
+                    cursor = conn.cursor()
+                    cursor.execute("SELECT salon_id FROM salons WHERE salon_id LIKE 'Jaind_%'")
+                    salon_id = self._next_salon_id_from_rows(cursor.fetchall())
+
+            if not salon_id:
+                salon_id = "Jaind_000"
             
             # Préparer la configuration SMTP (avec valeurs par défaut si non fournies)
             smtp_host_final = smtp_host or "smtp.gmail.com"
@@ -252,25 +285,46 @@ class SalonModel:
                 )
                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """
-            cursor.execute(
-                query_salon,
-                (
-                    salon_id,
-                    nom_salon,
-                    quartier,
-                    responsable,
-                    telephone,
-                    email,
-                    code_admin,
-                    smtp_host_final,
-                    smtp_port_final,
-                    smtp_user_final,
-                    smtp_password_final,
-                    smtp_from_final,
-                    smtp_use_tls_final,
-                    smtp_use_ssl_final,
-                ),
-            )
+            # En cas de collision (preview obsolète/concurrence), on retente avec le prochain ID.
+            for attempt in range(3):
+                try:
+                    cursor.execute(
+                        query_salon,
+                        (
+                            salon_id,
+                            nom_salon,
+                            quartier,
+                            responsable,
+                            telephone,
+                            email,
+                            code_admin,
+                            smtp_host_final,
+                            smtp_port_final,
+                            smtp_user_final,
+                            smtp_password_final,
+                            smtp_from_final,
+                            smtp_use_tls_final,
+                            smtp_use_ssl_final,
+                        ),
+                    )
+                    break
+                except Exception as insert_err:
+                    err_text = str(insert_err).lower()
+                    duplicate_salon_id = (
+                        "salons_pkey" in err_text
+                        or "duplicate key value violates unique constraint" in err_text
+                        or "duplicate entry" in err_text
+                    )
+                    if duplicate_salon_id and attempt < 2:
+                        try:
+                            conn.rollback()
+                        except Exception:
+                            pass
+                        cursor = conn.cursor()
+                        cursor.execute("SELECT salon_id FROM salons WHERE salon_id LIKE 'Jaind_%'")
+                        salon_id = self._next_salon_id_from_rows(cursor.fetchall())
+                        continue
+                    raise
             
             # ÉTAPE 2 : Créer l'admin (mot de passe hashe, salon_id est VARCHAR)
             admin_password_hash = hash_password(password_admin)
@@ -320,14 +374,23 @@ class SalonModel:
             cursor = conn.cursor()
             cursor.execute("SELECT generer_prochain_salon_id() AS id")
             res = cursor.fetchone()
-            return res[0] if res and res[0] else "Jaind_000"
+            salon_id = res[0] if res and res[0] else None
+            if salon_id:
+                return salon_id
+            cursor.execute("SELECT salon_id FROM salons WHERE salon_id LIKE 'Jaind_%'")
+            return self._next_salon_id_from_rows(cursor.fetchall())
         except Exception as e:
             print(f"Erreur prévisualisation salon_id : {e}")
             try:
                 conn.rollback()
             except Exception:
                 pass
-            return None
+            try:
+                cursor = conn.cursor()
+                cursor.execute("SELECT salon_id FROM salons WHERE salon_id LIKE 'Jaind_%'")
+                return self._next_salon_id_from_rows(cursor.fetchall())
+            except Exception:
+                return "Jaind_000"
         finally:
             if cursor:
                 try:
