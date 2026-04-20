@@ -397,7 +397,7 @@ def afficher_page_fermer_commandes():
                             "✅ Valider et passer en 'Livré et payé' (PDF dispo)",
                             key=f"admin_valider_livraison_{commande['id']}",
                             type="primary",
-                            width='stretch'
+                            use_container_width=True
                         ):
                             try:
                                 success_validation = commande_controller.valider_commande_livree_payee(
@@ -481,7 +481,7 @@ def afficher_page_fermer_commandes():
                                 if st.button(
                                     "📤 Demande non envoyée (cliquer pour envoyer)",
                                     key=button_key,
-                                    width='stretch',
+                                    use_container_width=True,
                                     type="primary"
                                 ):
                                     # Créer la demande de livraison
@@ -695,7 +695,7 @@ def afficher_page_fermer_commandes():
                                     data=pdf_bytes,
                                     file_name=f"Commande_{commande_id}_Livree_Terminee.pdf",
                                     mime="application/pdf",
-                                    width='stretch',
+                                    use_container_width=True,
                                     key=f"download_pdf_terminée_{commande_id}",
                                     type="primary"
                                 )

@@ -905,6 +905,11 @@ class CommandeModel:
     def obtenir_commande(self, commande_id: int) -> Optional[Dict]:
         """Récupère les détails d'une commande"""
         try:
+            if self.db.db_type != 'mysql':
+                try:
+                    self.db.get_connection().rollback()
+                except Exception:
+                    pass
             cursor = self.db.get_connection().cursor()
             # Utiliser des colonnes explicites au lieu de c.* pour éviter les problèmes d'ordre
             query = """
@@ -915,7 +920,7 @@ class CommandeModel:
                     c.date_livraison, c.statut,
                     c.fabric_image_path, c.fabric_image, c.fabric_image_name,
                     c.model_type, c.model_image_path, c.model_image, c.model_image_name,
-                    c.date_creation,
+                    c.date_creation, c.salon_id,
                     c.pdf_data, c.pdf_name, c.pdf_path,
                     cl.nom as client_nom, cl.prenom as client_prenom, 
                     cl.telephone as client_telephone, cl.email as client_email,
@@ -954,21 +959,22 @@ class CommandeModel:
                     'model_image': result[17],
                     'model_image_name': result[18],
                     'date_creation': result[19],
+                    'salon_id': result[20] if num_cols > 20 else None,
                 }
                 
-                # Ajouter les données PDF si disponibles (colonnes 20-22)
-                if num_cols > 22:
-                    data['pdf_data'] = result[20]
-                    data['pdf_name'] = result[21]
-                    data['pdf_path'] = result[22]
-                    # Données client et couturier (colonnes 23-29)
-                    data['client_nom'] = result[23]
-                    data['client_prenom'] = result[24]
-                    data['client_telephone'] = result[25]
-                    data['client_email'] = result[26]
-                    data['couturier_nom'] = result[27]
-                    data['couturier_prenom'] = result[28]
-                    data['couturier_code'] = result[29]
+                # Ajouter les données PDF et jointures si disponibles
+                if num_cols > 30:
+                    data['pdf_data'] = result[21]
+                    data['pdf_name'] = result[22]
+                    data['pdf_path'] = result[23]
+                    # Données client et couturier
+                    data['client_nom'] = result[24]
+                    data['client_prenom'] = result[25]
+                    data['client_telephone'] = result[26]
+                    data['client_email'] = result[27]
+                    data['couturier_nom'] = result[28]
+                    data['couturier_prenom'] = result[29]
+                    data['couturier_code'] = result[30]
                 else:
                     # Ancien format sans PDF (colonnes 20-26)
                     data['pdf_data'] = None
@@ -992,6 +998,10 @@ class CommandeModel:
             return None
         except (MySQLError, PGError, Exception) as e:
             print(f"Erreur récupération commande: {e}")
+            try:
+                self.db.get_connection().rollback()
+            except Exception:
+                pass
             return None
     
     def lister_commandes(self, couturier_id: Optional[int] = None, 
