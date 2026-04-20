@@ -200,10 +200,10 @@ def _afficher_galerie_photos(commande_model, couturier_id_filtre, salon_id, date
                         # Fallback défensif pour formats inattendus.
                         raw_image = bytes(raw_image)
 
-                    st.image(raw_image, caption=img_data['label'], use_container_width=True)
+                    st.image(raw_image, caption=img_data['label'], use_column_width=True)
             except Exception:
                 try:
-                    st.image(io.BytesIO(raw_image), caption=img_data['label'], use_container_width=True)
+                    st.image(io.BytesIO(raw_image), caption=img_data['label'], use_column_width=True)
                 except Exception as e:
                     st.error(f"❌ Impossible d'afficher l'image : {e}")
 
@@ -225,7 +225,21 @@ def _afficher_calendrier(commande_model, couturier_model, couturier_id, salon_id
     st.markdown("### 📅 Calendrier des livraisons")
 
     aujourd_hui = datetime.now().date()
-    date_rappel = aujourd_hui + timedelta(days=2)
+    col_r1, col_r2 = st.columns([1, 2])
+    with col_r1:
+        nb_jours_rappel = st.number_input(
+            "Rappel dans X jours",
+            min_value=1,
+            max_value=30,
+            value=2,
+            step=1,
+            key="cal_rappel_x_jours",
+            help="Afficher les commandes à livrer dans X jours."
+        )
+    with col_r2:
+        st.caption("Le rappel automatique quotidien reste actif. Ce filtre permet de visualiser les échéances ciblées.")
+
+    date_rappel = aujourd_hui + timedelta(days=int(nb_jours_rappel))
 
     col1, col2, col3 = st.columns(3)
     with col1:
@@ -288,7 +302,7 @@ def _afficher_calendrier(commande_model, couturier_model, couturier_id, salon_id
     elif commandes_rappel and not commandes_a_rappeler:
         st.success("✅ Rappels pour les livraisons du " + date_rappel.strftime('%d/%m/%Y') + " déjà envoyés.")
     else:
-        st.info("ℹ️ Aucune livraison prévue dans 2 jours.")
+        st.info(f"ℹ️ Aucune livraison prévue dans {int(nb_jours_rappel)} jours.")
 
     st.markdown("---")
     st.markdown("#### 📦 Par date")
@@ -311,6 +325,27 @@ def _afficher_calendrier(commande_model, couturier_model, couturier_id, salon_id
         if dl:
             key = dl if hasattr(dl, 'strftime') else dl
             par_date[key].append(c)
+
+    commandes_en_retard = 0
+    commandes_du_jour = 0
+    commandes_a_venir = 0
+    for date_liv in sorted(par_date.keys()):
+        if date_liv < aujourd_hui:
+            commandes_en_retard += len(par_date[date_liv])
+        elif date_liv == aujourd_hui:
+            commandes_du_jour += len(par_date[date_liv])
+        else:
+            commandes_a_venir += len(par_date[date_liv])
+
+    c1, c2, c3 = st.columns(3)
+    with c1:
+        st.metric("⏳ En retard", commandes_en_retard)
+    with c2:
+        st.metric("🟢 Aujourd'hui", commandes_du_jour)
+    with c3:
+        st.metric("📅 À venir", commandes_a_venir)
+
+    st.markdown("---")
 
     for date_liv in sorted(par_date.keys()):
         items = par_date[date_liv]
