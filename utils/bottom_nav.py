@@ -3,6 +3,8 @@ import os
 import textwrap
 import streamlit as st
 
+from utils.layout_css import CONTENT_INNER_WIDTH_CSS
+
 
 def _safe_format(template: str, values: dict) -> str:
     if not template:
@@ -139,14 +141,15 @@ def render_app_footer() -> None:
             border-top: 2px solid rgba(177, 156, 217, 0.4);
         }
         .app-footer-inner {
-            max-width: 1200px;
             margin: 0 auto;
-            padding: 0 1.5rem;
             display: flex;
             flex-wrap: wrap;
             align-items: flex-start;
             gap: 0.75rem 1.5rem;
         }
+        """
+        + CONTENT_INNER_WIDTH_CSS
+        + """
         .app-footer-title {
             font-weight: 700;
             color: #2C2C2C;
@@ -182,7 +185,6 @@ def render_bottom_nav(app_values: dict) -> None:
         }
 
         .bottom-nav-inner {
-            max-width: 1200px;
             margin: 0 auto;
             display: grid;
             grid-template-columns: 1.3fr 1fr;
@@ -194,6 +196,9 @@ def render_bottom_nav(app_values: dict) -> None:
             border: 1px solid rgba(177, 156, 217, 0.25);
             box-shadow: 0 10px 24px rgba(0, 0, 0, 0.08);
         }
+        """
+        + CONTENT_INNER_WIDTH_CSS
+        + """
 
         .bottom-nav-hero {
             min-width: 260px;

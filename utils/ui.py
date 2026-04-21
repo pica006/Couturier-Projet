@@ -5,6 +5,8 @@ Utilitaires UI centralisés pour les vues Streamlit.
 from contextlib import contextmanager
 import streamlit as st
 
+from utils.layout_css import MAIN_BLOCK_CONTAINER_CSS
+
 
 def ajouter_espace_vertical(lignes: int = 1) -> None:
     """
@@ -22,11 +24,12 @@ def appliquer_style_pages_critiques() -> None:
         """
         <style>
         .main .block-container {
-            max-width: 1200px;
             padding-top: 1.6rem;
             padding-bottom: 1.6rem;
         }
-
+        """
+        + MAIN_BLOCK_CONTAINER_CSS
+        + """
         h3 {
             margin-top: 0.6rem;
             margin-bottom: 0.65rem;

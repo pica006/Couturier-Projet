@@ -8,8 +8,10 @@ import io
 import json
 import re
 import tempfile
-from datetime import datetime
-from typing import Dict, Optional
+from datetime import date, datetime
+from decimal import Decimal
+from typing import Any, Dict, Optional
+from uuid import UUID
 
 from PIL import Image as PILImage
 import qrcode
@@ -65,6 +67,75 @@ _P_ALERTE_BG = colors.HexColor("#F5D5D5")
 
 def _pdf_fmt_fcfa(montant: float) -> str:
     return f"{int(round(montant)):,} FCFA".replace(",", " ")
+
+
+def _extraire_mesures_dict(raw: Any) -> Dict[str, Any]:
+    """Normalise mesures (dict / JSON str / bytes / liste) pour PDF et QR."""
+    if raw is None:
+        return {}
+    if isinstance(raw, dict):
+        return raw
+    if isinstance(raw, str):
+        s = raw.strip()
+        if not s:
+            return {}
+        try:
+            return _extraire_mesures_dict(json.loads(s))
+        except Exception:
+            return {}
+    if isinstance(raw, (bytes, bytearray, memoryview)):
+        try:
+            return _extraire_mesures_dict(
+                bytes(raw).decode("utf-8", errors="replace")
+            )
+        except Exception:
+            return {}
+    if isinstance(raw, (list, tuple)):
+        out: Dict[str, Any] = {}
+        for i, item in enumerate(raw):
+            if isinstance(item, dict):
+                if "nom" in item and "valeur" in item:
+                    out[str(item["nom"])] = item["valeur"]
+                elif len(item) == 1:
+                    k, v = next(iter(item.items()))
+                    out[str(k)] = v
+                else:
+                    out[f"mesure_{i + 1}"] = item
+            else:
+                out[f"mesure_{i + 1}"] = item
+        return out
+    return {}
+
+
+def _json_sanitize_qr(obj: Any) -> Any:
+    """Valeurs sérialisables JSON pour le contenu du QR (évite TypeError silencieux / mesures vides)."""
+    if obj is None:
+        return None
+    if isinstance(obj, (str, int, float, bool)):
+        return obj
+    if isinstance(obj, Decimal):
+        return float(obj)
+    if isinstance(obj, datetime):
+        return obj.isoformat(sep=" ", timespec="seconds")
+    if isinstance(obj, date):
+        return obj.isoformat()
+    if isinstance(obj, UUID):
+        return str(obj)
+    if isinstance(obj, (bytes, bytearray, memoryview)):
+        try:
+            return bytes(obj).decode("utf-8", errors="replace")
+        except Exception:
+            return str(obj)
+    if isinstance(obj, dict):
+        return {str(k): _json_sanitize_qr(v) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple)):
+        return [_json_sanitize_qr(v) for v in obj]
+    try:
+        if hasattr(obj, "item"):  # numpy scalar éventuel
+            return _json_sanitize_qr(obj.item())
+    except Exception:
+        pass
+    return str(obj)
 
 
 def _pdf_styles_commande():
@@ -713,14 +784,7 @@ class PDFController:
                 commande_data.get("date_livraison"), avec_heure=False
             )
 
-            mesures = commande_data.get("mesures", {})
-            if isinstance(mesures, str):
-                try:
-                    mesures = json.loads(mesures)
-                except Exception:
-                    mesures = {}
-            if not isinstance(mesures, dict):
-                mesures = {}
+            mesures = _extraire_mesures_dict(commande_data.get("mesures"))
 
             prix_total = float(commande_data.get("prix_total", 0) or 0)
             avance = float(commande_data.get("avance", 0) or 0)
@@ -739,9 +803,21 @@ class PDFController:
                 f"{commande_data.get('couturier_nom', '')}"
             ).strip()
 
-            mesures_qr = mesures
+            try:
+                cmd_id_qr = commande_data.get("id", "N/A")
+                if cmd_id_qr is not None and cmd_id_qr != "N/A":
+                    cmd_id_qr = int(cmd_id_qr)
+            except (TypeError, ValueError):
+                cmd_id_qr = str(commande_data.get("id", "N/A"))
+
+            couturier_code_qr = (
+                commande_data.get("couturier_code")
+                or commande_data.get("code_couturier")
+                or ""
+            )
+
             qr_data = {
-                "commande_id": commande_data.get("id", "N/A"),
+                "commande_id": cmd_id_qr,
                 "statut": commande_data.get("statut", "Non défini"),
                 "date_creation": date_creation_str,
                 "date_livraison": date_livraison_str,
@@ -756,7 +832,7 @@ class PDFController:
                     "categorie": commande_data.get("categorie", ""),
                     "sexe": commande_data.get("sexe", ""),
                     "modele": commande_data.get("modele", ""),
-                    "mesures": mesures_qr,
+                    "mesures": mesures,
                 },
                 "financier": {
                     "prix_total": prix_total,
@@ -767,20 +843,26 @@ class PDFController:
                     "nom": commande_data.get("couturier_nom", ""),
                     "prenom": commande_data.get("couturier_prenom", ""),
                     "nom_complet": couturier_nom_complet,
-                    "code": commande_data.get("couturier_code", ""),
+                    "code": couturier_code_qr,
                 },
             }
 
-            qr_json = json.dumps(qr_data, ensure_ascii=False, indent=2)
+            qr_payload = _json_sanitize_qr(qr_data)
+            qr_json = json.dumps(
+                qr_payload,
+                ensure_ascii=False,
+                separators=(",", ":"),
+                allow_nan=False,
+                default=str,
+            )
             qr = qrcode.QRCode(
-                version=1,
                 error_correction=qrcode.constants.ERROR_CORRECT_H,
                 box_size=10,
                 border=2,
             )
             qr.add_data(qr_json)
             qr.make(fit=True)
-            qr_img = qr.make_image(fill_color="#6E5D80", back_color="#FBF9F6")
+            qr_img = qr.make_image(fill_color="black", back_color="white")
             tmp_qr = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
             qr_path = tmp_qr.name
             tmp_qr.close()
@@ -1055,7 +1137,11 @@ class PDFController:
                                 ),
                                 (
                                     "Code couturier :",
-                                    str(commande_data.get("couturier_code", "—")),
+                                    str(
+                                        commande_data.get("couturier_code")
+                                        or commande_data.get("code_couturier")
+                                        or "—"
+                                    ),
                                 ),
                             ]
                         ),

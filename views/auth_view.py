@@ -595,7 +595,7 @@ def afficher_page_connexion():
                 .main .block-container {{
                     background: transparent !important;
                     padding-top: 2rem;
-                    max-width: 1200px;
+                    max-width: min(100%, 1680px);
                 }}
                 </style>
             """, unsafe_allow_html=True)

@@ -5,7 +5,9 @@ import streamlit as st
 import pandas as pd
 import os
 import re
+import json
 from datetime import datetime
+from typing import Any, Dict
 from controllers.commande_controller import CommandeController
 from controllers.pdf_controller import PDFController
 from utils.ui import (
@@ -15,6 +17,57 @@ from utils.ui import (
     afficher_titre_section,
     etat_chargement,
 )
+
+
+def _mesures_pour_affichage(raw: Any) -> Dict[str, Any]:
+    """Mesures en dict pour la liste (évite .items() sur une chaîne JSON)."""
+    if raw is None:
+        return {}
+    if isinstance(raw, dict):
+        return raw
+    if isinstance(raw, str):
+        s = raw.strip()
+        if not s:
+            return {}
+        try:
+            parsed = json.loads(s)
+            return _mesures_pour_affichage(parsed)
+        except Exception:
+            return {}
+    if isinstance(raw, (bytes, bytearray, memoryview)):
+        try:
+            return _mesures_pour_affichage(
+                bytes(raw).decode("utf-8", errors="replace")
+            )
+        except Exception:
+            return {}
+    return {}
+
+
+def _formater_date_creation_liste(v: Any) -> str:
+    if v is None:
+        return "—"
+    if isinstance(v, datetime):
+        return v.strftime("%d/%m/%Y à %H:%M")
+    if hasattr(v, "strftime"):
+        try:
+            return v.strftime("%d/%m/%Y à %H:%M")
+        except Exception:
+            return str(v)
+    if isinstance(v, str):
+        return v
+    return str(v)
+
+
+def _formater_date_livraison_liste(v: Any) -> str:
+    if v is None:
+        return "Non définie"
+    if hasattr(v, "strftime"):
+        try:
+            return v.strftime("%d/%m/%Y")
+        except Exception:
+            return str(v)
+    return str(v)
 
 
 def _generer_nom_fichier_pdf(details):
@@ -371,84 +424,105 @@ def afficher_page_liste_commandes():
             if not commande_ids:
                 afficher_info_minimale("Sélectionnez des filtres pour voir les commandes")
             else:
-                # Fonction pour forcer la mise à jour quand la sélection change
-                def on_commande_change():
-                    # Forcer un rerun pour mettre à jour l'affichage
-                    st.rerun()
-                
                 commande_selectionnee = st.selectbox(
                     "Sélectionnez une commande",
                     options=commande_ids,
                     format_func=lambda x: f"Commande #{x} - {next((c['client_prenom'] + ' ' + c['client_nom'] for c in commandes_filtrees if c['id'] == x), 'N/A')}",
                     key="select_commande_details",
-                    on_change=on_commande_change
                 )
                 
                 if commande_selectionnee:
                     # Récupérer les détails complets (toujours récupérer les données fraîches)
                     details = commande_controller.obtenir_details_commande(commande_selectionnee)
                     
-                    if details:
+                    if not details:
+                        st.warning(
+                            "Impossible de charger les détails de cette commande "
+                            "(données indisponibles ou erreur de lecture). Essayez « Actualiser »."
+                        )
+                    else:
+                        mesures_dict = _mesures_pour_affichage(details.get("mesures"))
+                        categorie_txt = str(details.get("categorie") or "—").strip() or "—"
+                        sexe_txt = str(details.get("sexe") or "—").strip() or "—"
+                        modele_txt = str(details.get("modele") or "—")
+
                         # Afficher directement sans placeholder pour éviter les problèmes de cache
                         # Utiliser des expanders pour organiser les informations
                         with st.expander("👤 Informations Client", expanded=True):
                             col1, col2 = st.columns(2)
                             
                             with col1:
-                                st.markdown(f"**Nom complet:** {details['client_prenom']} {details['client_nom']}")
-                                st.markdown(f"**Téléphone:** {details['client_telephone']}")
+                                st.markdown(
+                                    f"**Nom complet:** {details.get('client_prenom', '')} {details.get('client_nom', '')}"
+                                )
+                                st.markdown(f"**Téléphone:** {details.get('client_telephone', '—')}")
                             
                             with col2:
-                                st.markdown(f"**Email:** {details['client_email'] or 'Non renseigné'}")
+                                st.markdown(
+                                    f"**Email:** {details.get('client_email') or 'Non renseigné'}"
+                                )
                         
                         with st.expander("👔 Détails du Vêtement", expanded=True):
                             col1, col2, col3 = st.columns(3)
                             
                             with col1:
-                                st.markdown(f"**Catégorie:** {details['categorie'].capitalize()}")
+                                st.markdown(f"**Catégorie:** {categorie_txt.capitalize()}")
                             with col2:
-                                st.markdown(f"**Sexe:** {details['sexe'].capitalize()}")
+                                st.markdown(f"**Sexe:** {sexe_txt.capitalize()}")
                             with col3:
-                                st.markdown(f"**Modèle:** {details['modele']}")
+                                st.markdown(f"**Modèle:** {modele_txt}")
                         
                         with st.expander("💰 Informations de Paiement", expanded=True):
                             col1, col2, col3 = st.columns(3)
+                            pt = float(details.get("prix_total") or 0)
+                            av = float(details.get("avance") or 0)
+                            rs = float(details.get("reste") or 0)
                             
                             with col1:
-                                st.metric("Prix total", f"{details['prix_total']:,.0f} FCFA")
+                                st.metric("Prix total", f"{pt:,.0f} FCFA")
                             with col2:
-                                st.metric("Avance", f"{details['avance']:,.0f} FCFA")
+                                st.metric("Avance", f"{av:,.0f} FCFA")
                             with col3:
-                                st.metric("Reste à payer", f"{details['reste']:,.0f} FCFA", 
-                                         delta=f"{((details['reste']/details['prix_total'])*100):.1f}%" if details['prix_total'] > 0 else "0%")
+                                st.metric(
+                                    "Reste à payer",
+                                    f"{rs:,.0f} FCFA",
+                                    delta=f"{((rs / pt) * 100):.1f}%" if pt > 0 else "0%",
+                                )
                         
                         with st.expander("📅 Dates et Statut", expanded=False):
                             col1, col2 = st.columns(2)
                             
                             with col1:
-                                st.markdown(f"**Date de commande:** {details['date_creation'].strftime('%d/%m/%Y à %H:%M')}")
-                                st.markdown(f"**Date de livraison:** {details['date_livraison'].strftime('%d/%m/%Y') if details['date_livraison'] else 'Non définie'}")
+                                st.markdown(
+                                    f"**Date de commande:** {_formater_date_creation_liste(details.get('date_creation'))}"
+                                )
+                                st.markdown(
+                                    f"**Date de livraison:** {_formater_date_livraison_liste(details.get('date_livraison'))}"
+                                )
                             
                             with col2:
                                 # Badge de statut avec couleur
-                                statut = details['statut']
-                                if statut == 'En cours':
+                                statut = details.get("statut") or "—"
+                                if statut == "En cours":
                                     st.markdown(f"**Statut:** ⏳ {statut}")
-                                elif statut == 'Terminé':
+                                elif statut == "Terminé":
                                     st.markdown(f"**Statut:** ✅ {statut}")
-                                elif statut == 'Livré':
+                                elif statut in ("Livré", "Livré et payé"):
                                     st.markdown(f"**Statut:** 🚚 {statut}")
                                 else:
                                     st.markdown(f"**Statut:** {statut}")
                         
                         with st.expander("📏 Mesures", expanded=False):
-                            mesures_cols = st.columns(3)
-                            mesures_items = list(details['mesures'].items())
-                            
-                            for idx, (mesure, valeur) in enumerate(mesures_items):
-                                col_idx = idx % 3
-                                with mesures_cols[col_idx]:
-                                    st.metric(mesure, f"{valeur} cm")
+                            if not mesures_dict:
+                                st.caption("Aucune mesure enregistrée pour cette commande.")
+                            else:
+                                mesures_cols = st.columns(3)
+                                mesures_items = list(mesures_dict.items())
+                                
+                                for idx, (mesure, valeur) in enumerate(mesures_items):
+                                    col_idx = idx % 3
+                                    with mesures_cols[col_idx]:
+                                        st.metric(str(mesure), f"{valeur} cm")
                         
                         st.markdown("---")
                         

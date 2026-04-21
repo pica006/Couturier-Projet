@@ -69,7 +69,28 @@
     background: var(--beige) !important;
     padding-top: 2rem;
     padding-bottom: 2rem;
-    max-width: 1200px;
+    width: 100% !important;
+    max-width: min(100%, 1680px) !important;
+    margin-left: auto !important;
+    margin-right: auto !important;
+    padding-left: clamp(0.65rem, 2.2vw, 1.75rem) !important;
+    padding-right: clamp(0.65rem, 2.2vw, 1.75rem) !important;
+    box-sizing: border-box !important;
+}
+
+@media (max-width: 768px) {
+    .main .block-container {
+        max-width: 100% !important;
+        padding-left: 0.5rem !important;
+        padding-right: 0.5rem !important;
+    }
+}
+
+@media (max-width: 480px) {
+    .main .block-container {
+        padding-left: 0.4rem !important;
+        padding-right: 0.4rem !important;
+    }
 }
 
 /* ----------------------------------------------------------------------------

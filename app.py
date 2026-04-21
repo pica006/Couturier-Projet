@@ -25,6 +25,7 @@ from utils.permissions import est_super_admin
 from config import APP_CONFIG, PAGE_BACKGROUND_IMAGES, VISUAL_SAFE_MODE
 from services.session_service import initialize_session_state, sanitize_session_state, logout_user
 from utils.theme import get_sidebar_bg_css as theme_sidebar_bg_css
+from utils.layout_css import MAIN_BLOCK_CONTAINER_CSS
 
 logger = logging.getLogger(__name__)
 
@@ -72,26 +73,26 @@ def _safe_visual_css() -> str:
     """
     Mode visuel safe: style minimal, stable et non intrusif.
     """
-    return """
+    return f"""
     <style>
-    .stApp, .main .block-container {
+    .stApp, .main .block-container {{
         background: #FEFEFE !important;
         color: #2C2C2C !important;
         font-family: 'Inter', 'Segoe UI', sans-serif;
-    }
+    }}
 
-    .main .block-container {
-        max-width: 1100px;
+    .main .block-container {{
         padding-top: 1.5rem;
         padding-bottom: 1.5rem;
-    }
+    }}
+    {MAIN_BLOCK_CONTAINER_CSS}
 
-    [data-testid="stSidebar"] {
+    [data-testid="stSidebar"] {{
         background: #FAFAFA !important;
         border-right: 1px solid #EAEAEA;
-    }
+    }}
 
-    .stButton > button, button[kind="primary"] {
+    .stButton > button, button[kind="primary"] {{
         background: #B19CD9 !important;
         color: #FFFFFF !important;
         border: 1px solid #B19CD9 !important;
@@ -99,17 +100,17 @@ def _safe_visual_css() -> str:
         box-shadow: none !important;
         transition: none !important;
         transform: none !important;
-    }
+    }}
 
-    .stButton > button:hover, button[kind="primary"]:hover {
+    .stButton > button:hover, button[kind="primary"]:hover {{
         background: #9F87D3 !important;
         color: #FFFFFF !important;
         opacity: 1 !important;
-    }
+    }}
 
-    a, a:visited, a:hover {
+    a, a:visited, a:hover {{
         color: #40E0D0 !important;
-    }
+    }}
     </style>
     """
 
@@ -119,7 +120,8 @@ _apply_rich_theme = bool(st.session_state.get("authentifie", False))
 if VISUAL_SAFE_MODE:
     st.markdown(_safe_visual_css(), unsafe_allow_html=True)
 elif _apply_rich_theme:
-    st.markdown("""
+    st.markdown(
+        """
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Poppins:wght@400;500;600;700&display=swap');
     
@@ -169,9 +171,10 @@ elif _apply_rich_theme:
         background: #FEFEFE !important;
         padding-top: 2rem;
         padding-bottom: 2rem;
-        max-width: 1200px;
     }
-    
+"""
+        + MAIN_BLOCK_CONTAINER_CSS
+        + """
     /* ========================================================================
        HEADERS DE PAGE - GRADIENT VIOLET-BLEU
        (Styles appliqués en inline pour éviter les conflits DOM)
@@ -460,6 +463,7 @@ elif _apply_rich_theme:
 
 if (not VISUAL_SAFE_MODE) and (not _apply_rich_theme):
     # Ecran de connexion: style leger pour accelerer le premier rendu.
+    # Largeur finale login: theme.py (520px !important) prime sur cette base responsive.
     st.markdown(
         """
         <style>
@@ -469,10 +473,12 @@ if (not VISUAL_SAFE_MODE) and (not _apply_rich_theme):
             font-family: 'Inter', 'Segoe UI', sans-serif;
         }
         .main .block-container {
-            max-width: 980px;
             padding-top: 1.2rem;
             padding-bottom: 1.2rem;
         }
+        """
+        + MAIN_BLOCK_CONTAINER_CSS
+        + """
         </style>
         """,
         unsafe_allow_html=True,
@@ -706,7 +712,8 @@ def get_page_background_html(page_id):
                 logo_b64 = base64.b64encode(f_logo.read()).decode("utf-8")
             logo_html = f'<div style="position:fixed;top:1rem;left:1rem;z-index:99999;width:110px;height:auto;background:rgba(255,255,255,0.95);padding:6px;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,0.15);"><img src="data:image/png;base64,{logo_b64}" alt="Logo" style="width:100%;height:auto;display:block;"></div>'
 
-        return f"""
+        return (
+            f"""
     {logo_html}
     <style id="page-bg-style">
     /* Zone principale : image en arrière-plan (floue) + voile blanc fort pour lisibilité */
@@ -742,11 +749,14 @@ def get_page_background_html(page_id):
         border-radius: 12px !important;
         padding-top: 2rem !important;
         padding-bottom: 2rem !important;
-        max-width: 1200px !important;
         box-shadow: 0 2px 14px rgba(0, 0, 0, 0.05) !important;
     }}
+    """
+            + MAIN_BLOCK_CONTAINER_CSS
+            + """
     </style>
     """
+        )
     except Exception:
         return ""
 
