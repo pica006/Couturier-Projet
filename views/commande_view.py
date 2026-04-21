@@ -10,7 +10,7 @@ from controllers.email_controller import EmailController
 from config import MODELES, MESURES
 from utils.image_optimizer import optimiser_image, obtenir_taille_fichier_mb
 from models.salon_model import SalonModel
-from utils.role_utils import obtenir_salon_id
+from utils.role_utils import obtenir_salon_id_resolu
 from utils.ui import (
     ajouter_espace_vertical,
     appliquer_style_pages_critiques,
@@ -38,7 +38,7 @@ def afficher_page_commande():
     smtp_config = None
     try:
         if st.session_state.get("couturier_data"):
-            salon_id = obtenir_salon_id(st.session_state.couturier_data)
+            salon_id = obtenir_salon_id_resolu(st.session_state.couturier_data, db)
             if salon_id:
                 salon_model = SalonModel(db)
                 smtp_config = salon_model.obtenir_config_email_salon(salon_id)
@@ -470,8 +470,7 @@ def afficher_page_commande():
                         # Récupérer les données du couturier depuis la session
                         couturier_data = st.session_state.couturier_data
                         try:
-                            from utils.role_utils import obtenir_salon_id
-                            salon_id_courant = obtenir_salon_id(couturier_data)
+                            salon_id_courant = obtenir_salon_id_resolu(couturier_data, db)
                         except Exception:
                             salon_id_courant = couturier_data.get('salon_id') if couturier_data else None
                         

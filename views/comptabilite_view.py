@@ -22,7 +22,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from controllers.email_controller import EmailController
 from models.salon_model import SalonModel
-from utils.role_utils import obtenir_salon_id, est_admin
+from utils.role_utils import obtenir_salon_id_resolu, est_admin
 
 
 def afficher_page_comptabilite():
@@ -43,7 +43,11 @@ def afficher_page_comptabilite():
     # Récupérer l'ID du couturier
     couturier_id = st.session_state.couturier_data['id']
     is_admin_user = est_admin(st.session_state.couturier_data)
-    salon_id_user = obtenir_salon_id(st.session_state.couturier_data) if is_admin_user else None
+    salon_id_user = (
+        obtenir_salon_id_resolu(st.session_state.couturier_data, st.session_state.db_connection)
+        if is_admin_user
+        else None
+    )
     
     # Contrôleur (créé une seule fois)
     try:
@@ -416,7 +420,7 @@ def afficher_page_comptabilite():
         smtp_config = None
         try:
             if st.session_state.get("couturier_data"):
-                salon_id = obtenir_salon_id(st.session_state.couturier_data)
+                salon_id = obtenir_salon_id_resolu(st.session_state.couturier_data, db)
                 if salon_id:
                     salon_model = SalonModel(db)
                     smtp_config = salon_model.obtenir_config_email_salon(salon_id)

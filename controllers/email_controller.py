@@ -15,6 +15,25 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
+def _normaliser_cles_smtp(smtp_config: Optional[dict]) -> Optional[dict]:
+    """Accepte les clés internes (host, user) ou les colonnes BDD (smtp_host, smtp_user)."""
+    if not smtp_config:
+        return smtp_config
+    out = dict(smtp_config)
+    paires = (
+        ('smtp_host', 'host'),
+        ('smtp_port', 'port'),
+        ('smtp_user', 'user'),
+        ('smtp_password', 'password'),
+        ('smtp_from', 'from_email'),
+    )
+    for src, dst in paires:
+        v = out.get(src)
+        if v not in (None, '') and (out.get(dst) in (None, '')):
+            out[dst] = v
+    return out
+
+
 class EmailController:
     """Gère l'envoi d'e-mails via SMTP (multi-salons).
 
@@ -28,18 +47,36 @@ class EmailController:
         base = dict(EMAIL_CONFIG) if EMAIL_CONFIG else {}
 
         # Surcharger avec la configuration spécifique au salon si fournie
+        smtp_config = _normaliser_cles_smtp(smtp_config)
         if smtp_config:
             for key, value in smtp_config.items():
                 if value not in (None, ""):
                     base[key] = value
 
-        # Charger config finale
+        # Charger config finale (EMAIL_* et alias SMTP_* souvent utilisés dans .env)
         self.enabled = bool(base.get("enabled", False))
-        self.host = base.get("host", "") or os.getenv("EMAIL_HOST", "")
+        self.host = (
+            base.get("host", "")
+            or os.getenv("EMAIL_HOST", "")
+            or os.getenv("SMTP_HOST", "")
+        )
         self.port = int(base.get("port", 587) or 587)
-        self.user = base.get("user", "") or os.getenv("EMAIL_USER", "")
-        self.password = base.get("password", "") or os.getenv("EMAIL_PASSWORD", "")
-        self.from_email = base.get("from_email", "") or os.getenv("EMAIL_FROM", self.user)
+        self.user = (
+            base.get("user", "")
+            or os.getenv("EMAIL_USER", "")
+            or os.getenv("SMTP_USER", "")
+        )
+        self.password = (
+            base.get("password", "")
+            or os.getenv("EMAIL_PASSWORD", "")
+            or os.getenv("SMTP_PASSWORD", "")
+        )
+        self.from_email = (
+            base.get("from_email", "")
+            or os.getenv("EMAIL_FROM", "")
+            or os.getenv("SMTP_FROM", "")
+            or self.user
+        )
         self.use_tls = bool(base.get("use_tls", True))
         self.use_ssl = bool(base.get("use_ssl", False))
 

@@ -68,10 +68,32 @@ def obtenir_salon_id(couturier_data: Optional[dict]) -> Optional[str]:
         return None
     
     salon_id = couturier_data.get('salon_id')
-    
-    # Si l'admin n'a pas de salon_id, utiliser son propre id comme salon_id
-    if not salon_id and couturier_data.get('role') == 'admin':
-        salon_id = couturier_data.get('id')
-    
-    return salon_id
+    if salon_id is not None and str(salon_id).strip() != '':
+        return str(salon_id).strip()
+    return None
+
+
+def obtenir_salon_id_resolu(couturier_data: Optional[dict], db_connection) -> Optional[str]:
+    """
+    Comme obtenir_salon_id, mais recharge salon_id depuis la table couturiers si la session
+    ne l'a pas (évite l'ancien fallback admin qui utilisait l'id couturier comme salon_id).
+    """
+    sid = obtenir_salon_id(couturier_data)
+    if sid:
+        return sid
+    if not couturier_data or not db_connection:
+        return None
+    cid = couturier_data.get('id')
+    if not cid:
+        return None
+    try:
+        cursor = db_connection.get_connection().cursor()
+        cursor.execute('SELECT salon_id FROM couturiers WHERE id = %s', (cid,))
+        row = cursor.fetchone()
+        cursor.close()
+        if row and row[0] is not None and str(row[0]).strip() != '':
+            return str(row[0]).strip()
+    except Exception:
+        pass
+    return None
 

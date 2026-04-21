@@ -7,7 +7,7 @@ from datetime import date, datetime
 from controllers.commande_controller import CommandeController
 from controllers.email_controller import EmailController
 from models.salon_model import SalonModel
-from utils.role_utils import obtenir_couturier_id, obtenir_salon_id, est_admin
+from utils.role_utils import obtenir_couturier_id, obtenir_salon_id_resolu, est_admin
 
 
 def afficher_page_fermer_commandes():
@@ -16,6 +16,13 @@ def afficher_page_fermer_commandes():
     # En-tête encadré standardisé
     from utils.page_header import afficher_header_page
     afficher_header_page("🔒 Fermer mes commandes", "Gérez les paiements et demandez la fermeture de vos commandes")
+
+    st.info(
+        "**Parcours prévu :** 1) L’employé règle le **reste à payer** (onglet paiements) → statut **Terminé** quand tout est payé. "
+        "2) Il demande la **livraison** (onglet commandes terminées) → une entrée **en attente** apparaît chez l’**admin** "
+        "(Administration → Gestion des commandes → Demandes en attente). "
+        "3) L’admin **valide** → statut **Livré et payé** et PDF côté client si configuré."
+    )
     
     # Récupérer les données du couturier depuis la session
     couturier_data = st.session_state.get('couturier_data')
@@ -30,7 +37,9 @@ def afficher_page_fermer_commandes():
     
     # Obtenir le salon_id pour filtrer les commandes
     try:
-        salon_id_user = obtenir_salon_id(couturier_data)
+        salon_id_user = obtenir_salon_id_resolu(
+            couturier_data, st.session_state.get("db_connection")
+        )
     except Exception:
         salon_id_user = None
     
@@ -48,7 +57,7 @@ def afficher_page_fermer_commandes():
     smtp_config = None
     try:
         if st.session_state.get("couturier_data"):
-            salon_id = obtenir_salon_id(st.session_state.couturier_data)
+            salon_id = obtenir_salon_id_resolu(st.session_state.couturier_data, db)
             if salon_id:
                 salon_model = SalonModel(db)
                 smtp_config = salon_model.obtenir_config_email_salon(salon_id)
@@ -518,35 +527,161 @@ def afficher_page_fermer_commandes():
                                 st.success("✅ Commande validée. Elle apparaît désormais dans l'onglet PDF.")
                                 
                                 # Envoi d'un email de livraison terminée au client
-                                client_email = commande.get('client_email')
+                                commande_email = commande_model.obtenir_commande(commande["id"]) or {}
+                                client_email = (
+                                    commande_email.get("client_email")
+                                    or commande.get("client_email")
+                                )
                                 if not client_email:
                                     st.warning("⚠️ Email de livraison non envoyé : adresse email du client manquante.")
                                 else:
-                                    subject = f"Commande #{commande['id']} livrée et terminée"
-                                    date_livraison = commande.get('date_livraison')
-                                    date_livraison_txt = (
-                                        date_livraison.strftime('%d/%m/%Y')
-                                        if hasattr(date_livraison, 'strftime')
-                                        else str(date_livraison) if date_livraison else "Non définie"
+                                    salon_id_email = (
+                                        commande_email.get("salon_id")
+                                        or commande.get("salon_id")
+                                        or salon_id_user
                                     )
-                                    body = (
-                                        f"Bonjour {commande.get('client_prenom', '')} {commande.get('client_nom', '')},\n\n"
-                                        "Votre commande est maintenant livrée et terminée.\n\n"
-                                        f"Commande: #{commande['id']}\n"
-                                        f"Modèle: {commande.get('modele', 'N/A')}\n"
-                                        f"Date de livraison: {date_livraison_txt}\n\n"
-                                        "Merci pour votre confiance."
-                                    )
-                                    with st.spinner("📧 Envoi de l'email de livraison..."):
-                                        succes, message = email_controller.envoyer_email_avec_message(
-                                            client_email,
-                                            subject,
-                                            body
+                                    email_controller_envoi = email_controller
+                                    try:
+                                        salon_model_email = SalonModel(db)
+
+                                        # Fallback robuste: retrouver le salon via couturier_id si salon_id absent
+                                        if not salon_id_email and commande_email.get("couturier_id"):
+                                            try:
+                                                from models.database import CouturierModel
+                                                couturier_model_email = CouturierModel(db)
+                                                couturier_info = couturier_model_email.obtenir_couturier_par_id(
+                                                    commande_email.get("couturier_id")
+                                                )
+                                                if couturier_info:
+                                                    salon_id_email = couturier_info.get("salon_id")
+                                            except Exception:
+                                                salon_id_email = salon_id_user
+
+                                        if salon_id_email:
+                                            smtp_config_email = salon_model_email.obtenir_config_email_salon(salon_id_email) or {}
+                                            salon_info_email = salon_model_email.obtenir_salon_by_id(salon_id_email) or {}
+
+                                            # Compléter explicitement depuis la BDD si des champs SMTP sont vides
+                                            smtp_user = (salon_info_email.get("smtp_user") or "").strip()
+                                            smtp_password = salon_info_email.get("smtp_password")
+                                            smtp_from = (salon_info_email.get("smtp_from") or "").strip()
+                                            salon_email = (salon_info_email.get("email") or "").strip()
+                                            smtp_host = (salon_info_email.get("smtp_host") or "").strip()
+                                            smtp_port = salon_info_email.get("smtp_port")
+
+                                            if smtp_host:
+                                                smtp_config_email["host"] = smtp_host
+                                            if smtp_port is not None and str(smtp_port).strip() != "":
+                                                try:
+                                                    smtp_config_email["port"] = int(smtp_port)
+                                                except Exception:
+                                                    pass
+
+                                            smtp_config_email["user"] = smtp_config_email.get("user") or smtp_user or salon_email
+                                            smtp_config_email["password"] = smtp_config_email.get("password") or smtp_password
+                                            smtp_config_email["from_email"] = (
+                                                smtp_config_email.get("from_email")
+                                                or smtp_from
+                                                or smtp_user
+                                                or salon_email
+                                            )
+                                            smtp_config_email["enabled"] = True
+
+                                            email_controller_envoi = EmailController(smtp_config=smtp_config_email)
+                                        else:
+                                            # Dernier fallback: lire la config SMTP du salon directement via la commande
+                                            conn = db.get_connection()
+                                            cursor = conn.cursor()
+                                            try:
+                                                cursor.execute(
+                                                    """
+                                                    SELECT
+                                                        s.smtp_host,
+                                                        s.smtp_port,
+                                                        s.smtp_user,
+                                                        s.smtp_password,
+                                                        s.smtp_from,
+                                                        s.smtp_use_tls,
+                                                        s.smtp_use_ssl,
+                                                        s.email
+                                                    FROM commandes c
+                                                    JOIN salons s ON s.salon_id = c.salon_id
+                                                    WHERE c.id = %s
+                                                    """,
+                                                    (commande["id"],)
+                                                )
+                                                row = cursor.fetchone()
+                                                if row:
+                                                    smtp_config_email = {
+                                                        "enabled": True,
+                                                        "host": row[0],
+                                                        "port": row[1],
+                                                        "user": row[2] or row[7],
+                                                        "password": row[3],
+                                                        "from_email": row[4] or row[2] or row[7],
+                                                        "use_tls": row[5],
+                                                        "use_ssl": row[6],
+                                                    }
+                                                    email_controller_envoi = EmailController(smtp_config=smtp_config_email)
+                                            finally:
+                                                cursor.close()
+                                    except Exception:
+                                        email_controller_envoi = email_controller
+
+                                    ok_config, msg_config = email_controller_envoi.verifier_configuration()
+                                    if not ok_config:
+                                        # Salon incomplet : tenter la config globale (.env / EMAIL_CONFIG)
+                                        email_controller_envoi = EmailController(smtp_config=None)
+                                        ok_config, msg_config = email_controller_envoi.verifier_configuration()
+                                    if not ok_config:
+                                        st.error(
+                                            f"❌ Email de livraison non envoyé : {msg_config} "
+                                            "(la commande est bien passée en « Livré et payé »)."
                                         )
-                                    if succes:
-                                        st.success(f"✅ {message}")
                                     else:
-                                        st.error(f"❌ Email de livraison non envoyé : {message}")
+                                        subject = f"Commande #{commande['id']} livrée et terminée"
+                                        date_livraison = commande.get('date_livraison')
+                                        date_livraison_txt = (
+                                            date_livraison.strftime('%d/%m/%Y')
+                                            if hasattr(date_livraison, 'strftime')
+                                            else str(date_livraison) if date_livraison else "Non définie"
+                                        )
+                                        body = (
+                                            f"Bonjour {commande.get('client_prenom', '')} {commande.get('client_nom', '')},\n\n"
+                                            "Votre commande est maintenant livrée et terminée.\n\n"
+                                            f"Commande: #{commande['id']}\n"
+                                            f"Modèle: {commande.get('modele', 'N/A')}\n"
+                                            f"Date de livraison: {date_livraison_txt}\n\n"
+                                            "Merci pour votre confiance."
+                                        )
+                                        with st.spinner("📧 Envoi de l'email de livraison..."):
+                                            attachments = []
+                                            try:
+                                                from controllers.pdf_controller import PDFController
+                                                pdf_controller = PDFController(st.session_state.db_connection)
+                                                commande_pdf = commande_email or commande_model.obtenir_commande(commande["id"])
+                                                if commande_pdf:
+                                                    commande_pdf["statut"] = "Livré et payé"
+                                                    pdf_livraison_path = pdf_controller.generer_pdf_livraison(commande_pdf)
+                                                    if pdf_livraison_path and os.path.exists(pdf_livraison_path):
+                                                        attachments.append(pdf_livraison_path)
+                                            except Exception:
+                                                attachments = []
+
+                                            succes, message = email_controller_envoi.envoyer_email_avec_message(
+                                                client_email,
+                                                subject,
+                                                body,
+                                                attachments=attachments
+                                            )
+                                        if succes:
+                                            if attachments:
+                                                st.success(f"✅ {message} PDF joint envoyé au client.")
+                                            else:
+                                                st.success(f"✅ {message}")
+                                                st.warning("⚠️ Email envoyé sans PDF joint (génération du PDF indisponible).")
+                                        else:
+                                            st.error(f"❌ Email de livraison non envoyé : {message}")
                                 st.rerun()
                             except Exception as e:
                                 st.error(f"❌ Erreur lors de la validation : {e}")

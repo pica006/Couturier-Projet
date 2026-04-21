@@ -783,6 +783,17 @@ class SalonModel:
             print(f"Erreur récupération salon : {e}")
             return None
 
+    @staticmethod
+    def _smtp_mot_de_passe_vers_str(sp) -> str:
+        if sp is None:
+            return ""
+        if isinstance(sp, (bytes, bytearray, memoryview)):
+            try:
+                return bytes(sp).decode("utf-8", errors="replace").strip()
+            except Exception:
+                return ""
+        return str(sp).strip()
+
     def obtenir_config_email_salon(self, salon_id: str) -> Optional[Dict]:
         """
         Récupère les surcharges SMTP d'un salon pour l'envoi d'e-mails.
@@ -792,7 +803,10 @@ class SalonModel:
         quand le salon n'a pas encore saisi de mot de passe d'application).
         """
         try:
-            salon = self.obtenir_salon_by_id(salon_id)
+            sid = str(salon_id).strip() if salon_id is not None else ""
+            if not sid:
+                return None
+            salon = self.obtenir_salon_by_id(sid)
             if not salon:
                 return None
 
@@ -815,8 +829,9 @@ class SalonModel:
                 out["use_ssl"] = bool(salon.get("smtp_use_ssl"))
 
             su = (salon.get("smtp_user") or "").strip()
-            sp = salon.get("smtp_password")
-            if su and sp and str(sp).strip() != "":
+            sp_raw = salon.get("smtp_password")
+            sp = self._smtp_mot_de_passe_vers_str(sp_raw)
+            if su and sp:
                 out["user"] = su
                 out["password"] = sp
                 sf = (salon.get("smtp_from") or "").strip()
