@@ -92,7 +92,7 @@ def _safe_visual_css() -> str:
     }
 
     .stApp { background: var(--bg) \!important; font-family: 'Inter', 'Segoe UI', sans-serif; }
-    .main .block-container { background: transparent \!important; padding-top: 1.5rem; padding-bottom: 2rem; max-width: 1200px; }
+    .main .block-container { background: transparent \!important; padding-top: 1.5rem; padding-bottom: 2rem; max-width: min(1920px, 98vw); }
 
     /* BOUTONS */
     .stButton > button, button[data-baseweb="button"], div[data-testid="stButton"] > button {
@@ -257,7 +257,7 @@ elif _apply_rich_theme:
         background: transparent \!important;
         padding-top: 1.5rem;
         padding-bottom: 2.5rem;
-        max-width: 1200px;
+        max-width: min(1920px, 98vw);
     }
 
     /* ---- BOUTONS ---- */
@@ -438,7 +438,7 @@ if (not VISUAL_SAFE_MODE) and (not _apply_rich_theme):
             font-family: 'Inter', 'Segoe UI', sans-serif;
         }
         .main .block-container {
-            max-width: 980px;
+            max-width: min(1920px, 98vw);
             padding-top: 1.2rem;
             padding-bottom: 1.2rem;
         }
@@ -665,7 +665,7 @@ def get_page_background_html(page_id):
         border-radius: 12px !important;
         padding-top: 2rem !important;
         padding-bottom: 2rem !important;
-        max-width: 1200px !important;
+        max-width: min(1920px, 98vw) !important;
         box-shadow: 0 2px 14px rgba(0, 0, 0, 0.05) !important;
     }}
     </style>

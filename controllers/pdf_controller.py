@@ -886,7 +886,18 @@ class PDFController:
                 f"{commande_data.get('couturier_nom', '')}"
             ).strip()
 
-            mesures_qr = mesures
+            # QR : texte compact (lisible par tout téléphone) + résumé JSON sans mesures
+            # (les mesures gonflaient le payload et rendaient le QR illisible ou vide à la lecture).
+            tel_qr = str(commande_data.get("client_telephone", "") or "").replace("|", " ").strip()
+            ligne_compacte = (
+                "ANSCOUT|"
+                f"id={commande_data.get('id', '')}|"
+                f"client={client_nom_complet.replace('|', ' ')}|"
+                f"tel={tel_qr}|"
+                f"total={prix_total:.0f}|avance={avance:.0f}|reste={reste:.0f}|"
+                f"statut={commande_data.get('statut', '')}|"
+                f"livraison={date_livraison_str}"
+            )
             qr_data = {
                 "commande_id": commande_data.get("id", "N/A"),
                 "statut": commande_data.get("statut", "Non défini"),
@@ -903,7 +914,6 @@ class PDFController:
                     "categorie": commande_data.get("categorie", ""),
                     "sexe": commande_data.get("sexe", ""),
                     "modele": commande_data.get("modele", ""),
-                    "mesures": mesures_qr,
                 },
                 "financier": {
                     "prix_total": prix_total,
@@ -918,14 +928,15 @@ class PDFController:
                 },
             }
 
-            qr_json = json.dumps(qr_data, ensure_ascii=False, indent=2)
+            qr_json = json.dumps(qr_data, ensure_ascii=False, separators=(",", ":"))
+            qr_payload = ligne_compacte + "\n" + qr_json
             qr = qrcode.QRCode(
-                version=1,
+                version=None,
                 error_correction=qrcode.constants.ERROR_CORRECT_H,
                 box_size=10,
                 border=2,
             )
-            qr.add_data(qr_json)
+            qr.add_data(qr_payload)
             qr.make(fit=True)
             qr_img = qr.make_image(fill_color="#6E5D80", back_color="#FBF9F6")
             tmp_qr = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
@@ -1134,8 +1145,8 @@ class PDFController:
                         Image(qr_path, width=4.2 * cm, height=4.2 * cm),
                         Paragraph(
                             "<b>Code QR de vérification</b><br/><br/>"
-                            "Scannez ce code pour vérifier l'authenticité de ce document et "
-                            "retrouver l'ensemble des informations de la commande.<br/><br/>"
+                            "La première ligne contient un résumé lisible (client, montants, dates). "
+                            "La seconde est un résumé structuré (sans mesures détaillées, pour garder un QR fiable).<br/><br/>"
                             "<font color='#C45C5C'><b>Important :</b> aucun vêtement "
                             "ne sera remis sans la présentation de ce document.</font>",
                             ParagraphStyle(

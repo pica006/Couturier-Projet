@@ -2345,14 +2345,16 @@ def afficher_gestion_commandes_admin(commande_model: CommandeModel, admin_data: 
                             
                             if st.form_submit_button("✅ Valider", type="primary"):
                                 try:
-                                    if commande_model.valider_fermeture(
+                                    if not admin_id:
+                                        st.error("❌ Session administrateur invalide (identifiant manquant). Reconnectez-vous.")
+                                    elif commande_model.valider_fermeture(
                                         demande['id'], admin_id, True, commentaire_admin
                                     ):
                                         st.success("✅ Demande validée avec succès !")
                                         st.balloons()
                                         st.rerun()
                                     else:
-                                        st.error("❌ Erreur lors de la validation")
+                                        st.error("❌ Erreur lors de la validation (demande introuvable ou déjà traitée).")
                                 except Exception as e:
                                     st.error(f"❌ Erreur : {str(e)}")
                     
@@ -2366,13 +2368,15 @@ def afficher_gestion_commandes_admin(commande_model: CommandeModel, admin_data: 
                             
                             if st.form_submit_button("❌ Rejeter"):
                                 try:
-                                    if commande_model.valider_fermeture(
+                                    if not admin_id:
+                                        st.error("❌ Session administrateur invalide (identifiant manquant). Reconnectez-vous.")
+                                    elif commande_model.valider_fermeture(
                                         demande['id'], admin_id, False, commentaire_rejet
                                     ):
                                         st.warning("⚠️ Demande rejetée")
                                         st.rerun()
                                     else:
-                                        st.error("❌ Erreur lors du rejet")
+                                        st.error("❌ Erreur lors du rejet (demande introuvable ou déjà traitée).")
                                 except Exception as e:
                                     st.error(f"❌ Erreur : {str(e)}")
                     

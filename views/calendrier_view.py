@@ -180,56 +180,59 @@ def _afficher_galerie_photos(commande_model, couturier_id_filtre, salon_id, date
         return
 
     nb_photos = len(images_liste)
-    key_idx = f"galerie_photo_idx_{key_prefix}"
-    if key_idx not in st.session_state:
-        st.session_state[key_idx] = 0
 
     st.markdown("#### 📷 Galerie photos des réalisations")
-    st.caption(f"{nb_photos} photo(s) — Cliquez sur Suivant ou En arrière pour naviguer")
+    st.caption(
+        f"{nb_photos} photo(s) — utilisez le curseur ci-dessous (un seul rechargement par changement, "
+        "sans boucle « Running »)."
+    )
 
-    with st.expander("📷 Voir les photos", expanded=False):
-        idx = st.session_state[key_idx] % nb_photos
-        img_data = images_liste[idx]
+    idx = st.slider(
+        "Photo affichée",
+        min_value=1,
+        max_value=nb_photos,
+        value=1,
+        step=1,
+        key=f"galerie_slider_{key_prefix}",
+    )
+    img_data = images_liste[idx - 1]
 
-        col_img, _ = st.columns([2, 1])
-        with col_img:
+    col_img, _ = st.columns([2, 1])
+    with col_img:
+        raw_image = None
+        try:
+            raw_image = img_data.get('bytes')
+            if raw_image is None:
+                st.warning("⚠️ Image vide ou indisponible pour cette commande.")
+            else:
+                if isinstance(raw_image, memoryview):
+                    raw_image = raw_image.tobytes()
+                elif isinstance(raw_image, bytearray):
+                    raw_image = bytes(raw_image)
+                elif not isinstance(raw_image, bytes):
+                    raw_image = bytes(raw_image)
+
+                st.image(raw_image, caption=img_data['label'], use_container_width=True)
+        except Exception:
             try:
-                raw_image = img_data.get('bytes')
-                if raw_image is None:
-                    st.warning("⚠️ Image vide ou indisponible pour cette commande.")
+                if raw_image is not None:
+                    st.image(io.BytesIO(raw_image), caption=img_data['label'], use_container_width=True)
                 else:
-                    # PostgreSQL peut renvoyer BYTEA en memoryview selon le driver.
-                    if isinstance(raw_image, memoryview):
-                        raw_image = raw_image.tobytes()
-                    elif isinstance(raw_image, bytearray):
-                        raw_image = bytes(raw_image)
-                    elif not isinstance(raw_image, bytes):
-                        # Fallback défensif pour formats inattendus.
-                        raw_image = bytes(raw_image)
+                    st.error("❌ Impossible d'afficher l'image (données absentes).")
+            except Exception as e:
+                st.error(f"❌ Impossible d'afficher l'image : {e}")
 
-                    st.image(raw_image, caption=img_data['label'], use_column_width=True)
-            except Exception:
-                try:
-                    st.image(io.BytesIO(raw_image), caption=img_data['label'], use_column_width=True)
-                except Exception as e:
-                    st.error(f"❌ Impossible d'afficher l'image : {e}")
-
-        st.caption(f"Photo {idx + 1} / {nb_photos}")
-
-        col_prev, col_spacer, col_next = st.columns([1, 2, 1])
-        with col_prev:
-            if st.button("⬅️ En arrière", key=f"galerie_prev_{key_prefix}"):
-                st.session_state[key_idx] = (st.session_state[key_idx] - 1 + nb_photos) % nb_photos
-                st.rerun()
-        with col_next:
-            if st.button("Suivant ➡️", key=f"galerie_next_{key_prefix}"):
-                st.session_state[key_idx] = (st.session_state[key_idx] + 1) % nb_photos
-                st.rerun()
+    st.caption(f"Photo {idx} / {nb_photos}")
 
 
 def _afficher_calendrier(commande_model, couturier_model, couturier_id, salon_id, est_admin_user):
     """Affiche le calendrier des livraisons avec rappels."""
     st.markdown("### 📅 Calendrier des livraisons")
+    st.info(
+        "**Lecture rapide :** en haut, les livraisons **dans les X prochains jours** sans rappel encore envoyé "
+        "(pour le suivi). En dessous, **Par date** groupe chaque jour avec 🔴 retard, 🟢 aujourd'hui, 🟠 à venir. "
+        "Les rappels email J-2 sont lancés automatiquement une fois par session (bouton manuel possible en haut de page)."
+    )
 
     aujourd_hui = datetime.now().date()
     col_r1, col_r2 = st.columns([1, 2])

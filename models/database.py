@@ -2113,7 +2113,8 @@ class CommandeModel:
                        c.modele, c.prix_total, c.avance, c.reste,
                        cl.nom as client_nom, cl.prenom as client_prenom,
                        co.nom as couturier_nom, co.prenom as couturier_prenom,
-                       co.salon_id, s.nom as salon_nom
+                       co.salon_id, s.nom as salon_nom,
+                       h.statut_validation
                 FROM historique_commandes h
                 JOIN commandes c ON h.commande_id = c.id
                 JOIN clients cl ON c.client_id = cl.id
@@ -2149,6 +2150,7 @@ class CommandeModel:
                     'couturier_prenom': row[17],
                     'salon_id': row[18],
                     'salon_nom': row[19],
+                    'statut_validation': row[20],
                 })
             return demandes
         except (MySQLError, PGError, Exception) as e:

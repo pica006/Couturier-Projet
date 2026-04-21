@@ -16,6 +16,13 @@ def afficher_page_fermer_commandes():
     # En-tête encadré standardisé
     from utils.page_header import afficher_header_page
     afficher_header_page("🔒 Fermer mes commandes", "Gérez les paiements et demandez la fermeture de vos commandes")
+
+    st.info(
+        "**Parcours prévu :** 1) L’employé règle le **reste à payer** (onglet paiements) → statut **Terminé** quand tout est payé. "
+        "2) Il demande la **livraison** (onglet commandes terminées) → une entrée **en attente** apparaît chez l’**admin** "
+        "(Administration → Gestion des commandes → Demandes en attente). "
+        "3) L’admin **valide** → statut **Livré et payé** et PDF côté client si configuré."
+    )
     
     # Récupérer les données du couturier depuis la session
     couturier_data = st.session_state.get('couturier_data')
@@ -415,12 +422,12 @@ def afficher_page_fermer_commandes():
                 historique_counts = {}
 
             for cmd in commandes_terminees:
+                # lister_demandes_validation() ne renvoie que des lignes en_attente (filtre SQL)
                 demande_existante = next(
                     (
                         d for d in demandes
                         if d.get("commande_id") == cmd["id"]
                         and d.get("type_action") == "fermeture_demande"
-                        and d.get("statut_validation") == "en_attente"
                     ),
                     None,
                 )
@@ -621,52 +628,58 @@ def afficher_page_fermer_commandes():
 
                                     ok_config, msg_config = email_controller_envoi.verifier_configuration()
                                     if not ok_config:
-                                        st.error(f"❌ Email de livraison non envoyé : {msg_config}")
-                                        st.rerun()
-
-                                    subject = f"Commande #{commande['id']} livrée et terminée"
-                                    date_livraison = commande.get('date_livraison')
-                                    date_livraison_txt = (
-                                        date_livraison.strftime('%d/%m/%Y')
-                                        if hasattr(date_livraison, 'strftime')
-                                        else str(date_livraison) if date_livraison else "Non définie"
-                                    )
-                                    body = (
-                                        f"Bonjour {commande.get('client_prenom', '')} {commande.get('client_nom', '')},\n\n"
-                                        "Votre commande est maintenant livrée et terminée.\n\n"
-                                        f"Commande: #{commande['id']}\n"
-                                        f"Modèle: {commande.get('modele', 'N/A')}\n"
-                                        f"Date de livraison: {date_livraison_txt}\n\n"
-                                        "Merci pour votre confiance."
-                                    )
-                                    with st.spinner("📧 Envoi de l'email de livraison..."):
-                                        attachments = []
-                                        try:
-                                            from controllers.pdf_controller import PDFController
-                                            pdf_controller = PDFController(st.session_state.db_connection)
-                                            commande_pdf = commande_email or commande_model.obtenir_commande(commande["id"])
-                                            if commande_pdf:
-                                                commande_pdf["statut"] = "Livré et payé"
-                                                pdf_livraison_path = pdf_controller.generer_pdf_livraison(commande_pdf)
-                                                if pdf_livraison_path and os.path.exists(pdf_livraison_path):
-                                                    attachments.append(pdf_livraison_path)
-                                        except Exception:
-                                            attachments = []
-
-                                        succes, message = email_controller_envoi.envoyer_email_avec_message(
-                                            client_email,
-                                            subject,
-                                            body,
-                                            attachments=attachments
+                                        # Salon incomplet : tenter la config globale (.env / EMAIL_CONFIG)
+                                        email_controller_envoi = EmailController(smtp_config=None)
+                                        ok_config, msg_config = email_controller_envoi.verifier_configuration()
+                                    if not ok_config:
+                                        st.error(
+                                            f"❌ Email de livraison non envoyé : {msg_config} "
+                                            "(la commande est bien passée en « Livré et payé »)."
                                         )
-                                    if succes:
-                                        if attachments:
-                                            st.success(f"✅ {message} PDF joint envoyé au client.")
-                                        else:
-                                            st.success(f"✅ {message}")
-                                            st.warning("⚠️ Email envoyé sans PDF joint (génération du PDF indisponible).")
                                     else:
-                                        st.error(f"❌ Email de livraison non envoyé : {message}")
+                                        subject = f"Commande #{commande['id']} livrée et terminée"
+                                        date_livraison = commande.get('date_livraison')
+                                        date_livraison_txt = (
+                                            date_livraison.strftime('%d/%m/%Y')
+                                            if hasattr(date_livraison, 'strftime')
+                                            else str(date_livraison) if date_livraison else "Non définie"
+                                        )
+                                        body = (
+                                            f"Bonjour {commande.get('client_prenom', '')} {commande.get('client_nom', '')},\n\n"
+                                            "Votre commande est maintenant livrée et terminée.\n\n"
+                                            f"Commande: #{commande['id']}\n"
+                                            f"Modèle: {commande.get('modele', 'N/A')}\n"
+                                            f"Date de livraison: {date_livraison_txt}\n\n"
+                                            "Merci pour votre confiance."
+                                        )
+                                        with st.spinner("📧 Envoi de l'email de livraison..."):
+                                            attachments = []
+                                            try:
+                                                from controllers.pdf_controller import PDFController
+                                                pdf_controller = PDFController(st.session_state.db_connection)
+                                                commande_pdf = commande_email or commande_model.obtenir_commande(commande["id"])
+                                                if commande_pdf:
+                                                    commande_pdf["statut"] = "Livré et payé"
+                                                    pdf_livraison_path = pdf_controller.generer_pdf_livraison(commande_pdf)
+                                                    if pdf_livraison_path and os.path.exists(pdf_livraison_path):
+                                                        attachments.append(pdf_livraison_path)
+                                            except Exception:
+                                                attachments = []
+
+                                            succes, message = email_controller_envoi.envoyer_email_avec_message(
+                                                client_email,
+                                                subject,
+                                                body,
+                                                attachments=attachments
+                                            )
+                                        if succes:
+                                            if attachments:
+                                                st.success(f"✅ {message} PDF joint envoyé au client.")
+                                            else:
+                                                st.success(f"✅ {message}")
+                                                st.warning("⚠️ Email envoyé sans PDF joint (génération du PDF indisponible).")
+                                        else:
+                                            st.error(f"❌ Email de livraison non envoyé : {message}")
                                 st.rerun()
                             except Exception as e:
                                 st.error(f"❌ Erreur lors de la validation : {e}")

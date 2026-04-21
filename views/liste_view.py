@@ -5,6 +5,7 @@ import streamlit as st
 import pandas as pd
 import os
 import re
+import json
 from datetime import datetime
 from controllers.commande_controller import CommandeController
 from controllers.pdf_controller import PDFController
@@ -144,7 +145,7 @@ def afficher_page_liste_commandes():
             with col1:
                 filtre_statut = st.selectbox(
                     "📌 Filtrer par statut",
-                    options=["Tous", "En cours", "Terminé", "Livré"],
+                    options=["Tous", "En cours", "Terminé", "Livré et payé"],
                     index=0,
                     key="filtre_statut_liste"
                 )
@@ -197,9 +198,15 @@ def afficher_page_liste_commandes():
         # Filtrer les commandes
         commandes_filtrees = commandes
         
-        # Filtrer par statut
+        # Filtrer par statut (aligné sur les valeurs en base : « Livré et payé »)
         if filtre_statut != "Tous":
-            commandes_filtrees = [c for c in commandes_filtrees if c['statut'] == filtre_statut]
+            if filtre_statut == "Livré et payé":
+                commandes_filtrees = [
+                    c for c in commandes_filtrees
+                    if c.get("statut") in ("Livré et payé", "Livré")
+                ]
+            else:
+                commandes_filtrees = [c for c in commandes_filtrees if c.get("statut") == filtre_statut]
         
         # Filtrer par recherche client
         if recherche:
@@ -339,7 +346,8 @@ def afficher_page_liste_commandes():
                     statut_icon = {
                         'En cours': '⏳',
                         'Terminé': '✅',
-                        'Livré': '🚚'
+                        'Livré et payé': '🚚',
+                        'Livré': '🚚',
                     }.get(cmd['statut'], '📋')
                     
                     df_data.append({
@@ -371,24 +379,23 @@ def afficher_page_liste_commandes():
             if not commande_ids:
                 afficher_info_minimale("Sélectionnez des filtres pour voir les commandes")
             else:
-                # Fonction pour forcer la mise à jour quand la sélection change
-                def on_commande_change():
-                    # Forcer un rerun pour mettre à jour l'affichage
-                    st.rerun()
-                
                 commande_selectionnee = st.selectbox(
                     "Sélectionnez une commande",
                     options=commande_ids,
                     format_func=lambda x: f"Commande #{x} - {next((c['client_prenom'] + ' ' + c['client_nom'] for c in commandes_filtrees if c['id'] == x), 'N/A')}",
                     key="select_commande_details",
-                    on_change=on_commande_change
                 )
                 
                 if commande_selectionnee:
                     # Récupérer les détails complets (toujours récupérer les données fraîches)
                     details = commande_controller.obtenir_details_commande(commande_selectionnee)
                     
-                    if details:
+                    if not details:
+                        st.error(
+                            "❌ Impossible de charger le détail de cette commande. "
+                            "Réessayez après actualisation ou contactez un administrateur."
+                        )
+                    elif details:
                         # Afficher directement sans placeholder pour éviter les problèmes de cache
                         # Utiliser des expanders pour organiser les informations
                         with st.expander("👤 Informations Client", expanded=True):
@@ -436,14 +443,24 @@ def afficher_page_liste_commandes():
                                     st.markdown(f"**Statut:** ⏳ {statut}")
                                 elif statut == 'Terminé':
                                     st.markdown(f"**Statut:** ✅ {statut}")
-                                elif statut == 'Livré':
+                                elif statut in ('Livré et payé', 'Livré'):
                                     st.markdown(f"**Statut:** 🚚 {statut}")
                                 else:
                                     st.markdown(f"**Statut:** {statut}")
                         
                         with st.expander("📏 Mesures", expanded=False):
                             mesures_cols = st.columns(3)
-                            mesures_items = list(details['mesures'].items())
+                            mesures_dict = details.get("mesures") or {}
+                            if isinstance(mesures_dict, str):
+                                try:
+                                    mesures_dict = json.loads(mesures_dict)
+                                except Exception:
+                                    mesures_dict = {}
+                            if not isinstance(mesures_dict, dict):
+                                mesures_dict = {}
+                            mesures_items = list(mesures_dict.items())
+                            if not mesures_items:
+                                st.caption("Aucune mesure enregistrée pour cette commande.")
                             
                             for idx, (mesure, valeur) in enumerate(mesures_items):
                                 col_idx = idx % 3
