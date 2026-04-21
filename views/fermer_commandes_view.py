@@ -518,10 +518,33 @@ def afficher_page_fermer_commandes():
                                 st.success("✅ Commande validée. Elle apparaît désormais dans l'onglet PDF.")
                                 
                                 # Envoi d'un email de livraison terminée au client
-                                client_email = commande.get('client_email')
+                                commande_email = commande_model.obtenir_commande(commande["id"]) or {}
+                                client_email = (
+                                    commande_email.get("client_email")
+                                    or commande.get("client_email")
+                                )
                                 if not client_email:
                                     st.warning("⚠️ Email de livraison non envoyé : adresse email du client manquante.")
                                 else:
+                                    salon_id_email = (
+                                        commande_email.get("salon_id")
+                                        or commande.get("salon_id")
+                                        or salon_id_user
+                                    )
+                                    email_controller_envoi = email_controller
+                                    try:
+                                        if salon_id_email:
+                                            salon_model_email = SalonModel(db)
+                                            smtp_config_email = salon_model_email.obtenir_config_email_salon(salon_id_email)
+                                            email_controller_envoi = EmailController(smtp_config=smtp_config_email)
+                                    except Exception:
+                                        email_controller_envoi = email_controller
+
+                                    ok_config, msg_config = email_controller_envoi.verifier_configuration()
+                                    if not ok_config:
+                                        st.error(f"❌ Email de livraison non envoyé : {msg_config}")
+                                        st.rerun()
+
                                     subject = f"Commande #{commande['id']} livrée et terminée"
                                     date_livraison = commande.get('date_livraison')
                                     date_livraison_txt = (
@@ -542,7 +565,7 @@ def afficher_page_fermer_commandes():
                                         try:
                                             from controllers.pdf_controller import PDFController
                                             pdf_controller = PDFController(st.session_state.db_connection)
-                                            commande_pdf = commande_model.obtenir_commande(commande["id"])
+                                            commande_pdf = commande_email or commande_model.obtenir_commande(commande["id"])
                                             if commande_pdf:
                                                 commande_pdf["statut"] = "Livré et payé"
                                                 pdf_livraison_path = pdf_controller.generer_pdf_livraison(commande_pdf)
@@ -551,7 +574,7 @@ def afficher_page_fermer_commandes():
                                         except Exception:
                                             attachments = []
 
-                                        succes, message = email_controller.envoyer_email_avec_message(
+                                        succes, message = email_controller_envoi.envoyer_email_avec_message(
                                             client_email,
                                             subject,
                                             body,

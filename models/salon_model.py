@@ -809,10 +809,27 @@ class SalonModel:
                 except (TypeError, ValueError):
                     pass
 
-            if salon.get("smtp_use_tls") is not None:
-                out["use_tls"] = bool(salon.get("smtp_use_tls"))
-            if salon.get("smtp_use_ssl") is not None:
-                out["use_ssl"] = bool(salon.get("smtp_use_ssl"))
+            def _to_bool(value):
+                if value is None:
+                    return None
+                if isinstance(value, bool):
+                    return value
+                if isinstance(value, (int, float)):
+                    return value != 0
+                if isinstance(value, str):
+                    v = value.strip().lower()
+                    if v in ("1", "true", "oui", "yes", "on"):
+                        return True
+                    if v in ("0", "false", "non", "no", "off", ""):
+                        return False
+                return bool(value)
+
+            tls_value = _to_bool(salon.get("smtp_use_tls"))
+            ssl_value = _to_bool(salon.get("smtp_use_ssl"))
+            if tls_value is not None:
+                out["use_tls"] = tls_value
+            if ssl_value is not None:
+                out["use_ssl"] = ssl_value
 
             su = (salon.get("smtp_user") or "").strip()
             sp = salon.get("smtp_password")
