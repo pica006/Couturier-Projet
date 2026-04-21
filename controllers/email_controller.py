@@ -24,6 +24,27 @@ class EmailController:
     """
 
     def __init__(self, smtp_config: Optional[dict] = None):
+        def _pick(cfg: dict, *keys, default=None):
+            for k in keys:
+                if k in cfg and cfg.get(k) not in (None, ""):
+                    return cfg.get(k)
+            return default
+
+        def _to_bool(value, default=False):
+            if value is None:
+                return default
+            if isinstance(value, bool):
+                return value
+            if isinstance(value, (int, float)):
+                return value != 0
+            if isinstance(value, str):
+                v = value.strip().lower()
+                if v in ("1", "true", "yes", "oui", "on"):
+                    return True
+                if v in ("0", "false", "no", "non", "off", ""):
+                    return False
+            return bool(value)
+
         # Base = configuration globale (fallback)
         base = dict(EMAIL_CONFIG) if EMAIL_CONFIG else {}
 
@@ -34,14 +55,17 @@ class EmailController:
                     base[key] = value
 
         # Charger config finale
-        self.enabled = bool(base.get("enabled", False))
-        self.host = base.get("host", "") or os.getenv("EMAIL_HOST", "")
-        self.port = int(base.get("port", 587) or 587)
-        self.user = base.get("user", "") or os.getenv("EMAIL_USER", "")
-        self.password = base.get("password", "") or os.getenv("EMAIL_PASSWORD", "")
-        self.from_email = base.get("from_email", "") or os.getenv("EMAIL_FROM", self.user)
-        self.use_tls = bool(base.get("use_tls", True))
-        self.use_ssl = bool(base.get("use_ssl", False))
+        self.enabled = _to_bool(_pick(base, "enabled", default=False), default=False)
+        self.host = _pick(base, "host", "smtp_host", default="") or os.getenv("EMAIL_HOST", "")
+        self.port = int(_pick(base, "port", "smtp_port", default=587) or 587)
+        self.user = _pick(base, "user", "smtp_user", "utilisateur", default="") or os.getenv("EMAIL_USER", "")
+        self.password = _pick(base, "password", "smtp_password", "mot_de_passe", default="") or os.getenv("EMAIL_PASSWORD", "")
+        self.from_email = (
+            _pick(base, "from_email", "smtp_from", "expediteur", default="")
+            or os.getenv("EMAIL_FROM", self.user)
+        )
+        self.use_tls = _to_bool(_pick(base, "use_tls", "smtp_use_tls", default=True), default=True)
+        self.use_ssl = _to_bool(_pick(base, "use_ssl", "smtp_use_ssl", default=False), default=False)
 
     def _verifier_configuration(self) -> bool:
         return self.enabled and self.host and self.port and self.user and self.password and self.from_email
