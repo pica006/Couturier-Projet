@@ -533,9 +533,51 @@ def afficher_page_fermer_commandes():
                                     )
                                     email_controller_envoi = email_controller
                                     try:
+                                        salon_model_email = SalonModel(db)
+
+                                        # Fallback robuste: retrouver le salon via couturier_id si salon_id absent
+                                        if not salon_id_email and commande_email.get("couturier_id"):
+                                            try:
+                                                from models.database import CouturierModel
+                                                couturier_model_email = CouturierModel(db)
+                                                couturier_info = couturier_model_email.obtenir_couturier_par_id(
+                                                    commande_email.get("couturier_id")
+                                                )
+                                                if couturier_info:
+                                                    salon_id_email = couturier_info.get("salon_id")
+                                            except Exception:
+                                                salon_id_email = salon_id_user
+
                                         if salon_id_email:
-                                            salon_model_email = SalonModel(db)
-                                            smtp_config_email = salon_model_email.obtenir_config_email_salon(salon_id_email)
+                                            smtp_config_email = salon_model_email.obtenir_config_email_salon(salon_id_email) or {}
+                                            salon_info_email = salon_model_email.obtenir_salon_by_id(salon_id_email) or {}
+
+                                            # Compléter explicitement depuis la BDD si des champs SMTP sont vides
+                                            smtp_user = (salon_info_email.get("smtp_user") or "").strip()
+                                            smtp_password = salon_info_email.get("smtp_password")
+                                            smtp_from = (salon_info_email.get("smtp_from") or "").strip()
+                                            salon_email = (salon_info_email.get("email") or "").strip()
+                                            smtp_host = (salon_info_email.get("smtp_host") or "").strip()
+                                            smtp_port = salon_info_email.get("smtp_port")
+
+                                            if smtp_host:
+                                                smtp_config_email["host"] = smtp_host
+                                            if smtp_port is not None and str(smtp_port).strip() != "":
+                                                try:
+                                                    smtp_config_email["port"] = int(smtp_port)
+                                                except Exception:
+                                                    pass
+
+                                            smtp_config_email["user"] = smtp_config_email.get("user") or smtp_user or salon_email
+                                            smtp_config_email["password"] = smtp_config_email.get("password") or smtp_password
+                                            smtp_config_email["from_email"] = (
+                                                smtp_config_email.get("from_email")
+                                                or smtp_from
+                                                or smtp_user
+                                                or salon_email
+                                            )
+                                            smtp_config_email["enabled"] = True
+
                                             email_controller_envoi = EmailController(smtp_config=smtp_config_email)
                                     except Exception:
                                         email_controller_envoi = email_controller
