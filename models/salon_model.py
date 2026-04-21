@@ -330,7 +330,14 @@ class SalonModel:
         }
         cursor = None
         try:
-            cursor = self.db.get_connection().cursor()
+            conn = self.db.get_connection()
+            # En PostgreSQL, une transaction en échec reste "aborted" jusqu'à rollback.
+            # On repart sur une transaction propre pour que le diagnostic puisse s'exécuter.
+            try:
+                conn.rollback()
+            except Exception:
+                pass
+            cursor = conn.cursor()
 
             if self.db.db_type == "mysql":
                 cursor.execute("SHOW TABLES LIKE 'salons'")
@@ -367,6 +374,10 @@ class SalonModel:
             return diagnostic
         except Exception as e:
             diagnostic["error"] = str(e)
+            try:
+                self.db.get_connection().rollback()
+            except Exception:
+                pass
             return diagnostic
         finally:
             try:
@@ -505,6 +516,11 @@ class SalonModel:
                 
             except Exception as e_simple:
                 print(f"Erreur requête simple salons: {e_simple}")
+                # Remettre la connexion dans un état utilisable (PostgreSQL: transaction aborted)
+                try:
+                    self.db.get_connection().rollback()
+                except Exception:
+                    pass
                 # Essayer de vérifier si la table existe
                 try:
                     if self.db.db_type == 'mysql':
@@ -526,13 +542,24 @@ class SalonModel:
                         return []
                 except Exception as e_check:
                     print(f"Erreur vérification table: {e_check}")
-                    cursor.close()
+                    try:
+                        self.db.get_connection().rollback()
+                    except Exception:
+                        pass
+                    try:
+                        cursor.close()
+                    except Exception:
+                        pass
                     return []
             
         except (MySQLError, PGError, Exception) as e:
             print(f"Erreur liste salons : {e}")
             import traceback
             traceback.print_exc()
+            try:
+                self.db.get_connection().rollback()
+            except Exception:
+                pass
             try:
                 cursor.close()
             except:

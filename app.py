@@ -913,7 +913,7 @@ def afficher_sidebar():
             if est_super_admin():
                 st.markdown("### 🔧 SUPER ADMINISTRATION")
                 
-                if st.button("📊 Dashboard Super Admin", width='stretch'):
+                if st.button("📊 Dashboard Super Admin", use_container_width=True):
                     st.session_state.page = 'super_admin_dashboard'
                     st.rerun()
                 
@@ -924,31 +924,31 @@ def afficher_sidebar():
                 st.markdown("### 📋 Navigation")
             
             # Boutons de navigation standard (pour tous)
-            if st.button("📊 Tableau de bord", width='stretch'):
+            if st.button("📊 Tableau de bord", use_container_width=True):
                 st.session_state.page = 'dashboard'
                 st.rerun()
             
-            if st.button("➕ Nouvelle commande", width='stretch'):
+            if st.button("➕ Nouvelle commande", use_container_width=True):
                 st.session_state.page = 'nouvelle_commande'
                 st.rerun()
             
-            if st.button("📜 Mes commandes", width='stretch'):
+            if st.button("📜 Mes commandes", use_container_width=True):
                 st.session_state.page = 'liste_commandes'
                 st.rerun()
             
-            if st.button("💰 Comptabilité", width='stretch'):
+            if st.button("💰 Comptabilité", use_container_width=True):
                 st.session_state.page = 'comptabilite'
                 st.rerun()
             
-            if st.button("📄 Mes charges", width='stretch'):
+            if st.button("📄 Mes charges", use_container_width=True):
                 st.session_state.page = 'charges'
                 st.rerun()
             
-            if st.button("🔒 Fermer mes commandes", width='stretch'):
+            if st.button("🔒 Fermer mes commandes", use_container_width=True):
                 st.session_state.page = 'fermer_commandes'
                 st.rerun()
             
-            if st.button("📋 Modèles & Calendrier", width='stretch'):
+            if st.button("📋 Modèles & Calendrier", use_container_width=True):
                 st.session_state.page = 'calendrier'
                 st.rerun()
             
@@ -956,30 +956,23 @@ def afficher_sidebar():
             if est_admin(st.session_state.couturier_data) and not est_super_admin():
                 st.markdown("---")
                 st.markdown("### 👑 Administration")
-                if st.button("👑 Administration", width='stretch'):
+                if st.button("👑 Administration", use_container_width=True):
                     st.session_state.page = 'administration'
                     st.rerun()
             
             st.markdown("---")
             
             # Bouton de déconnexion avec approche simplifiée
-            if st.button("🚪 Déconnexion", width='stretch', key="btn_deconnexion"):
+            if st.button("🚪 Déconnexion", use_container_width=True, key="btn_deconnexion"):
                 logout_user()
                 # Rediriger vers la page de connexion
                 st.rerun()
         else:
-            # Sidebar page de connexion : contenu utile au lieu d'un vide
-            app_name = APP_CONFIG.get("name", "Gestion Couturier")
-            app_sub = APP_CONFIG.get("subtitle", "Gestion d'atelier")
-            st.markdown(f"### ✂️ **{app_name}**")
-            st.markdown(f"*{app_sub}*")
-            st.markdown("---")
-            st.markdown("🔐 **Connectez-vous** pour accéder au menu et gérer votre atelier.")
-            st.markdown("")
-            st.info("Utilisez votre **code couturier** et votre **mot de passe** fournis par votre responsable.")
-            st.markdown("---")
-            st.markdown("**Besoin d'aide ?**")
-            st.markdown("Contactez l'administrateur ou votre responsable d'atelier.")
+            # Afficher au moins un bloc vide pour forcer l'affichage de la sidebar
+            st.markdown(
+                "<div style='height: 100vh;'></div>",
+                unsafe_allow_html=True,
+            )
 
 
 def afficher_header_principal():

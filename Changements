@@ -1165,3 +1165,19 @@ Sortie : "OK: COUT001 existe déjà et le mot de passe 'admin123' est valide."
   rien n’a été effacé).
 
 
+
+--------------------------------------------------
+DIAGNOSTIC PAGE CONNEXION EN PRODUCTION (RENDER)
+--------------------------------------------------
+Constat : En localhost le formulaire (Code Couturier, Mot de passe, Se connecter)
+s affiche correctement ; sur Render seule la modale Authentification et le message
+sur la connexion base de donnees apparaissent, sans champs ni bouton.
+
+Points de diagnostic (a executer / verifier) :
+1. Logs Render : timeouts, 504, tracebacks au chargement de la page connexion.
+2. DOM en prod : F12 > Elements, chercher auth_form ou Code Couturier / Se connecter.
+3. Tester sans fond d ecran en prod (implemente : pas de wallpaper sur Render).
+4. Tester VISUAL_SAFE_MODE=false sur Render (Dashboard > Environment).
+5. Reordonner : formulaire AVANT fond d ecran (implemente).
+
+Modifications : views/auth_view.py import IS_RENDER ; ordre formulaire puis wallpaper ; pas de wallpaper data URI en prod.

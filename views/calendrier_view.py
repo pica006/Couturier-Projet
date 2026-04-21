@@ -56,7 +56,7 @@ def afficher_page_calendrier(onglet_admin: bool = False):
     with col_rappel_a:
         st.caption("Les rappels sont declenches automatiquement 1 fois/jour par session.")
     with col_rappel_b:
-        if st.button("🔔 Relancer les rappels", width="stretch", key="btn_relancer_rappels"):
+        if st.button("🔔 Relancer les rappels", use_container_width=True, key="btn_relancer_rappels"):
             nb_rappels, msg_rappels = executer_rappels_automatiques(st.session_state.db_connection)
             if msg_rappels:
                 if nb_rappels > 0:
@@ -268,7 +268,7 @@ def _afficher_calendrier(commande_model, couturier_model, couturier_id, salon_id
         df_rappel_display = df_rappel[['modele', 'client_prenom', 'client_nom', 'couturier_prenom', 'couturier_nom', 'prix_total']].copy()
         df_rappel_display.columns = ['Modèle', 'Prénom Client', 'Nom Client', 'Prénom Couturier', 'Nom Couturier', 'Prix (FCFA)']
         df_rappel_display['Prix (FCFA)'] = df_rappel_display['Prix (FCFA)'].apply(lambda x: f"{x:,.0f}")
-        st.dataframe(df_rappel_display, hide_index=True, width='stretch')
+        st.dataframe(df_rappel_display, hide_index=True, use_container_width=True)
     elif commandes_rappel and not commandes_a_rappeler:
         st.success("✅ Rappels pour les livraisons du " + date_rappel.strftime('%d/%m/%Y') + " déjà envoyés.")
     else:

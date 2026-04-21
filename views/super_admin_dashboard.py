@@ -386,7 +386,7 @@ def afficher_vue_ensemble(super_admin_ctrl, salon_model):
             df_comp = df_comp.rename(columns={k: v for k, v in mapping_noms.items() if k in df_comp.columns})
 
             st.markdown("#### 📋 Tableau comparatif (tous les salons)")
-            st.dataframe(df_comp, width='stretch', hide_index=True)
+            st.dataframe(df_comp, use_container_width=True, hide_index=True)
 
             st.markdown("---")
 
@@ -398,7 +398,7 @@ def afficher_vue_ensemble(super_admin_ctrl, salon_model):
                 if 'CA (FCFA)' in df_comp.columns:
                     st.dataframe(
                         df_comp[['Salon', 'CA (FCFA)']].sort_values('CA (FCFA)', ascending=False).head(10),
-                        width='stretch',
+                        use_container_width=True,
                         hide_index=True,
                     )
 
@@ -407,7 +407,7 @@ def afficher_vue_ensemble(super_admin_ctrl, salon_model):
                 if 'Clients' in df_comp.columns:
                     st.dataframe(
                         df_comp[['Salon', 'Clients']].sort_values('Clients', ascending=False).head(10),
-                        width='stretch',
+                        use_container_width=True,
                         hide_index=True,
                     )
 
@@ -416,7 +416,7 @@ def afficher_vue_ensemble(super_admin_ctrl, salon_model):
                 if 'Commandes' in df_comp.columns:
                     st.dataframe(
                         df_comp[['Salon', 'Commandes']].sort_values('Commandes', ascending=False).head(10),
-                        width='stretch',
+                        use_container_width=True,
                         hide_index=True,
                     )
 
@@ -429,7 +429,7 @@ def afficher_vue_ensemble(super_admin_ctrl, salon_model):
                 if 'Total encaissé (FCFA)' in df_comp.columns:
                     st.dataframe(
                         df_comp[['Salon', 'Total encaissé (FCFA)']].sort_values('Total encaissé (FCFA)', ascending=False).head(10),
-                        width='stretch',
+                        use_container_width=True,
                         hide_index=True,
                     )
 
@@ -438,7 +438,7 @@ def afficher_vue_ensemble(super_admin_ctrl, salon_model):
                 if 'Bénéfice (FCFA)' in df_comp.columns:
                     st.dataframe(
                         df_comp[['Salon', 'Bénéfice (FCFA)']].sort_values('Bénéfice (FCFA)', ascending=False).head(10),
-                        width='stretch',
+                        use_container_width=True,
                         hide_index=True,
                     )
 
@@ -490,7 +490,7 @@ def afficher_gestion_salons(salon_model):
             
             st.dataframe(
                 df_salons[colonnes_existantes],
-                width='stretch',
+                use_container_width=True,
                 hide_index=True
             )
             
@@ -836,7 +836,7 @@ def afficher_gestion_utilisateurs(super_admin_ctrl, salon_model, couturier_model
 
             st.dataframe(
                 df_users[colonnes_existantes],
-                width='stretch',
+                use_container_width=True,
                 hide_index=True
             )
 
@@ -1155,7 +1155,7 @@ def afficher_toutes_commandes(super_admin_ctrl, salon_model):
                     })
 
                     st.markdown("### 🏆 Comparatif des salons (commandes & chiffres d'affaires)")
-                    st.dataframe(df_comp, width='stretch', hide_index=True)
+                    st.dataframe(df_comp, use_container_width=True, hide_index=True)
 
                     # Nuage de points CA vs Commandes pour voir rapidement les salons vendeurs
                     if all(col in df_salons.columns for col in ['ca_total', 'nb_commandes', 'nom_salon']):
@@ -1203,7 +1203,7 @@ def afficher_toutes_commandes(super_admin_ctrl, salon_model):
         
         st.dataframe(
             df_cmd[colonnes_existantes],
-            width='stretch',
+            use_container_width=True,
             hide_index=True,
         )
 
@@ -1749,7 +1749,7 @@ def afficher_statistiques_avancees(super_admin_ctrl, salon_model):
         'Commandes': df_synthese['nb_commandes']
     })
     
-    st.dataframe(df_display, width='stretch', hide_index=True)
+    st.dataframe(df_display, use_container_width=True, hide_index=True)
 
 
 def afficher_rapports(super_admin_ctrl, salon_model):
@@ -1836,7 +1836,7 @@ def afficher_rapports(super_admin_ctrl, salon_model):
         - Archivage structuré
         """)
         
-        if st.button("📥 Générer rapport JSON", width='stretch'):
+        if st.button("📥 Générer rapport JSON", use_container_width=True):
             with st.spinner("Génération du rapport..."):
                 rapport = super_admin_ctrl.generer_rapport_complet(salon_id_rapport)
                 
@@ -1848,7 +1848,7 @@ def afficher_rapports(super_admin_ctrl, salon_model):
                     data=json_str,
                     file_name=f"rapport_{'global' if not salon_id_rapport else salon_id_rapport}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json",
                     mime="application/json",
-                    width='stretch'
+                    use_container_width=True
                 )
                 
                 st.success("✅ Rapport JSON généré avec succès !")
@@ -1873,7 +1873,7 @@ def afficher_rapports(super_admin_ctrl, salon_model):
         - Import dans des bases de données
         """)
         
-        if st.button("📥 Générer rapport CSV", width='stretch'):
+        if st.button("📥 Générer rapport CSV", use_container_width=True):
             with st.spinner("Génération du rapport..."):
                 rapport = super_admin_ctrl.generer_rapport_complet(salon_id_rapport)
                 
@@ -1887,14 +1887,14 @@ def afficher_rapports(super_admin_ctrl, salon_model):
                         data=csv,
                         file_name=f"rapport_salons_{'global' if not salon_id_rapport else salon_id_rapport}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
                         mime="text/csv",
-                        width='stretch'
+                        use_container_width=True
                     )
                     
                     st.success("✅ Rapport CSV généré avec succès !")
                     
                     # Aperçu du tableau
                     with st.expander("👁️ Aperçu du tableau (premiers salons)"):
-                        st.dataframe(df_salons.head(10), width='stretch', hide_index=True)
+                        st.dataframe(df_salons.head(10), use_container_width=True, hide_index=True)
                 else:
                     st.warning("⚠️ Aucun salon à exporter")
 

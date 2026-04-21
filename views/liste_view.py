@@ -73,7 +73,7 @@ def afficher_page_liste_commandes():
         with st.container():
             afficher_info_minimale("Aucune commande enregistrée pour le moment")
             st.markdown("---")
-            if st.button("➕ Créer une nouvelle commande", width='stretch', type="primary"):
+            if st.button("➕ Créer une nouvelle commande", use_container_width=True, type="primary"):
                 st.session_state.page = 'nouvelle_commande'
                 st.rerun()
     else:
@@ -158,7 +158,7 @@ def afficher_page_liste_commandes():
             
             with col3:
                 ajouter_espace_vertical()
-                if st.button("🔄 Actualiser", width='stretch', key="btn_actualiser_liste"):
+                if st.button("🔄 Actualiser", use_container_width=True, key="btn_actualiser_liste"):
                     if 'commandes_liste' in st.session_state:
                         del st.session_state.commandes_liste
                     st.rerun()
@@ -187,7 +187,7 @@ def afficher_page_liste_commandes():
             
             with col_date3:
                 ajouter_espace_vertical()
-                if st.button("🗑️ Effacer dates", width='stretch', key="btn_effacer_dates"):
+                if st.button("🗑️ Effacer dates", use_container_width=True, key="btn_effacer_dates"):
                     if 'filtre_date_debut_liste' in st.session_state:
                         del st.session_state.filtre_date_debut_liste
                     if 'filtre_date_fin_liste' in st.session_state:
@@ -458,7 +458,7 @@ def afficher_page_liste_commandes():
                         col1, col2 = st.columns(2)
                         
                         with col1:
-                            if st.button("📄 Générer PDF", width='stretch', type="primary", key=f"btn_gen_pdf_{commande_selectionnee}"):
+                            if st.button("📄 Générer PDF", use_container_width=True, type="primary", key=f"btn_gen_pdf_{commande_selectionnee}"):
                                 with etat_chargement("Génération du PDF en cours..."):
                                     pdf_path = pdf_controller.generer_pdf_commande(details)
                                     
@@ -486,7 +486,7 @@ def afficher_page_liste_commandes():
                                         st.error("❌ Erreur lors de la génération du PDF")
                         
                         with col2:
-                            if st.button("🔄 Actualiser", width='stretch', key=f"btn_actualiser_details_{commande_selectionnee}"):
+                            if st.button("🔄 Actualiser", use_container_width=True, key=f"btn_actualiser_details_{commande_selectionnee}"):
                                 if 'commandes_liste' in st.session_state:
                                     del st.session_state.commandes_liste
                                 st.rerun()

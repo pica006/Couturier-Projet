@@ -700,7 +700,7 @@ def afficher_page_commande():
         
         with col_upload2:
             ajouter_espace_vertical()
-            if st.button("📤 Copier le PDF", width='stretch', key="btn_upload_pdf_outside"):
+            if st.button("📤 Copier le PDF", use_container_width=True, key="btn_upload_pdf_outside"):
                 try:
                     if not pdf_path_upload or not os.path.exists(pdf_path_upload):
                         st.error("❌ Le PDF n'est plus disponible. Regénérez-le avant la copie.")

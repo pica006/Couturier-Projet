@@ -1033,7 +1033,7 @@ def afficher_analyses_graphiques(
     df_monthly['Total (FCFA)'] = df_monthly['Total (FCFA)'].apply(lambda x: f"{x:,.0f}")
     df_monthly['Montant moyen'] = df_monthly['Montant moyen'].apply(lambda x: f"{x:,.0f}")
     
-    st.dataframe(df_monthly, width='stretch', hide_index=True)
+    st.dataframe(df_monthly, use_container_width=True, hide_index=True)
 
 
 # ============================================================================

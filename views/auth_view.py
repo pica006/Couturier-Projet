@@ -25,7 +25,7 @@ import os
 import logging
 import streamlit as st
 from controllers.auth_controller import AuthController
-from config import DATABASE_CONFIG, APP_CONFIG, BRANDING, VISUAL_SAFE_MODE
+from config import DATABASE_CONFIG, APP_CONFIG, BRANDING, VISUAL_SAFE_MODE, IS_RENDER
 from utils.bottom_nav import load_site_content
 from services.db_bootstrap_service import connect_and_initialize, validate_required_config
 from utils.ui import (
@@ -259,44 +259,42 @@ hide_st_style = """
     }
 
     .login-scope .login-card {
-        background: linear-gradient(165deg, #ffffff 0%, #f8f6ff 50%, #f0eeff 100%);
-        border-radius: 24px;
-        border: 2px solid rgba(177, 156, 217, 0.4);
-        padding: 3.5rem 4rem;
-        box-shadow: 0 20px 50px rgba(64, 224, 208, 0.15), 0 12px 28px rgba(177, 156, 217, 0.2);
+        background: var(--lux-accent);
+        border-radius: 22px;
+        border: 1px solid rgba(201, 162, 39, 0.3);
+        padding: 2.8rem;
+        box-shadow: 0 16px 32px rgba(0, 0, 0, 0.18);
         text-align: center;
-        max-width: 720px;
-        min-width: 520px;
+        max-width: 560px;
+        min-width: 380px;
         margin: 0 auto;
         width: 100%;
     }
 
     .login-scope .login-card h3 {
-        font-size: 2.4rem !important;
+        font-size: 2.1rem !important;
         font-weight: 700 !important;
         margin-bottom: 0.5rem !important;
-        color: #2d2a3a;
     }
 
     .login-scope .login-card h4 {
-        font-size: 1.5rem !important;
+        font-size: 1.35rem !important;
         font-weight: 600 !important;
-        margin-top: 1.2rem !important;
-        margin-bottom: 1.2rem !important;
-        color: #3d3a4a;
+        margin-top: 1rem !important;
+        margin-bottom: 1rem !important;
     }
 
     .login-scope .login-card [data-testid="stForm"] label,
     .login-scope .login-card [data-testid="stForm"] p {
-        font-size: 1.2rem !important;
+        font-size: 1.15rem !important;
     }
 
     .login-scope .login-muted {
-        color: rgba(45, 42, 58, 0.75);
-        font-size: 1.25rem;
-        margin-top: -0.4rem;
-        margin-bottom: 1.5rem;
-        line-height: 1.5;
+        color: rgba(26, 20, 15, 0.7);
+        font-size: 1.2rem;
+        margin-top: -0.6rem;
+        margin-bottom: 1.2rem;
+        line-height: 1.45;
     }
 
     .login-scope .login-support {
@@ -331,52 +329,37 @@ hide_st_style = """
 
     .login-scope .stTextInput > div > div input,
     .login-scope .stPasswordInput > div > div input {
-        border-radius: 14px !important;
-        border: 2px solid rgba(177, 156, 217, 0.35) !important;
-        padding: 1rem 1.25rem !important;
+        border-radius: 12px !important;
+        border: 1px solid rgba(201, 162, 39, 0.35) !important;
+        padding: 0.75rem 1rem !important;
         background: #FFFFFF !important;
-        font-size: 1.15rem !important;
+        font-size: 1.1rem !important;
     }
 
     .login-scope .stTextInput > div > div input:focus,
     .login-scope .stPasswordInput > div > div input:focus {
-        border-color: #40E0D0 !important;
-        box-shadow: 0 0 0 3px rgba(64, 224, 208, 0.25) !important;
+        border-color: var(--lux-primary) !important;
+        box-shadow: 0 0 0 0.15rem rgba(201, 162, 39, 0.25) !important;
     }
 
     .login-scope .stButton > button,
     .login-scope button[kind="primary"],
     .login-scope button[data-baseweb="button"][kind="primary"] {
-        background: linear-gradient(135deg, #B19CD9 0%, #40E0D0 100%) !important;
-        color: #FFFFFF !important;
+        background: linear-gradient(135deg, var(--lux-primary) 0%, #E3C873 100%) !important;
+        color: #1A140F !important;
         border: none !important;
         font-weight: 700 !important;
-        letter-spacing: 0.3px;
-        font-size: 1.15rem !important;
-        padding: 0.9rem 2rem !important;
-        border-radius: 14px !important;
+        letter-spacing: 0.2px;
+        font-size: 1.08rem !important;
+        padding: 0.65rem 1.25rem !important;
     }
 
     .login-scope .stButton > button:hover,
     .login-scope button[kind="primary"]:hover,
     .login-scope button[data-baseweb="button"][kind="primary"]:hover {
-        background: linear-gradient(135deg, #40E0D0 0%, #B19CD9 100%) !important;
-        color: #FFFFFF !important;
+        background: linear-gradient(135deg, #E3C873 0%, var(--lux-primary) 100%) !important;
+        color: #1A140F !important;
         opacity: 0.95;
-        transform: translateY(-1px);
-    }
-
-    .login-scope .login-forgot {
-        margin-top: 1rem;
-        font-size: 1rem;
-    }
-    .login-scope .login-forgot a {
-        color: #40E0D0;
-        text-decoration: none;
-        font-weight: 500;
-    }
-    .login-scope .login-forgot a:hover {
-        text-decoration: underline;
     }
 
     </style>
@@ -454,34 +437,8 @@ def afficher_page_connexion():
         afficher_erreur_minimale("Erreur d'initialisation de l'interface de connexion.")
 
     content = load_site_content()
-    
-    # ========================================================================
-    # FOND D'ÉCRAN PLEIN ÉCRAN (image en arrière-plan, formulaire par-dessus)
-    # ========================================================================
-    
-    # Fond d'écran : cache pour éviter 4-13 s de chargement à chaque requête
-    wallpaper_path = APP_CONFIG.get('wallpaper_url')
-    data_uri = _load_wallpaper_data_uri(wallpaper_path) if wallpaper_path else None
-    if data_uri:
-        st.markdown(f"""
-            <style>
-            .stApp {{
-                background-image: url("{data_uri}") !important;
-                background-size: cover !important;
-                background-position: center !important;
-                background-attachment: fixed !important;
-                background-repeat: no-repeat !important;
-                background-color: transparent !important;
-                min-height: 100vh;
-            }}
-            .main .block-container {{
-                background: transparent !important;
-                padding-top: 2rem;
-                max-width: 1200px;
-            }}
-            </style>
-        """, unsafe_allow_html=True)
-    
+
+    # Message DB avant le formulaire (formulaire rendu en premier pour éviter timeout en prod)
     if st.session_state.get("db_connection") is None:
         afficher_info_minimale(
             "La connexion base de données sera établie uniquement au clic sur « Se connecter »."
@@ -502,7 +459,7 @@ def afficher_page_connexion():
     # COMMENT ? L'user entre son code + password, on vérifie dans la base de données
     st.markdown('<div class="login-scope">', unsafe_allow_html=True)
     
-    _, form_col, _ = st.columns([0.6, 2, 0.6], gap="large")
+    _, form_col, _ = st.columns([1, 1.3, 1], gap="large")
 
     with form_col:
         st.markdown('<div class="login-card">', unsafe_allow_html=True)
@@ -536,10 +493,6 @@ def afficher_page_connexion():
             submit_auth = st.form_submit_button(
                 "🔓 Se connecter",
                 type="primary"
-            )
-            st.markdown(
-                '<p class="login-forgot">Mot de passe oublié ? <a href="#">Contactez votre responsable</a></p>',
-                unsafe_allow_html=True
             )
             
             # ================================================================
@@ -624,4 +577,29 @@ def afficher_page_connexion():
         st.markdown("</div>", unsafe_allow_html=True)
     
     st.markdown("</div>", unsafe_allow_html=True)
+
+    # Fond d'écran après le formulaire (réduit risque de réponse tronquée en prod)
+    # En production (Render) : pas de data URI pour éviter payload lourd / timeout
+    if not IS_RENDER:
+        wallpaper_path = APP_CONFIG.get('wallpaper_url')
+        data_uri = _load_wallpaper_data_uri(wallpaper_path) if wallpaper_path else None
+        if data_uri:
+            st.markdown(f"""
+                <style>
+                .stApp {{
+                    background-image: url("{data_uri}") !important;
+                    background-size: cover !important;
+                    background-position: center !important;
+                    background-attachment: fixed !important;
+                    background-repeat: no-repeat !important;
+                    background-color: transparent !important;
+                    min-height: 100vh;
+                }}
+                .main .block-container {{
+                    background: transparent !important;
+                    padding-top: 2rem;
+                    max-width: 1200px;
+                }}
+                </style>
+            """, unsafe_allow_html=True)
 
