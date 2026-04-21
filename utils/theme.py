@@ -375,8 +375,8 @@ def get_sidebar_bg_css() -> str:
     if THEME_ACTIVE == "ultra_minimal":
         return "background: #FFFFFF \!important; border-right: 1px solid #E5E7EB \!important;"
     return """
-    background: linear-gradient(180deg, #ECE6F8 0%, #DFF7F4 100%) \!important;
-    border-right: 1px solid rgba(0, 0, 0, 0.06) \!important;
+    background: linear-gradient(180deg, #ede9fe 0%, #d1faf3 100%) \!important;
+    border-right: 1px solid rgba(108, 99, 255, 0.10) \!important;
     """
 
 
@@ -580,4 +580,5 @@ def get_app_premium_css() -> str:
         background: rgba(108, 99, 255, 0.45);
     }}
     </style>
+
     """

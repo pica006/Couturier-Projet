@@ -121,340 +121,267 @@ if VISUAL_SAFE_MODE:
 elif _apply_rich_theme:
     st.markdown("""
     <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Poppins:wght@400;500;600;700&display=swap');
-    
-    /* ========================================================================
-       PALETTE DE COULEURS - DESIGN PROFESSIONNEL 2025
-       ======================================================================== */
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Poppins:wght@400;500;600;700;800&display=swap');
+
+    /* =====================================================================
+       PALETTE PREMIUM GLASS — CLAUDE.md : violet #6C63FF → turquoise #00C9A7
+       ===================================================================== */
     :root {
-        /* Couleurs principales */
-        --violet-clair: #B19CD9;
-        --bleu-turquoise: #40E0D0;
-        --beige: #FEFEFE;
-        --beige-fonce: #FAFAFA;
-        --beige-tres-fonce: #F5F5F5;
-        
-        /* Couleurs complémentaires */
-        --blanc: #FFFFFF;
-        --noir: #2C2C2C;
-        --gris-clair: #F8F8F8;
-        --gris-moyen: #E0E0E0;
-        --gris-fonce: #6C6C6C;
-        
-        /* Dégradés */
-        --gradient-primary: linear-gradient(135deg, #B19CD9 0%, #40E0D0 100%);
-        --gradient-soft: linear-gradient(135deg, #F5F5DC 0%, #E8E8D3 100%);
-        --gradient-accent: linear-gradient(135deg, #40E0D0 0%, #B19CD9 100%);
-        
-        /* Ombres */
-        --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.05);
-        --shadow-md: 0 4px 8px rgba(0, 0, 0, 0.1);
-        --shadow-lg: 0 8px 16px rgba(0, 0, 0, 0.15);
-        
-        /* Espacements */
-        --radius-sm: 8px;
-        --radius-md: 12px;
-        --radius-lg: 16px;
+        --violet:          #6C63FF;
+        --turquoise:       #00C9A7;
+        --violet-soft:     #8B7FFF;
+        --gradient:        linear-gradient(135deg, #6C63FF 0%, #00C9A7 100%);
+        --gradient-inv:    linear-gradient(135deg, #00C9A7 0%, #6C63FF 100%);
+        --bg-app:          linear-gradient(160deg, #f0eeff 0%, #e8f9f6 50%, #eef6ff 100%);
+        --surface:         #FFFFFF;
+        --surface-soft:    #F8F9FC;
+        --text:            #111827;
+        --text-soft:       #6B7280;
+        --border:          #E5E7EB;
+        --shadow-xs:       0 1px 3px rgba(108,99,255,0.06);
+        --shadow-sm:       0 4px 12px rgba(108,99,255,0.10);
+        --shadow-md:       0 8px 28px rgba(108,99,255,0.16);
+        --shadow-lg:       0 20px 50px rgba(108,99,255,0.20);
+        --radius-sm:       10px;
+        --radius-md:       14px;
+        --radius-lg:       20px;
+        --radius-xl:       28px;
     }
-    
-    /* ========================================================================
-       FOND GLOBAL - BEIGE DOMINANT (60%)
-       ======================================================================== */
+
+    /* =====================================================================
+       FOND GLOBAL — dégradé lavande→cyan très subtil (glass sur blanc)
+       ===================================================================== */
     .stApp {
-        background: #FEFEFE !important;
+        background: var(--bg-app) !important;
         font-family: 'Inter', 'Segoe UI', sans-serif;
+        min-height: 100vh;
     }
-    
+
     .main .block-container {
-        background: #FEFEFE !important;
-        padding-top: 2rem;
-        padding-bottom: 2rem;
+        background: transparent !important;
+        padding-top: 1.5rem;
+        padding-bottom: 2.5rem;
         max-width: 1200px;
     }
-    
-    /* ========================================================================
-       HEADERS DE PAGE - GRADIENT VIOLET-BLEU
-       (Styles appliqués en inline pour éviter les conflits DOM)
-       ======================================================================== */
-    
-    /* ========================================================================
-       SIDEBAR - BEIGE FONCÉ (valeur par défaut, surchargée ensuite)
-       ======================================================================== */
+
+    /* =====================================================================
+       SIDEBAR
+       ===================================================================== */
     [data-testid="stSidebar"] {
-        border-right: 2px solid #F5F5F5;
+        border-right: 1px solid rgba(108,99,255,0.10);
     }
-    
-    /* Styles pour le header de la sidebar - Supprimés car utilisés en inline uniquement */
-    
-    /* ========================================================================
-       BOUTONS - GRADIENT VIOLET-BLEU (PAS DE NOIR !)
-       ======================================================================== */
-    .stButton > button {
-        background: linear-gradient(135deg, #B19CD9 0%, #40E0D0 100%) !important;
+
+    /* =====================================================================
+       BOUTONS — gradient violet→turquoise (un seul bloc consolidé)
+       ===================================================================== */
+    .stButton > button,
+    button[data-baseweb="button"],
+    [data-baseweb="button"],
+    div[data-testid="stButton"] > button {
+        background: var(--gradient) !important;
         color: #FFFFFF !important;
         border: none !important;
         border-radius: var(--radius-md) !important;
-        padding: 0.75rem 1.5rem !important;
-        font-weight: 500 !important;
-        transition: all 0.3s ease !important;
+        padding: 0.7rem 1.4rem !important;
+        font-weight: 600 !important;
+        font-size: 0.95rem !important;
+        letter-spacing: 0.01em;
         box-shadow: var(--shadow-sm) !important;
+        transition: transform 0.15s ease, box-shadow 0.2s ease !important;
     }
-    
-    .stButton > button:hover {
-        background: linear-gradient(135deg, #B19CD9 0%, #40E0D0 100%) !important;
-        color: #FFFFFF !important;
-        transform: translateY(-2px);
-        box-shadow: var(--shadow-md) !important;
-        opacity: 0.9;
-    }
-    
-    .stButton > button:active,
-    .stButton > button:focus {
-        background: linear-gradient(135deg, #B19CD9 0%, #40E0D0 100%) !important;
-        color: #FFFFFF !important;
-        border: none !important;
-        outline: none !important;
-    }
-    
-    /* Boutons primaires - toujours violet-bleu (FORCER pour éviter le rouge) */
-    button[kind="primary"],
-    button[data-baseweb="button"][kind="primary"],
-    button[data-baseweb="button"][data-testid="baseButton-primary"],
-    .stButton > button[kind="primary"],
-    div[data-testid="stButton"] > button[kind="primary"],
-    button.st-emotion-cache-1[data-baseweb="button"][kind="primary"] {
-        background: linear-gradient(135deg, #40E0D0 0%, #B19CD9 100%) !important;
-        background-color: transparent !important;
-        color: #FFFFFF !important;
-        border: none !important;
-    }
-    
-    button[kind="primary"]:hover,
-    button[kind="primary"]:active,
-    button[kind="primary"]:focus,
-    button[data-baseweb="button"][kind="primary"]:hover,
-    button[data-baseweb="button"][kind="primary"]:active,
-    button[data-baseweb="button"][kind="primary"]:focus {
-        background: linear-gradient(135deg, #40E0D0 0%, #B19CD9 100%) !important;
-        background-color: transparent !important;
-        color: #FFFFFF !important;
-    }
-    
-    /* Empêcher Streamlit de mettre du rouge ou du noir - TOUS les boutons */
-    button[data-baseweb="button"],
-    button[data-testid="baseButton"],
-    .stButton > button,
-    div[data-testid="stButton"] > button {
-        background: linear-gradient(135deg, #B19CD9 0%, #40E0D0 100%) !important;
-        background-color: transparent !important;
-        color: #FFFFFF !important;
-    }
-    
+
+    .stButton > button:hover,
     button[data-baseweb="button"]:hover,
-    button[data-baseweb="button"]:active,
-    button[data-baseweb="button"]:focus,
-    button[data-testid="baseButton"]:hover,
-    button[data-testid="baseButton"]:active,
-    button[data-testid="baseButton"]:focus {
-        background: linear-gradient(135deg, #B19CD9 0%, #40E0D0 100%) !important;
-        background-color: transparent !important;
-        color: #FFFFFF !important;
+    [data-baseweb="button"]:hover,
+    div[data-testid="stButton"] > button:hover {
+        transform: translateY(-2px) !important;
+        box-shadow: var(--shadow-md) !important;
+        opacity: 0.96;
     }
-    
-    /* Forcer le style sur les boutons de formulaire aussi */
-    form button[data-baseweb="button"],
-    form button[kind="primary"],
-    form .stButton > button {
-        background: linear-gradient(135deg, #40E0D0 0%, #B19CD9 100%) !important;
-        background-color: transparent !important;
-        color: #FFFFFF !important;
-        border: none !important;
+
+    .stButton > button:active,
+    button[data-baseweb="button"]:active {
+        transform: translateY(0) !important;
+        box-shadow: var(--shadow-xs) !important;
     }
-    
-    form button[data-baseweb="button"]:hover,
-    form button[kind="primary"]:hover {
-        background: linear-gradient(135deg, #40E0D0 0%, #B19CD9 100%) !important;
-        background-color: transparent !important;
-        color: #FFFFFF !important;
-    }
-    
-    /* ========================================================================
-       FORCER LE DÉGRADÉ SUR TOUS LES BOUTONS (même les rouges de Streamlit)
-       ======================================================================== */
-    /* Cibler spécifiquement les boutons qui pourraient être rouges */
-    button[data-baseweb="button"][style*="background"],
-    button[data-baseweb="button"][style*="rgb"],
-    button[data-baseweb="button"][style*="red"],
-    button[data-baseweb="button"][style*="#ff"],
-    button[data-baseweb="button"][style*="#FF"] {
-        background: linear-gradient(135deg, #B19CD9 0%, #40E0D0 100%) !important;
-        background-color: transparent !important;
-        background-image: linear-gradient(135deg, #B19CD9 0%, #40E0D0 100%) !important;
-    }
-    
-    /* Forcer sur les boutons primaires même avec styles inline */
-    button[kind="primary"][style],
-    button[data-baseweb="button"][kind="primary"][style] {
-        background: linear-gradient(135deg, #40E0D0 0%, #B19CD9 100%) !important;
-        background-color: transparent !important;
-        background-image: linear-gradient(135deg, #40E0D0 0%, #B19CD9 100%) !important;
-    }
-    
-    /* ========================================================================
+
+    /* =====================================================================
        ONGLETS (TABS)
-       ======================================================================== */
+       ===================================================================== */
     .stTabs [data-baseweb="tab-list"] {
-        gap: 0.5rem;
-        background: #FAFAFA;
-        padding: 0.5rem;
+        background: rgba(108,99,255,0.06);
         border-radius: var(--radius-md);
+        padding: 0.35rem;
+        gap: 0.3rem;
         margin-bottom: 1.5rem;
+        border: 1px solid rgba(108,99,255,0.08);
     }
-    
+
     .stTabs [data-baseweb="tab"] {
         background: transparent !important;
         border-radius: var(--radius-sm) !important;
-        padding: 0.75rem 1.5rem !important;
-        color: var(--noir) !important;
+        padding: 0.65rem 1.25rem !important;
+        color: var(--text) !important;
         font-weight: 500 !important;
-        transition: all 0.3s ease !important;
+        transition: background 0.2s ease, color 0.2s ease !important;
     }
-    
+
     .stTabs [data-baseweb="tab"]:hover {
-        background: #FEFEFE !important;
+        background: rgba(108,99,255,0.08) !important;
+        color: var(--violet) !important;
     }
-    
+
     .stTabs [aria-selected="true"] {
-        background: linear-gradient(135deg, #B19CD9 0%, #40E0D0 100%) !important;
+        background: var(--gradient) !important;
         color: #FFFFFF !important;
         box-shadow: var(--shadow-sm) !important;
     }
-    
-    .stTabs [aria-selected="true"]:hover,
-    .stTabs [aria-selected="true"]:active,
-    .stTabs [aria-selected="true"]:focus {
-        background: linear-gradient(135deg, #B19CD9 0%, #40E0D0 100%) !important;
+
+    .stTabs [aria-selected="true"]:hover {
+        background: var(--gradient) !important;
         color: #FFFFFF !important;
+        opacity: 0.95;
     }
-    
-    /* ========================================================================
-       MÉTRIQUES
-       ======================================================================== */
+
+    /* =====================================================================
+       MÉTRIQUES — cartes glass légères
+       ===================================================================== */
+    [data-testid="stMetric"] {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-md);
+        padding: 1.2rem 1.3rem;
+        box-shadow: var(--shadow-xs);
+        transition: box-shadow 0.2s ease, transform 0.15s ease;
+    }
+
+    [data-testid="stMetric"]:hover {
+        box-shadow: var(--shadow-sm);
+        transform: translateY(-2px);
+    }
+
     [data-testid="stMetricValue"] {
-        font-size: 2.5rem;
-        font-weight: 700;
-        color: var(--noir);
-        font-family: 'Poppins', sans-serif;
+        font-family: 'Poppins', 'Inter', sans-serif !important;
+        font-size: 2.1rem !important;
+        font-weight: 700 !important;
+        color: var(--violet) !important;
     }
-    
+
     [data-testid="stMetricLabel"] {
-        font-size: 1rem;
-        color: var(--gris-fonce);
-        font-weight: 500;
+        font-size: 0.82rem !important;
+        color: var(--text-soft) !important;
+        font-weight: 500 !important;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
     }
-    
-    /* ========================================================================
-       FORMULAIRES
-       ======================================================================== */
-    .stTextInput > div > div > input,
-    .stNumberInput > div > div > input,
-    .stSelectbox > div > div > select,
-    .stTextArea > div > div > textarea {
-        background: var(--blanc) !important;
-        border: 2px solid #F5F5F5 !important;
+
+    [data-testid="stMetricDelta"] {
+        font-size: 0.875rem !important;
+        font-weight: 600 !important;
+    }
+
+    /* =====================================================================
+       FORMULAIRES — bordures fines, focus violet
+       ===================================================================== */
+    .stTextInput > div > div,
+    .stNumberInput > div > div,
+    .stSelectbox > div > div,
+    .stMultiSelect > div > div,
+    .stTextArea > div > div,
+    .stDateInput > div > div {
+        background: var(--surface) !important;
+        border: 1.5px solid var(--border) !important;
         border-radius: var(--radius-sm) !important;
-        transition: all 0.3s ease !important;
+        transition: border-color 0.2s ease, box-shadow 0.2s ease !important;
     }
-    
-    .stTextInput > div > div > input:focus,
-    .stNumberInput > div > div > input:focus {
-        border-color: #B19CD9 !important;
-        box-shadow: 0 0 0 3px rgba(177, 156, 217, 0.1) !important;
-        outline: none !important;
+
+    .stTextInput > div > div:focus-within,
+    .stNumberInput > div > div:focus-within,
+    .stTextArea > div > div:focus-within,
+    .stDateInput > div > div:focus-within,
+    .stSelectbox > div > div:focus-within {
+        border-color: var(--violet) !important;
+        box-shadow: 0 0 0 3px rgba(108,99,255,0.12) !important;
     }
-    
-    /* ========================================================================
+
+    /* =====================================================================
        TABLEAUX
-       ======================================================================== */
+       ===================================================================== */
     .stDataFrame {
         border-radius: var(--radius-md);
         overflow: hidden;
-        box-shadow: var(--shadow-sm);
-        background: var(--blanc);
+        box-shadow: var(--shadow-xs);
+        border: 1px solid var(--border);
     }
-    
-    .stDataFrame thead {
-        background: var(--gradient-soft);
-    }
-    
+
     .stDataFrame th {
-        background: var(--beige-fonce) !important;
-        color: var(--noir) !important;
+        background: rgba(108,99,255,0.06) !important;
+        color: var(--text) !important;
         font-weight: 600 !important;
+        font-size: 0.85rem !important;
+        letter-spacing: 0.02em;
     }
-    
-    /* ========================================================================
-       TYPOGRAPHIE
-       ======================================================================== */
-    h1, h2, h3, h4, h5, h6 {
-        font-family: 'Poppins', sans-serif;
-        color: var(--noir);
-        font-weight: 600;
+
+    .stDataFrame tr:hover td {
+        background: rgba(108,99,255,0.03) !important;
     }
-    
-    p, span, div {
-        color: var(--noir);
+
+    /* =====================================================================
+       EXPANDERS
+       ===================================================================== */
+    [data-testid="stExpander"] {
+        border-radius: var(--radius-md) !important;
+        border: 1px solid var(--border) !important;
+        box-shadow: var(--shadow-xs) !important;
+        background: var(--surface) !important;
+        overflow: hidden;
     }
-    
-    /* ========================================================================
-       ÉLÉMENTS CLIQUABLES - TOUJOURS VIOLET, JAMAIS NOIR
-       ======================================================================== */
-    a, a:visited, a:hover, a:active, a:focus {
-        color: #B19CD9 !important;
+
+    [data-testid="stExpander"] summary {
+        font-weight: 600 !important;
+        color: var(--text) !important;
+        padding: 0.9rem 1rem !important;
     }
-    
-    /* Empêcher les styles noirs par défaut de Streamlit sur les boutons */
-    [data-baseweb="button"] {
-        background: linear-gradient(135deg, #B19CD9 0%, #40E0D0 100%) !important;
-        color: #FFFFFF !important;
-    }
-    
-    [data-baseweb="button"]:hover,
-    [data-baseweb="button"]:active,
-    [data-baseweb="button"]:focus {
-        background: linear-gradient(135deg, #B19CD9 0%, #40E0D0 100%) !important;
-        color: #FFFFFF !important;
-    }
-    
-    /* Liens et éléments interactifs */
-    [role="button"],
-    [role="link"],
-    [role="tab"] {
-        color: #B19CD9 !important;
-    }
-    
-    [role="button"]:hover,
-    [role="link"]:hover,
-    [role="tab"]:hover {
-        color: #40E0D0 !important;
-    }
-    
-    /* ========================================================================
+
+    /* =====================================================================
        ALERTES
-       ======================================================================== */
+       ===================================================================== */
     .stAlert {
-        border-radius: var(--radius-md);
-        border-left: 4px solid;
+        border-radius: var(--radius-md) !important;
+        border-left-width: 4px !important;
+        box-shadow: var(--shadow-xs) !important;
     }
-    
-    /* ========================================================================
-       SÉPARATEURS
-       ======================================================================== */
+
+    /* =====================================================================
+       TYPOGRAPHIE
+       ===================================================================== */
+    h1, h2, h3, h4, h5, h6 {
+        font-family: 'Poppins', 'Inter', sans-serif !important;
+        color: var(--text) !important;
+        font-weight: 600;
+        letter-spacing: -0.01em;
+    }
+
+    /* =====================================================================
+       LIENS & COULEURS INTERACTIVES
+       ===================================================================== */
+    a, a:visited { color: var(--violet) !important; }
+    a:hover     { color: var(--turquoise) !important; }
+
+    /* =====================================================================
+       SÉPARATEURS & SCROLLBAR
+       ===================================================================== */
     hr {
         border: none;
-        border-top: 2px solid var(--beige-tres-fonce);
-        margin: 2rem 0;
+        border-top: 1px solid var(--border);
+        margin: 1.5rem 0;
     }
+
+    ::-webkit-scrollbar        { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-track  { background: transparent; }
+    ::-webkit-scrollbar-thumb  { background: rgba(108,99,255,0.22); border-radius: 6px; }
+    ::-webkit-scrollbar-thumb:hover { background: rgba(108,99,255,0.40); }
+
     </style>
 """, unsafe_allow_html=True)
 
