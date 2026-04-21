@@ -229,7 +229,7 @@ def afficher_page_liste_commandes():
                     # Si c'est un objet avec une méthode date() (comme datetime)
                     try:
                         date_commande = date_creation.date()
-                    except:
+                    except Exception:
                         pass
                 elif isinstance(date_creation, str):
                     # Si c'est une chaîne, essayer de la convertir
@@ -239,10 +239,10 @@ def afficher_page_liste_commandes():
                             date_commande = datetime.strptime(date_creation.split()[0], '%Y-%m-%d').date()
                         else:
                             date_commande = datetime.strptime(date_creation, '%Y-%m-%d').date()
-                    except:
+                    except Exception:
                         try:
                             date_commande = datetime.strptime(date_creation, '%Y-%m-%d %H:%M:%S').date()
-                        except:
+                        except Exception:
                             continue
                 elif hasattr(date_creation, 'year') and hasattr(date_creation, 'month') and hasattr(date_creation, 'day'):
                     # C'est déjà une date
@@ -281,7 +281,7 @@ def afficher_page_liste_commandes():
             if hasattr(date_creation, 'date') and callable(getattr(date_creation, 'date')):
                 try:
                     return datetime.combine(date_creation.date(), datetime.min.time())
-                except:
+                except Exception:
                     return datetime.min
             if isinstance(date_creation, str):
                 try:
@@ -289,16 +289,16 @@ def afficher_page_liste_commandes():
                         return datetime.strptime(date_creation.split()[0], '%Y-%m-%d')
                     else:
                         return datetime.strptime(date_creation, '%Y-%m-%d')
-                except:
+                except Exception:
                     try:
                         return datetime.strptime(date_creation, '%Y-%m-%d %H:%M:%S')
-                    except:
+                    except Exception:
                         return datetime.min
             if hasattr(date_creation, 'year') and hasattr(date_creation, 'month') and hasattr(date_creation, 'day'):
                 # C'est déjà une date
                 try:
                     return datetime.combine(date_creation, datetime.min.time())
-                except:
+                except Exception:
                     return datetime.min
             return datetime.min
         

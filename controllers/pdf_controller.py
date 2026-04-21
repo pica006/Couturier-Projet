@@ -6,8 +6,10 @@ Génère un PDF complet avec QR code et logo de l'entreprise
 import os
 import io
 import json
+import logging
 import re
 import tempfile
+import unicodedata
 from datetime import datetime
 from typing import Dict, Optional
 
@@ -20,6 +22,8 @@ from reportlab.lib import colors
 from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
 from reportlab.lib.units import cm
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.platypus import (
     BaseDocTemplate,
     Frame,
@@ -43,7 +47,145 @@ try:
     from config import PDF_STORAGE_PATH
 except ImportError:
     PDF_STORAGE_PATH = os.path.join(os.path.dirname(__file__), "pdfs")
-    os.makedirs(PDF_STORAGE_PATH, exist_ok=True)
+
+_logger = logging.getLogger("pdf_controller")
+if not _logger.handlers:
+    _h = logging.StreamHandler()
+    _h.setFormatter(logging.Formatter("[pdf] %(levelname)s %(message)s"))
+    _logger.addHandler(_h)
+    _logger.setLevel(logging.INFO)
+
+
+def _pdf_ensure_storage_path() -> str:
+    """Garantit que le dossier de sortie PDF existe avant chaque génération.
+
+    Lève une exception explicite si impossible (permission, disque plein...).
+    """
+    try:
+        os.makedirs(PDF_STORAGE_PATH, exist_ok=True)
+    except OSError as exc:
+        _logger.error(
+            "Impossible de créer le dossier PDF %s : %s", PDF_STORAGE_PATH, exc
+        )
+        raise
+    return PDF_STORAGE_PATH
+
+
+# ---------------------------------------------------------------------------
+# Gestion des polices Unicode (accents / emojis)
+# ---------------------------------------------------------------------------
+_PDF_UNICODE_FONT: Optional[str] = None
+_PDF_UNICODE_FONT_BOLD: Optional[str] = None
+
+
+def _try_register_unicode_font() -> None:
+    """Enregistre une police TTF Unicode si on en trouve une sur le système.
+
+    Essaye DejaVu Sans (Linux/Mac/Windows) puis Arial comme repli.
+    Laisse le contrôleur retomber sur Helvetica si rien n'est trouvé.
+    """
+    global _PDF_UNICODE_FONT, _PDF_UNICODE_FONT_BOLD
+
+    if _PDF_UNICODE_FONT is not None:
+        return
+
+    candidates = [
+        # (nom logique, chemin regular, chemin bold)
+        (
+            "DejaVuSans",
+            ["/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+             "/Library/Fonts/DejaVuSans.ttf",
+             "C:/Windows/Fonts/DejaVuSans.ttf"],
+            ["/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+             "/Library/Fonts/DejaVuSans-Bold.ttf",
+             "C:/Windows/Fonts/DejaVuSans-Bold.ttf"],
+        ),
+        (
+            "Arial",
+            ["C:/Windows/Fonts/arial.ttf",
+             "/Library/Fonts/Arial.ttf"],
+            ["C:/Windows/Fonts/arialbd.ttf",
+             "/Library/Fonts/Arial Bold.ttf"],
+        ),
+    ]
+
+    for nom, regs, bolds in candidates:
+        reg = next((p for p in regs if os.path.exists(p)), None)
+        if not reg:
+            continue
+        try:
+            pdfmetrics.registerFont(TTFont(nom, reg))
+            _PDF_UNICODE_FONT = nom
+            bold = next((p for p in bolds if os.path.exists(p)), None)
+            if bold:
+                try:
+                    pdfmetrics.registerFont(TTFont(f"{nom}-Bold", bold))
+                    _PDF_UNICODE_FONT_BOLD = f"{nom}-Bold"
+                except Exception as exc:  # pragma: no cover
+                    _logger.warning("Echec enregistrement %s-Bold : %s", nom, exc)
+            _logger.info("Police Unicode PDF: %s", nom)
+            return
+        except Exception as exc:  # pragma: no cover
+            _logger.warning("Echec enregistrement police %s : %s", nom, exc)
+
+    _logger.info("Aucune police Unicode trouvée, repli sur Helvetica (accents OK, pas d'emoji)")
+
+
+# Tente l'enregistrement une fois au chargement du module
+_try_register_unicode_font()
+
+
+# Regex pour détecter les emojis / symboles non latin-1
+_EMOJI_RE = re.compile(
+    "["
+    "\U0001F300-\U0001F6FF"   # emoticônes, transports, symboles
+    "\U0001F700-\U0001F77F"
+    "\U0001F780-\U0001F7FF"
+    "\U0001F800-\U0001F8FF"
+    "\U0001F900-\U0001F9FF"
+    "\U0001FA00-\U0001FA6F"
+    "\U0001FA70-\U0001FAFF"
+    "\U00002600-\U000026FF"   # ☀️ ☁️ ⚠️ ...
+    "\U00002700-\U000027BF"   # ✅ ❌ ...
+    "]",
+    flags=re.UNICODE,
+)
+
+
+def _pdf_safe_text(texte: Optional[str]) -> str:
+    """Nettoie un texte pour l'affichage PDF.
+
+    - Si une police Unicode est chargée : renvoie le texte tel quel.
+    - Sinon (Helvetica / latin-1) : retire les emojis, normalise les accents.
+    """
+    if texte is None:
+        return ""
+    s = str(texte)
+    if _PDF_UNICODE_FONT:
+        return s
+    # Repli Helvetica : on strip les emojis, on garde les accents latin-1
+    s = _EMOJI_RE.sub("", s)
+    # Remplace quelques symboles problématiques par leur équivalent ASCII
+    remplacements = {
+        "\u2192": "->",
+        "\u2190": "<-",
+        "\u2013": "-",
+        "\u2014": "-",
+        "\u2026": "...",
+        "\xa0": " ",
+    }
+    for k, v in remplacements.items():
+        s = s.replace(k, v)
+    # Normalise (décompose puis recompose) pour maximiser la compatibilité latin-1
+    s = unicodedata.normalize("NFC", s)
+    return s.strip()
+
+
+def _pdf_font(bold: bool = False) -> str:
+    """Renvoie la police à utiliser (Unicode si disponible, sinon Helvetica)."""
+    if bold:
+        return _PDF_UNICODE_FONT_BOLD or "Helvetica-Bold"
+    return _PDF_UNICODE_FONT or "Helvetica"
 
 # Palette PDF commande — mauve doux & or champagne (tons clairs, non bordeaux)
 _P_MAUVE = colors.HexColor("#9B8AB5")
@@ -435,8 +577,15 @@ def _pdf_dessiner_decor_commande(
             )
             canvas_obj.restoreState()
             drawn_logo = True
-        except Exception:
+        except Exception as exc:
+            _logger.warning(
+                "Logo salon illisible (%s octets) : %s — repli monogramme",
+                len(logo_bytes) if logo_bytes else 0,
+                exc,
+            )
             drawn_logo = False
+    else:
+        _logger.debug("Pas de logo_bytes : monogramme utilisé")
     if not drawn_logo:
         canvas_obj.setFillColor(_P_OR_CHAMPAGNE)
         canvas_obj.circle(cx, cy, r, stroke=0, fill=1)
@@ -506,11 +655,16 @@ class PDFController:
     def __init__(self, db_connection=None):
         """
         Initialise le contrôleur PDF
-        
+
         Args:
             db_connection: Connexion à la base de données (optionnel, pour récupérer le logo)
         """
-        self.storage_path = PDF_STORAGE_PATH
+        # Assure la présence du dossier de sortie, sinon log l'erreur (non fatal à l'init,
+        # mais la génération qui suit remontera l'exception proprement).
+        try:
+            self.storage_path = _pdf_ensure_storage_path()
+        except Exception:
+            self.storage_path = PDF_STORAGE_PATH
         self.db_connection = db_connection
         self.last_error = None
         self.last_error_details = None
@@ -786,10 +940,10 @@ class PDFController:
             numero_cmd = str(commande_data.get("id", "N/A"))
 
             story = []
-            story.append(Paragraph("FICHE DE COMMANDE", styles_pdf["document_titre"]))
+            story.append(Paragraph(_pdf_safe_text("FICHE DE COMMANDE"), styles_pdf["document_titre"]))
             story.append(
                 Paragraph(
-                    "— Confirmation officielle de réception —",
+                    _pdf_safe_text("— Confirmation officielle de réception —"),
                     styles_pdf["document_sous_titre"],
                 )
             )
@@ -1181,16 +1335,16 @@ class PDFController:
             return filepath
 
         except Exception as e:
-            error_msg = f"❌ Erreur génération PDF: {e}"
-            print(error_msg)
+            error_msg = f"Erreur génération PDF commande: {e}"
             import traceback
             error_details = traceback.format_exc()
-            print(error_details)
+            _logger.error(error_msg)
+            _logger.debug(error_details)
             # Stocker l'erreur dans un attribut pour que la vue puisse y accéder
             self.last_error = error_msg
             self.last_error_details = error_details
             return None
-    
+
     def generer_pdf_livraison(self, commande_data: Dict) -> Optional[str]:
         """
         Génère un PDF de livraison pour une commande

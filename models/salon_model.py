@@ -369,7 +369,7 @@ class SalonModel:
             print(f"Erreur création salon manuelle : {e}")
             try:
                 conn.rollback()
-            except:
+            except Exception:
                 pass
             return {
                 'success': False,
@@ -535,7 +535,7 @@ class SalonModel:
                             (salon_id,)
                         )
                         nb_employes = cursor.fetchone()[0] or 0
-                    except:
+                    except Exception:
                         nb_employes = 0
                     
                     try:
@@ -545,7 +545,7 @@ class SalonModel:
                             (salon_id,)
                         )
                         nb_clients = cursor.fetchone()[0] or 0
-                    except:
+                    except Exception:
                         nb_clients = 0
                     
                     try:
@@ -555,7 +555,7 @@ class SalonModel:
                             (salon_id,)
                         )
                         nb_commandes = cursor.fetchone()[0] or 0
-                    except:
+                    except Exception:
                         nb_commandes = 0
                     
                     # Calculer le CA total
@@ -565,7 +565,7 @@ class SalonModel:
                             (salon_id,)
                         )
                         ca_total = float(cursor.fetchone()[0] or 0)
-                    except:
+                    except Exception:
                         ca_total = 0.0
                     
                     # Récupérer l'admin du salon
@@ -577,7 +577,7 @@ class SalonModel:
                         admin_row = cursor.fetchone()
                         admin_nom = admin_row[0] if admin_row else None
                         admin_prenom = admin_row[1] if admin_row and len(admin_row) > 1 else None
-                    except:
+                    except Exception:
                         admin_nom = None
                         admin_prenom = None
                     
@@ -657,7 +657,7 @@ class SalonModel:
                 pass
             try:
                 cursor.close()
-            except:
+            except Exception:
                 pass
             return []
     
@@ -940,7 +940,7 @@ class SalonModel:
             print(f"Erreur modification salon : {e}")
             try:
                 conn.rollback()
-            except:
+            except Exception:
                 pass
             return False
 

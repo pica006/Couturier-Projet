@@ -1297,7 +1297,7 @@ def afficher_calcul_impots_admin(charges_model: ChargesModel, commande_model: Co
     try:
         if st.session_state.get('couturier_data'):
             salon_id_admin = obtenir_salon_id(st.session_state.couturier_data)
-    except:
+    except Exception:
         pass
     
     if not salon_id_admin:

@@ -1306,7 +1306,7 @@ def _generer_pdf_impots(date_debut,
             if st.session_state.get('couturier_data'):
                 from utils.role_utils import obtenir_salon_id
                 salon_id = obtenir_salon_id(st.session_state.couturier_data)
-        except:
+        except Exception:
             pass
         logo_filigrane_data = _get_logo_from_db(salon_id)
         # IMPORTANT : pas de fallback vers assets -> si pas de logo en BDD, aucun logo n'est utilisé
@@ -1576,7 +1576,7 @@ def _generer_pdf_analyse_charges(date_debut,
             if st.session_state.get('couturier_data'):
                 from utils.role_utils import obtenir_salon_id
                 salon_id = obtenir_salon_id(st.session_state.couturier_data)
-        except:
+        except Exception:
             pass
         logo_filigrane_data = _get_logo_from_db(salon_id)
         # IMPORTANT : pas de fallback vers assets -> si pas de logo en BDD, aucun logo n'est utilisé
@@ -1936,7 +1936,7 @@ def _generer_pdf_bulletin_salaire(employe_nom: str,
             if st.session_state.get('couturier_data'):
                 from utils.role_utils import obtenir_salon_id
                 salon_id = obtenir_salon_id(st.session_state.couturier_data)
-        except:
+        except Exception:
             pass
         
         logo_filigrane_data = _get_logo_from_db(salon_id)

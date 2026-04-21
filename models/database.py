@@ -1360,7 +1360,7 @@ class CommandeModel:
                 pass
             try:
                 cursor.close()
-            except:
+            except Exception:
                 pass
             return None
     

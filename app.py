@@ -807,6 +807,9 @@ def _render_authenticated_page(page_id: str):
     elif page_id == 'administration':
         from views.admin_view import afficher_page_administration
         afficher_page_administration()
+    elif page_id == 'salons':
+        from views.salons_view import afficher_page_salons
+        afficher_page_salons()
 
 
 def deconnecter_utilisateur():
@@ -1042,7 +1045,11 @@ def afficher_sidebar():
                 if st.button("📊 Dashboard Super Admin", use_container_width=True):
                     st.session_state.page = 'super_admin_dashboard'
                     st.rerun()
-                
+
+                if st.button("🏢 Gestion des Salons", use_container_width=True):
+                    st.session_state.page = 'salons'
+                    st.rerun()
+
                 st.markdown("---")
                 st.markdown("### 📋 Navigation")
             else:
@@ -1189,6 +1196,13 @@ def main():
                 st.error("❌ Accès refusé. Cette page est réservée aux administrateurs.")
                 st.session_state.page = 'dashboard'
                 st.rerun()
+        elif st.session_state.page == 'salons':
+            if est_super_admin():
+                _render_authenticated_page('salons')
+            else:
+                st.error("❌ Accès refusé. Cette page est réservée au Super Administrateur.")
+                st.session_state.page = 'dashboard'
+                st.rerun()
         else:
             # Page par défaut après connexion
             if est_super_admin():
@@ -1198,7 +1212,7 @@ def main():
             st.rerun()
 
     if VISUAL_SAFE_MODE:
-        st.markdown("---")
+        st.markdown('---')
         st.caption(
             f"{APP_CONFIG.get('name', 'Gestion Couturier')} - "
             f"{APP_CONFIG.get('subtitle', 'Systeme de gestion d atelier')}"
@@ -1210,23 +1224,5 @@ def main():
         render_app_footer()
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()
-)
-
-    if VISUAL_SAFE_MODE:
-        st.markdown("---")
-        st.caption(
-            f"{APP_CONFIG.get('name', 'Gestion Couturier')} - "
-            f"{APP_CONFIG.get('subtitle', 'Systeme de gestion d atelier')}"
-        )
-
-    # Footer global uniquement sur pages authentifiees.
-    # La page de connexion gere deja son propre footer.
-    if st.session_state.authentifie:
-        render_app_footer()
-
-
-if __name__ == "__main__":
-    main()
-()
