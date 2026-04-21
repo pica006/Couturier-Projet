@@ -69,50 +69,155 @@ def _get_sidebar_bg_css_with_image() -> str:
         return SIDEBAR_BG_PLAIN
 
 def _safe_visual_css() -> str:
-    """
-    Mode visuel safe: style minimal, stable et non intrusif.
-    """
+    """CSS applique toujours (VISUAL_SAFE_MODE=True sur Render).
+    Contient le design complet Premium Glass."""
     return """
     <style>
-    .stApp, .main .block-container {
-        background: #FEFEFE !important;
-        color: #2C2C2C !important;
-        font-family: 'Inter', 'Segoe UI', sans-serif;
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Poppins:wght@400;500;600;700;800&display=swap');
+
+    :root {
+        --v: #6C63FF;
+        --t: #00C9A7;
+        --g: linear-gradient(135deg, #6C63FF 0%, #00C9A7 100%);
+        --bg: linear-gradient(160deg, #f0eeff 0%, #e4f9f5 50%, #eef5ff 100%);
+        --surface: #FFFFFF;
+        --text: #111827;
+        --soft: #6B7280;
+        --border: #E5E7EB;
+        --sh-xs: 0 2px 8px rgba(108,99,255,0.08);
+        --sh-sm: 0 6px 18px rgba(108,99,255,0.14);
+        --sh-md: 0 12px 32px rgba(108,99,255,0.20);
+        --r-sm: 10px;
+        --r-md: 16px;
     }
 
-    .main .block-container {
-        max-width: 1100px;
-        padding-top: 1.5rem;
-        padding-bottom: 1.5rem;
-    }
+    .stApp { background: var(--bg) \!important; font-family: 'Inter', 'Segoe UI', sans-serif; }
+    .main .block-container { background: transparent \!important; padding-top: 1.5rem; padding-bottom: 2rem; max-width: 1200px; }
 
+    /* BOUTONS */
+    .stButton > button, button[data-baseweb="button"], div[data-testid="stButton"] > button {
+        background: var(--g) \!important;
+        color: #fff \!important;
+        border: none \!important;
+        border-radius: var(--r-md) \!important;
+        padding: 0.65rem 1.35rem \!important;
+        font-weight: 600 \!important;
+        font-size: 0.9rem \!important;
+        box-shadow: var(--sh-xs) \!important;
+        transition: transform 0.15s ease, box-shadow 0.2s ease \!important;
+    }
+    .stButton > button:hover, div[data-testid="stButton"] > button:hover {
+        transform: translateY(-2px) \!important;
+        box-shadow: var(--sh-sm) \!important;
+    }
+    .stButton > button:active { transform: translateY(0) \!important; }
+
+    /* SIDEBAR */
     [data-testid="stSidebar"] {
-        background: #FAFAFA !important;
-        border-right: 1px solid #EAEAEA;
+        background: linear-gradient(180deg, #ede9fe 0%, #d1faf3 100%) \!important;
+        border-right: 1px solid rgba(108,99,255,0.12) \!important;
+    }
+    [data-testid="stSidebar"] [data-testid="stSidebarContent"] { background: transparent \!important; }
+    [data-testid="stSidebar"] h3 {
+        font-size: 0.70rem \!important; font-weight: 700 \!important; color: #9CA3AF \!important;
+        text-transform: uppercase \!important; letter-spacing: 0.09em \!important;
+        margin: 0.8rem 0 0.25rem 0 \!important;
+    }
+    [data-testid="stSidebar"] .stButton > button {
+        background: transparent \!important;
+        color: #374151 \!important;
+        border: none \!important;
+        border-radius: 10px \!important;
+        padding: 0.6rem 0.9rem \!important;
+        font-size: 0.88rem \!important;
+        font-weight: 500 \!important;
+        text-align: left \!important;
+        box-shadow: none \!important;
+        transform: none \!important;
+    }
+    [data-testid="stSidebar"] .stButton > button:hover {
+        background: rgba(108,99,255,0.10) \!important;
+        color: #6C63FF \!important;
+        box-shadow: none \!important;
+        transform: none \!important;
+    }
+    [data-testid="stSidebar"] .stButton:last-of-type > button {
+        color: #EF4444 \!important;
+        border: 1px solid rgba(239,68,68,0.22) \!important;
+        background: rgba(255,255,255,0.55) \!important;
+    }
+    [data-testid="stSidebar"] .stButton:last-of-type > button:hover {
+        background: rgba(239,68,68,0.07) \!important;
+        color: #DC2626 \!important;
+    }
+    [data-testid="stSidebar"] hr { border-color: rgba(108,99,255,0.15) \!important; margin: 0.5rem 0 \!important; }
+    [data-testid="stSidebar"] .stAlert {
+        border-radius: 10px \!important; padding: 0.45rem 0.75rem \!important;
+        font-size: 0.82rem \!important; border-left-width: 3px \!important;
     }
 
-    .stButton > button, button[kind="primary"] {
-        background: #6C63FF !important;
-        color: #FFFFFF !important;
-        border: 1px solid #6C63FF !important;
-        border-radius: 10px !important;
-        box-shadow: none !important;
-        transition: none !important;
-        transform: none !important;
+    /* ONGLETS */
+    .stTabs [data-baseweb="tab-list"] {
+        background: rgba(108,99,255,0.07); border-radius: var(--r-md);
+        padding: 0.35rem; gap: 0.3rem; margin-bottom: 1.5rem;
+        border: 1px solid rgba(108,99,255,0.10);
+    }
+    .stTabs [data-baseweb="tab"] {
+        background: transparent \!important; border-radius: var(--r-sm) \!important;
+        padding: 0.6rem 1.2rem \!important; color: var(--text) \!important; font-weight: 500 \!important;
+    }
+    .stTabs [data-baseweb="tab"]:hover { background: rgba(108,99,255,0.09) \!important; color: var(--v) \!important; }
+    .stTabs [aria-selected="true"] { background: var(--g) \!important; color: #fff \!important; box-shadow: var(--sh-xs) \!important; }
+
+    /* METRIQUES */
+    [data-testid="stMetric"] {
+        background: var(--surface); border: 1px solid var(--border);
+        border-radius: var(--r-md); padding: 1.2rem 1.3rem; box-shadow: var(--sh-xs);
+    }
+    [data-testid="stMetricValue"] {
+        font-family: 'Poppins', 'Inter', sans-serif \!important;
+        font-size: 2rem \!important; font-weight: 700 \!important; color: var(--v) \!important;
+    }
+    [data-testid="stMetricLabel"] {
+        font-size: 0.72rem \!important; color: var(--soft) \!important;
+        font-weight: 700 \!important; text-transform: uppercase; letter-spacing: 0.07em;
     }
 
-    .stButton > button:hover, button[kind="primary"]:hover {
-        background: #5A52E0 !important;
-        color: #FFFFFF !important;
-        opacity: 1 !important;
+    /* FORMULAIRES */
+    .stTextInput > div > div, .stNumberInput > div > div,
+    .stSelectbox > div > div, .stTextArea > div > div, .stDateInput > div > div {
+        background: var(--surface) \!important;
+        border: 1.5px solid var(--border) \!important;
+        border-radius: var(--r-sm) \!important;
+    }
+    .stTextInput > div > div:focus-within, .stNumberInput > div > div:focus-within,
+    .stTextArea > div > div:focus-within, .stDateInput > div > div:focus-within {
+        border-color: var(--v) \!important;
+        box-shadow: 0 0 0 3px rgba(108,99,255,0.13) \!important;
     }
 
-    a, a:visited, a:hover {
-        color: #00C9A7 !important;
-    }
+    /* TABLEAUX */
+    .stDataFrame { border-radius: var(--r-md); overflow: hidden; box-shadow: var(--sh-xs); border: 1px solid var(--border); }
+    .stDataFrame th { background: rgba(108,99,255,0.06) \!important; color: var(--text) \!important; font-weight: 700 \!important; font-size: 0.78rem \!important; text-transform: uppercase; letter-spacing: 0.04em; }
+
+    /* EXPANDERS */
+    [data-testid="stExpander"] { border-radius: var(--r-md) \!important; border: 1px solid var(--border) \!important; box-shadow: var(--sh-xs) \!important; overflow: hidden; }
+    [data-testid="stExpander"] summary { font-weight: 600 \!important; color: var(--text) \!important; }
+
+    /* ALERTES */
+    .stAlert { border-radius: var(--r-md) \!important; border-left-width: 4px \!important; }
+
+    /* TYPOGRAPHIE */
+    h1, h2, h3, h4, h5, h6 { font-family: 'Poppins', 'Inter', sans-serif \!important; color: var(--text) \!important; font-weight: 600; }
+    a, a:visited { color: var(--v) \!important; }
+    a:hover { color: var(--t) \!important; }
+    hr { border: none; border-top: 1px solid var(--border); margin: 1.5rem 0; }
+    ::-webkit-scrollbar { width: 7px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: rgba(108,99,255,0.22); border-radius: 6px; }
+    ::-webkit-scrollbar-thumb:hover { background: rgba(108,99,255,0.40); }
     </style>
     """
-
 
 _apply_rich_theme = bool(st.session_state.get("authentifie", False))
 
