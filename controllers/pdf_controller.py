@@ -376,11 +376,6 @@ def _pdf_dessiner_decor_commande(
     responsable = ((salon_row or {}).get("responsable") or "").strip()
     telephone = ((salon_row or {}).get("telephone") or "").strip()
     email = ((salon_row or {}).get("email") or "").strip()
-    code_salon = str(
-        (salon_row or {}).get("code_admin")
-        or (salon_row or {}).get("salon_id")
-        or ""
-    )
 
     # Filigrane texte très pâle
     canvas_obj.saveState()
@@ -458,9 +453,7 @@ def _pdf_dessiner_decor_commande(
     canvas_obj.drawString(3.6 * cm, H - 1.82 * cm, slogan)
     canvas_obj.setFillColor(colors.white)
     canvas_obj.setFont("Helvetica", 8.5)
-    canvas_obj.drawString(
-        3.6 * cm, H - 2.32 * cm, f"Code salon : {code_salon or '—'}"
-    )
+    canvas_obj.drawString(3.6 * cm, H - 2.32 * cm, "Document de livraison officiel")
 
     canvas_obj.setFillColor(colors.white)
     canvas_obj.setFont("Helvetica-Bold", 9)
@@ -503,7 +496,7 @@ def _pdf_dessiner_decor_commande(
     canvas_obj.drawCentredString(
         W / 2,
         0.4 * cm,
-        f"Document officiel — Commande N° {numero_commande}  {page_txt}",
+        f"Document officiel {page_txt}",
     )
 
 
@@ -813,16 +806,6 @@ class PDFController:
                 [
                     [
                         Paragraph(
-                            f"<b>N° {numero_cmd}</b>",
-                            ParagraphStyle(
-                                "RubanN",
-                                fontName="Helvetica-Bold",
-                                fontSize=11,
-                                textColor=colors.white,
-                                alignment=TA_CENTER,
-                            ),
-                        ),
-                        Paragraph(
                             f"<b>Statut : {commande_data.get('statut', 'Non défini')}</b>",
                             ParagraphStyle(
                                 "RubanS",
@@ -844,18 +827,16 @@ class PDFController:
                         ),
                     ]
                 ],
-                colWidths=[5.8 * cm, 5.85 * cm, 5.85 * cm],
+                colWidths=[8.75 * cm, 8.75 * cm],
             )
             ruban.setStyle(
                 TableStyle(
                     [
-                        ("BACKGROUND", (0, 0), (0, 0), _P_MAUVE),
-                        ("BACKGROUND", (1, 0), (1, 0), statut_couleur),
-                        ("BACKGROUND", (2, 0), (2, 0), _P_MAUVE),
+                        ("BACKGROUND", (0, 0), (0, 0), statut_couleur),
+                        ("BACKGROUND", (1, 0), (1, 0), _P_MAUVE),
                         ("TOPPADDING", (0, 0), (-1, -1), 8),
                         ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
                         ("LINEBEFORE", (1, 0), (1, 0), 2, colors.white),
-                        ("LINEAFTER", (1, 0), (1, 0), 2, colors.white),
                     ]
                 )
             )
@@ -867,7 +848,6 @@ class PDFController:
             story.append(
                 _pdf_table_infos_commande(
                     [
-                        ("N° Commande :", numero_cmd),
                         ("Date :", date_creation_str),
                         ("Statut :", str(commande_data.get("statut", "Non défini"))),
                         ("Date de livraison :", date_livraison_str),
@@ -1152,7 +1132,7 @@ class PDFController:
                     rightMargin=1.6 * cm,
                     topMargin=3.8 * cm,
                     bottomMargin=2.0 * cm,
-                    title=f"Fiche de commande N°{numero_cmd}",
+                    title="Fiche de commande",
                     author=nom_salon_affiche,
                     subject="Confirmation de commande",
                 )
@@ -1432,7 +1412,6 @@ class PDFController:
             # Détails commande
             elements.append(Paragraph("Détails de la commande", heading_style))
             commande_info = [
-                ['N° Commande:', str(commande_data.get('id', '---'))],
                 ['Modèle:', str(commande_data.get('modele', '---'))],
                 ['Date de livraison:', datetime.now().strftime('%d/%m/%Y')],
                 ['Prix total:', f"{commande_data.get('prix_total', 0):,.0f} FCFA"]

@@ -538,13 +538,31 @@ def afficher_page_fermer_commandes():
                                         "Merci pour votre confiance."
                                     )
                                     with st.spinner("📧 Envoi de l'email de livraison..."):
+                                        attachments = []
+                                        try:
+                                            from controllers.pdf_controller import PDFController
+                                            pdf_controller = PDFController(st.session_state.db_connection)
+                                            commande_pdf = commande_model.obtenir_commande(commande["id"])
+                                            if commande_pdf:
+                                                commande_pdf["statut"] = "Livré et payé"
+                                                pdf_livraison_path = pdf_controller.generer_pdf_livraison(commande_pdf)
+                                                if pdf_livraison_path and os.path.exists(pdf_livraison_path):
+                                                    attachments.append(pdf_livraison_path)
+                                        except Exception:
+                                            attachments = []
+
                                         succes, message = email_controller.envoyer_email_avec_message(
                                             client_email,
                                             subject,
-                                            body
+                                            body,
+                                            attachments=attachments
                                         )
                                     if succes:
-                                        st.success(f"✅ {message}")
+                                        if attachments:
+                                            st.success(f"✅ {message} PDF joint envoyé au client.")
+                                        else:
+                                            st.success(f"✅ {message}")
+                                            st.warning("⚠️ Email envoyé sans PDF joint (génération du PDF indisponible).")
                                     else:
                                         st.error(f"❌ Email de livraison non envoyé : {message}")
                                 st.rerun()
