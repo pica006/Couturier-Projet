@@ -106,10 +106,6 @@ CREATE TABLE IF NOT EXISTS commandes (
     date_creation      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     date_dernier_paiement TIMESTAMP NULL,
     date_fermeture     TIMESTAMP NULL,
-    est_supprime       BOOLEAN NOT NULL DEFAULT FALSE,
-    supprime_par       INTEGER NULL,
-    date_suppression   TIMESTAMP NULL,
-    motif_suppression  TEXT,
 
     statut             VARCHAR(50) DEFAULT 'En cours',
     est_ouverte        BOOLEAN DEFAULT TRUE,
@@ -140,7 +136,6 @@ CREATE INDEX IF NOT EXISTS idx_commandes_date_creation ON commandes(date_creatio
 CREATE INDEX IF NOT EXISTS idx_commandes_date_livraison ON commandes(date_livraison);
 CREATE INDEX IF NOT EXISTS idx_commandes_couturier_statut ON commandes(couturier_id, statut);
 CREATE INDEX IF NOT EXISTS idx_commandes_est_ouverte ON commandes(est_ouverte);
-CREATE INDEX IF NOT EXISTS idx_commandes_est_supprime ON commandes(est_supprime);
 CREATE INDEX IF NOT EXISTS idx_commandes_date_fermeture ON commandes(date_fermeture);
 CREATE INDEX IF NOT EXISTS idx_commandes_mesures ON commandes USING GIN (mesures);
 

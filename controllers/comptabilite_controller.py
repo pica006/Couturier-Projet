@@ -70,36 +70,22 @@ class ComptabiliteController:
             print(f"Erreur stats: {e}")
             return {'nb_commandes': 0, 'ca_total': 0, 'avances_total': 0, 'reste_total': 0, 'taux_avance': 0, 'commandes_par_statut': {}, 'top_modeles': []}
     
-    def obtenir_liste_clients(self, couturier_id: Optional[int] = None, salon_id: Optional[str] = None) -> List:
-        """Récupère la liste des clients avec leurs stats (par couturier ou par salon)."""
+    def obtenir_liste_clients(self, couturier_id: int) -> List:
+        """Récupère la liste des clients avec leurs stats"""
         try:
             cursor = self.db.get_connection().cursor()
-            if salon_id is not None:
-                query = """
-                    SELECT c.nom, c.prenom, c.telephone, 
-                           COUNT(cmd.id) as nb_commandes,
-                           COALESCE(SUM(cmd.prix_total), 0) as ca_total,
-                           COALESCE(SUM(cmd.reste), 0) as reste_total
-                    FROM clients c
-                    LEFT JOIN commandes cmd ON c.id = cmd.client_id
-                    WHERE c.salon_id = %s
-                    GROUP BY c.id, c.nom, c.prenom, c.telephone
-                    ORDER BY ca_total DESC
-                """
-                cursor.execute(query, (salon_id,))
-            else:
-                query = """
-                    SELECT c.nom, c.prenom, c.telephone, 
-                           COUNT(cmd.id) as nb_commandes,
-                           COALESCE(SUM(cmd.prix_total), 0) as ca_total,
-                           COALESCE(SUM(cmd.reste), 0) as reste_total
-                    FROM clients c
-                    LEFT JOIN commandes cmd ON c.id = cmd.client_id
-                    WHERE c.couturier_id = %s
-                    GROUP BY c.id, c.nom, c.prenom, c.telephone
-                    ORDER BY ca_total DESC
-                """
-                cursor.execute(query, (couturier_id,))
+            query = """
+                SELECT c.nom, c.prenom, c.telephone, 
+                       COUNT(cmd.id) as nb_commandes,
+                       COALESCE(SUM(cmd.prix_total), 0) as ca_total,
+                       COALESCE(SUM(cmd.reste), 0) as reste_total
+                FROM clients c
+                LEFT JOIN commandes cmd ON c.id = cmd.client_id
+                WHERE c.couturier_id = %s
+                GROUP BY c.id, c.nom, c.prenom, c.telephone
+                ORDER BY ca_total DESC
+            """
+            cursor.execute(query, (couturier_id,))
             clients = cursor.fetchall()
             cursor.close()
             return clients
@@ -107,51 +93,31 @@ class ComptabiliteController:
             print(f"Erreur clients: {e}")
             return []
     
-    def obtenir_commandes_a_relancer(self, couturier_id: Optional[int] = None, salon_id: Optional[str] = None) -> List[Dict]:
+    def obtenir_commandes_a_relancer(self, couturier_id: int) -> List[Dict]:
         """Récupère les commandes avec reste à payer (pour relance client).
         
         Inclut le chemin PDF si disponible pour pouvoir l'ajouter en pièce jointe.
         """
         try:
             cursor = self.db.get_connection().cursor()
-            if salon_id is not None:
-                query = """
-                    SELECT cmd.id,
-                           cmd.modele,
-                           cmd.prix_total,
-                           cmd.avance,
-                           cmd.reste,
-                           cmd.date_creation,
-                           c.nom   AS client_nom,
-                           c.prenom AS client_prenom,
-                           c.telephone AS client_telephone,
-                           c.email AS client_email,
-                           cmd.pdf_path
-                    FROM commandes cmd
-                    JOIN clients c ON cmd.client_id = c.id
-                    WHERE cmd.salon_id = %s AND cmd.reste > 0
-                    ORDER BY cmd.date_creation DESC
-                """
-                cursor.execute(query, (salon_id,))
-            else:
-                query = """
-                    SELECT cmd.id,
-                           cmd.modele,
-                           cmd.prix_total,
-                           cmd.avance,
-                           cmd.reste,
-                           cmd.date_creation,
-                           c.nom   AS client_nom,
-                           c.prenom AS client_prenom,
-                           c.telephone AS client_telephone,
-                           c.email AS client_email,
-                           cmd.pdf_path
-                    FROM commandes cmd
-                    JOIN clients c ON cmd.client_id = c.id
-                    WHERE cmd.couturier_id = %s AND cmd.reste > 0
-                    ORDER BY cmd.date_creation DESC
-                """
-                cursor.execute(query, (couturier_id,))
+            query = """
+                SELECT cmd.id,
+                       cmd.modele,
+                       cmd.prix_total,
+                       cmd.avance,
+                       cmd.reste,
+                       cmd.date_creation,
+                       c.nom   AS client_nom,
+                       c.prenom AS client_prenom,
+                       c.telephone AS client_telephone,
+                       c.email AS client_email,
+                       cmd.pdf_path
+                FROM commandes cmd
+                JOIN clients c ON cmd.client_id = c.id
+                WHERE cmd.couturier_id = %s AND cmd.reste > 0
+                ORDER BY cmd.date_creation DESC
+            """
+            cursor.execute(query, (couturier_id,))
             results = cursor.fetchall()
             cursor.close()
             
@@ -218,11 +184,10 @@ class ComptabiliteController:
             print(f"Erreur top modèles: {e}")
             return []
 
-    def repartition_argent_par_modele(self, couturier_id: Optional[int] = None,
+    def repartition_argent_par_modele(self, couturier_id: int,
                                       date_debut: Optional[datetime] = None,
                                       date_fin: Optional[datetime] = None,
-                                      limit: int = 10,
-                                      salon_id: Optional[str] = None):
+                                      limit: int = 10):
         """Retourne la somme des avances reçues par modèle, triée décroissante.
 
         Args:
@@ -236,12 +201,8 @@ class ComptabiliteController:
         """
         try:
             cursor = self.db.get_connection().cursor()
-            if salon_id is not None:
-                where = ["couturier_id IN (SELECT id FROM couturiers WHERE salon_id = %s)"]
-                params: list = [salon_id]
-            else:
-                where = ["couturier_id = %s"]
-                params = [couturier_id]
+            where = ["couturier_id = %s"]
+            params: list = [couturier_id]
             if date_debut:
                 where.append("date_creation >= %s")
                 params.append(date_debut)
@@ -303,19 +264,14 @@ class ComptabiliteController:
             print(f"Erreur répartition argent par catégorie: {e}")
             return []
 
-    def lister_modeles_par_periode(self, couturier_id: Optional[int] = None,
+    def lister_modeles_par_periode(self, couturier_id: int,
                                    date_debut: Optional[datetime] = None,
-                                   date_fin: Optional[datetime] = None,
-                                   salon_id: Optional[str] = None) -> List[str]:
+                                   date_fin: Optional[datetime] = None) -> List[str]:
         """Liste les modèles existants dans la période, triés par fréquence décroissante."""
         try:
             cursor = self.db.get_connection().cursor()
-            if salon_id is not None:
-                where = ["couturier_id IN (SELECT id FROM couturiers WHERE salon_id = %s)"]
-                params: list = [salon_id]
-            else:
-                where = ["couturier_id = %s"]
-                params = [couturier_id]
+            where = ["couturier_id = %s"]
+            params: list = [couturier_id]
             if date_debut:
                 where.append("date_creation >= %s")
                 params.append(date_debut)
@@ -369,11 +325,10 @@ class ComptabiliteController:
             print(f"Erreur reste par catégorie: {e}")
             return []
 
-    def reste_par_modele(self, couturier_id: Optional[int] = None,
+    def reste_par_modele(self, couturier_id: int,
                           date_debut: Optional[datetime] = None,
                           date_fin: Optional[datetime] = None,
-                          limit: Optional[int] = None,
-                          salon_id: Optional[str] = None):
+                          limit: Optional[int] = None):
         """Retourne la somme du reste à percevoir par modèle, avec le nombre de vêtements.
 
         Returns:
@@ -381,12 +336,8 @@ class ComptabiliteController:
         """
         try:
             cursor = self.db.get_connection().cursor()
-            if salon_id is not None:
-                where = ["couturier_id IN (SELECT id FROM couturiers WHERE salon_id = %s)"]
-                params: list = [salon_id]
-            else:
-                where = ["couturier_id = %s"]
-                params = [couturier_id]
+            where = ["couturier_id = %s"]
+            params: list = [couturier_id]
             if date_debut:
                 where.append("date_creation >= %s")
                 params.append(date_debut)

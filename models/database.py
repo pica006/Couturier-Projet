@@ -139,7 +139,6 @@ class CouturierModel:
     
     def __init__(self, db_connection: DatabaseConnection):
         self.db = db_connection
-        self.last_error: Optional[str] = None
     
     def verifier_code(self, code_couturier: str) -> Tuple[bool, Optional[Dict]]:
         """
@@ -159,14 +158,6 @@ class CouturierModel:
         IMPORTANT : On récupère aussi le PASSWORD pour le vérifier après !
         """
         try:
-            # PostgreSQL: nettoyer une transaction potentiellement abandonnée
-            # avant d'exécuter de nouvelles requêtes.
-            if self.db.db_type != 'mysql':
-                try:
-                    self.db.get_connection().rollback()
-                except Exception:
-                    pass
-
             # Créer un curseur pour exécuter la requête SQL
             cursor = self.db.get_connection().cursor()
             
@@ -215,10 +206,6 @@ class CouturierModel:
         except (MySQLError, PGError, Exception) as e:
             # En cas d'erreur SQL
             print(f"Erreur vérification: {e}")
-            try:
-                self.db.get_connection().rollback()
-            except Exception:
-                pass
             return False, None
     
     def creer_tables(self) -> bool:
@@ -303,11 +290,6 @@ class CouturierModel:
     def lister_tous_couturiers(self, salon_id: Optional[str] = None) -> List[Dict]:
         """Liste tous les couturiers (optionnellement filtrés par salon)"""
         try:
-            if self.db.db_type != 'mysql':
-                try:
-                    self.db.get_connection().rollback()
-                except Exception:
-                    pass
             cursor = self.db.get_connection().cursor()
             if salon_id:
                 query = """
@@ -344,10 +326,6 @@ class CouturierModel:
             return couturiers
         except (MySQLError, PGError, Exception) as e:
             print(f"Erreur liste couturiers: {e}")
-            try:
-                self.db.get_connection().rollback()
-            except Exception:
-                pass
             return []
     
     def creer_utilisateur(self, code_couturier: str, password: str, nom: str, prenom: str,
@@ -369,41 +347,17 @@ class CouturierModel:
         Returns:
             ID de l'utilisateur créé ou None si erreur
         """
-        cursor = None
-        self.last_error = None
         try:
-            # PostgreSQL: repartir d'un état transactionnel propre.
-            if self.db.db_type != 'mysql':
-                try:
-                    self.db.get_connection().rollback()
-                except Exception:
-                    pass
-
             # Vérifier que le code n'existe pas déjà
             existe, _ = self.verifier_code(code_couturier)
             if existe:
-                self.last_error = f"Le code de connexion '{code_couturier}' existe déjà."
                 return None  # Code déjà existant
             
             # Vérifier que le rôle est valide
             if role not in ['admin', 'employe']:
-                self.last_error = f"Rôle invalide '{role}', basculement automatique vers 'employe'."
                 role = 'employe'
             
             cursor = self.db.get_connection().cursor()
-
-            # En multi-tenant, un utilisateur doit toujours être rattaché à un salon existant.
-            if not salon_id:
-                self.last_error = "Salon non défini pour cet utilisateur. Reconnectez-vous puis réessayez."
-                cursor.close()
-                return None
-
-            cursor.execute("SELECT 1 FROM salons WHERE salon_id = %s", (salon_id,))
-            salon_exists = cursor.fetchone()
-            if not salon_exists:
-                self.last_error = f"Le salon '{salon_id}' est introuvable."
-                cursor.close()
-                return None
             
             # Hasher le mot de passe avant stockage
             password_hash = hash_password(password)
@@ -417,16 +371,6 @@ class CouturierModel:
                 cursor.execute(query, (code_couturier, password_hash, nom, prenom, role, email, telephone, salon_id))
                 user_id = cursor.lastrowid
             else:
-                # Séquence SERIAL potentiellement désynchronisée (import/seed manuel).
-                cursor.execute(
-                    """
-                    SELECT setval(
-                        pg_get_serial_sequence('couturiers', 'id'),
-                        COALESCE((SELECT MAX(id) FROM couturiers), 0) + 1,
-                        false
-                    )
-                    """
-                )
                 query = """
                     INSERT INTO couturiers (code_couturier, password, nom, prenom, role, email, telephone, salon_id, actif)
                     VALUES (%s, %s, %s, %s, %s, %s, %s, %s, TRUE) RETURNING id
@@ -434,21 +378,15 @@ class CouturierModel:
                 cursor.execute(query, (code_couturier, password_hash, nom, prenom, role, email, telephone, salon_id))
                 user_id = cursor.fetchone()[0]
             
+            # Si c'est un admin et qu'il n'a pas de salon_id, lui assigner son propre id
+            if role == 'admin' and not salon_id:
+                cursor.execute("UPDATE couturiers SET salon_id = %s WHERE id = %s", (user_id, user_id))
+            
             self.db.get_connection().commit()
             cursor.close()
             return user_id
         except (MySQLError, PGError, Exception) as e:
             print(f"Erreur création utilisateur: {e}")
-            self.last_error = str(e)
-            try:
-                self.db.get_connection().rollback()
-            except Exception:
-                pass
-            if cursor:
-                try:
-                    cursor.close()
-                except Exception:
-                    pass
             return None
 
     def mettre_a_jour_statut_actif(self, user_id: int, actif: bool) -> bool:
@@ -460,11 +398,6 @@ class CouturierModel:
             actif: True pour activer, False pour désactiver
         """
         try:
-            if self.db.db_type != 'mysql':
-                try:
-                    self.db.get_connection().rollback()
-                except Exception:
-                    pass
             cursor = self.db.get_connection().cursor()
             if self.db.db_type == 'mysql':
                 query = "UPDATE couturiers SET actif = %s WHERE id = %s"
@@ -478,10 +411,6 @@ class CouturierModel:
             return True
         except (MySQLError, PGError, Exception) as e:
             print(f"Erreur mise à jour statut actif utilisateur {user_id}: {e}")
-            try:
-                self.db.get_connection().rollback()
-            except Exception:
-                pass
             return False
     
     def reinitialiser_mot_de_passe(self, couturier_id: int, nouveau_password: str) -> bool:
@@ -496,11 +425,6 @@ class CouturierModel:
             True si succès, False sinon
         """
         try:
-            if self.db.db_type != 'mysql':
-                try:
-                    self.db.get_connection().rollback()
-                except Exception:
-                    pass
             cursor = self.db.get_connection().cursor()
             query = "UPDATE couturiers SET password = %s WHERE id = %s"
             cursor.execute(query, (hash_password(nouveau_password), couturier_id))
@@ -509,10 +433,6 @@ class CouturierModel:
             return True
         except (MySQLError, PGError, Exception) as e:
             print(f"Erreur réinitialisation mot de passe: {e}")
-            try:
-                self.db.get_connection().rollback()
-            except Exception:
-                pass
             return False
     
     def modifier_role(self, couturier_id: int, nouveau_role: str) -> bool:
@@ -530,11 +450,6 @@ class CouturierModel:
             # Vérifier que le rôle est valide
             if nouveau_role not in ['admin', 'employe']:
                 return False
-            if self.db.db_type != 'mysql':
-                try:
-                    self.db.get_connection().rollback()
-                except Exception:
-                    pass
             
             cursor = self.db.get_connection().cursor()
             query = "UPDATE couturiers SET role = %s WHERE id = %s"
@@ -544,10 +459,6 @@ class CouturierModel:
             return True
         except (MySQLError, PGError, Exception) as e:
             print(f"Erreur modification rôle: {e}")
-            try:
-                self.db.get_connection().rollback()
-            except Exception:
-                pass
             return False
     
     def supprimer_utilisateur(self, couturier_id: int) -> bool:
@@ -561,11 +472,6 @@ class CouturierModel:
             True si succès, False sinon
         """
         try:
-            if self.db.db_type != 'mysql':
-                try:
-                    self.db.get_connection().rollback()
-                except Exception:
-                    pass
             cursor = self.db.get_connection().cursor()
             query = "DELETE FROM couturiers WHERE id = %s"
             cursor.execute(query, (couturier_id,))
@@ -574,10 +480,6 @@ class CouturierModel:
             return True
         except (MySQLError, PGError, Exception) as e:
             print(f"Erreur suppression utilisateur: {e}")
-            try:
-                self.db.get_connection().rollback()
-            except Exception:
-                pass
             return False
 
 
@@ -769,32 +671,6 @@ class CommandeModel:
     def __init__(self, db_connection: DatabaseConnection):
         self.db = db_connection
 
-    def _ensure_soft_delete_columns(self) -> None:
-        """Ajoute les colonnes de suppression logique si elles n'existent pas."""
-        cursor = self.db.get_connection().cursor()
-        try:
-            if self.db.db_type == 'mysql':
-                cursor.execute("ALTER TABLE commandes ADD COLUMN IF NOT EXISTS est_supprime BOOLEAN NOT NULL DEFAULT FALSE")
-                cursor.execute("ALTER TABLE commandes ADD COLUMN IF NOT EXISTS supprime_par INT NULL")
-                cursor.execute("ALTER TABLE commandes ADD COLUMN IF NOT EXISTS date_suppression TIMESTAMP NULL")
-                cursor.execute("ALTER TABLE commandes ADD COLUMN IF NOT EXISTS motif_suppression TEXT NULL")
-            else:
-                cursor.execute("ALTER TABLE commandes ADD COLUMN IF NOT EXISTS est_supprime BOOLEAN NOT NULL DEFAULT FALSE")
-                cursor.execute("ALTER TABLE commandes ADD COLUMN IF NOT EXISTS supprime_par INTEGER NULL")
-                cursor.execute("ALTER TABLE commandes ADD COLUMN IF NOT EXISTS date_suppression TIMESTAMP NULL")
-                cursor.execute("ALTER TABLE commandes ADD COLUMN IF NOT EXISTS motif_suppression TEXT NULL")
-            self.db.get_connection().commit()
-        except Exception:
-            try:
-                self.db.get_connection().rollback()
-            except Exception:
-                pass
-        finally:
-            try:
-                cursor.close()
-            except Exception:
-                pass
-
 
 
     def ajouter_commande(self, client_id: int, couturier_id: int, 
@@ -905,11 +781,6 @@ class CommandeModel:
     def obtenir_commande(self, commande_id: int) -> Optional[Dict]:
         """Récupère les détails d'une commande"""
         try:
-            if self.db.db_type != 'mysql':
-                try:
-                    self.db.get_connection().rollback()
-                except Exception:
-                    pass
             cursor = self.db.get_connection().cursor()
             # Utiliser des colonnes explicites au lieu de c.* pour éviter les problèmes d'ordre
             query = """
@@ -920,7 +791,7 @@ class CommandeModel:
                     c.date_livraison, c.statut,
                     c.fabric_image_path, c.fabric_image, c.fabric_image_name,
                     c.model_type, c.model_image_path, c.model_image, c.model_image_name,
-                    c.date_creation, c.salon_id,
+                    c.date_creation,
                     c.pdf_data, c.pdf_name, c.pdf_path,
                     cl.nom as client_nom, cl.prenom as client_prenom, 
                     cl.telephone as client_telephone, cl.email as client_email,
@@ -959,22 +830,21 @@ class CommandeModel:
                     'model_image': result[17],
                     'model_image_name': result[18],
                     'date_creation': result[19],
-                    'salon_id': result[20] if num_cols > 20 else None,
                 }
                 
-                # Ajouter les données PDF et jointures si disponibles
-                if num_cols > 30:
-                    data['pdf_data'] = result[21]
-                    data['pdf_name'] = result[22]
-                    data['pdf_path'] = result[23]
-                    # Données client et couturier
-                    data['client_nom'] = result[24]
-                    data['client_prenom'] = result[25]
-                    data['client_telephone'] = result[26]
-                    data['client_email'] = result[27]
-                    data['couturier_nom'] = result[28]
-                    data['couturier_prenom'] = result[29]
-                    data['couturier_code'] = result[30]
+                # Ajouter les données PDF si disponibles (colonnes 20-22)
+                if num_cols > 22:
+                    data['pdf_data'] = result[20]
+                    data['pdf_name'] = result[21]
+                    data['pdf_path'] = result[22]
+                    # Données client et couturier (colonnes 23-29)
+                    data['client_nom'] = result[23]
+                    data['client_prenom'] = result[24]
+                    data['client_telephone'] = result[25]
+                    data['client_email'] = result[26]
+                    data['couturier_nom'] = result[27]
+                    data['couturier_prenom'] = result[28]
+                    data['couturier_code'] = result[29]
                 else:
                     # Ancien format sans PDF (colonnes 20-26)
                     data['pdf_data'] = None
@@ -998,10 +868,6 @@ class CommandeModel:
             return None
         except (MySQLError, PGError, Exception) as e:
             print(f"Erreur récupération commande: {e}")
-            try:
-                self.db.get_connection().rollback()
-            except Exception:
-                pass
             return None
     
     def lister_commandes(self, couturier_id: Optional[int] = None, 
@@ -1018,7 +884,6 @@ class CommandeModel:
             Liste des commandes
         """
         try:
-            self._ensure_soft_delete_columns()
             cursor = self.db.get_connection().cursor()
             
             if tous_les_couturiers and not salon_id:
@@ -1030,7 +895,6 @@ class CommandeModel:
                     FROM commandes c
                     JOIN clients cl ON c.client_id = cl.id
                     LEFT JOIN couturiers co ON c.couturier_id = co.id
-                    WHERE COALESCE(c.est_supprime, FALSE) = FALSE
                     ORDER BY c.date_creation DESC
                 """
                 cursor.execute(query)
@@ -1044,7 +908,6 @@ class CommandeModel:
                     JOIN clients cl ON c.client_id = cl.id
                     LEFT JOIN couturiers co ON c.couturier_id = co.id
                     WHERE co.salon_id = %s
-                      AND COALESCE(c.est_supprime, FALSE) = FALSE
                     ORDER BY c.date_creation DESC
                 """
                 cursor.execute(query, (salon_id,))
@@ -1060,7 +923,6 @@ class CommandeModel:
                         JOIN clients cl ON c.client_id = cl.id
                         LEFT JOIN couturiers co ON c.couturier_id = co.id
                         WHERE co.salon_id = %s AND c.couturier_id = %s
-                          AND COALESCE(c.est_supprime, FALSE) = FALSE
                         ORDER BY c.date_creation DESC
                     """
                     cursor.execute(query, (salon_id, couturier_id))
@@ -1074,7 +936,6 @@ class CommandeModel:
                         JOIN clients cl ON c.client_id = cl.id
                         LEFT JOIN couturiers co ON c.couturier_id = co.id
                         WHERE co.salon_id = %s
-                          AND COALESCE(c.est_supprime, FALSE) = FALSE
                         ORDER BY c.date_creation DESC
                     """
                     cursor.execute(query, (salon_id,))
@@ -1086,7 +947,6 @@ class CommandeModel:
                         FROM commandes c
                         JOIN clients cl ON c.client_id = cl.id
                         WHERE c.couturier_id = %s
-                          AND COALESCE(c.est_supprime, FALSE) = FALSE
                         ORDER BY c.date_creation DESC
                     """
                     cursor.execute(query, (couturier_id,))
@@ -1272,8 +1132,8 @@ class CommandeModel:
             print(f"Erreur modification prix commande: {e}")
             return False
     
-    def demander_fermeture(self, commande_id: int, couturier_id: int,
-                         commentaire: Optional[str] = None) -> Optional[dict]:
+    def demander_fermeture(self, commande_id: int, couturier_id: int, 
+                          commentaire: Optional[str] = None) -> Optional[int]:
         """
         Demande la fermeture d'une commande (création d'une entrée en attente de validation)
         
@@ -1283,7 +1143,7 @@ class CommandeModel:
             commentaire: Commentaire optionnel
             
         Returns:
-            dict: {"id": <id>, "created": <bool>} ou None si erreur
+            ID de l'entrée d'historique créée ou None si erreur
         """
         try:
             connection = self.db.get_connection()
@@ -1354,13 +1214,8 @@ class CommandeModel:
             print(f"❌ Erreur demande fermeture: {e}")
             print(f"Détails: {error_details}")
             try:
-                if getattr(self.db, "db_type", "") == "postgresql":
-                    self.db.get_connection().rollback()
-            except Exception:
-                pass
-            try:
                 cursor.close()
-            except Exception:
+            except:
                 pass
             return None
     
@@ -1466,7 +1321,6 @@ class CommandeModel:
     ) -> List[Dict]:
         """Liste les commandes ouvertes (est_ouverte = TRUE), optionnellement filtrées par salon."""
         try:
-            self._ensure_soft_delete_columns()
             cursor = self.db.get_connection().cursor()
             
             if tous_les_couturiers:
@@ -1481,7 +1335,6 @@ class CommandeModel:
                     JOIN clients cl ON c.client_id = cl.id
                     LEFT JOIN couturiers co ON c.couturier_id = co.id
                     WHERE c.est_ouverte = TRUE
-                      AND COALESCE(c.est_supprime, FALSE) = FALSE
                 """
                 params: list = []
                 if salon_id:
@@ -1497,7 +1350,6 @@ class CommandeModel:
                     FROM commandes c
                     JOIN clients cl ON c.client_id = cl.id
                     WHERE c.couturier_id = %s AND c.est_ouverte = TRUE
-                      AND COALESCE(c.est_supprime, FALSE) = FALSE
                     ORDER BY c.date_creation DESC
                 """
                 cursor.execute(query, (couturier_id,))
@@ -1550,7 +1402,6 @@ class CommandeModel:
     ) -> List[Dict]:
         """Liste les commandes fermées (est_ouverte = FALSE), filtrables par salon."""
         try:
-            self._ensure_soft_delete_columns()
             cursor = self.db.get_connection().cursor()
 
             if tous_les_couturiers:
@@ -1564,7 +1415,6 @@ class CommandeModel:
                     JOIN clients cl ON c.client_id = cl.id
                     LEFT JOIN couturiers co ON c.couturier_id = co.id
                     WHERE c.est_ouverte = FALSE
-                      AND COALESCE(c.est_supprime, FALSE) = FALSE
                 """
                 params: list = []
                 if salon_id:
@@ -1581,7 +1431,6 @@ class CommandeModel:
                     JOIN clients cl ON c.client_id = cl.id
                     LEFT JOIN couturiers co ON c.couturier_id = co.id
                     WHERE c.couturier_id = %s AND c.est_ouverte = FALSE
-                      AND COALESCE(c.est_supprime, FALSE) = FALSE
                 """
                 params = [couturier_id]
                 if salon_id:
@@ -1644,7 +1493,6 @@ class CommandeModel:
         Retourne les infos nécessaires : id, modele, client, couturier, date_livraison, prix.
         """
         try:
-            self._ensure_soft_delete_columns()
             cursor = self.db.get_connection().cursor()
             if tous_les_couturiers:
                 query = """
@@ -1658,7 +1506,6 @@ class CommandeModel:
                     JOIN clients cl ON c.client_id = cl.id
                     LEFT JOIN couturiers co ON c.couturier_id = co.id
                     WHERE c.est_ouverte = TRUE
-                      AND COALESCE(c.est_supprime, FALSE) = FALSE
                       AND c.date_livraison IS NOT NULL
                       AND c.date_livraison >= %s
                       AND c.date_livraison <= %s
@@ -1682,7 +1529,6 @@ class CommandeModel:
                     LEFT JOIN couturiers co ON c.couturier_id = co.id
                     WHERE c.couturier_id = %s
                       AND c.est_ouverte = TRUE
-                      AND COALESCE(c.est_supprime, FALSE) = FALSE
                       AND c.date_livraison IS NOT NULL
                       AND c.date_livraison >= %s
                       AND c.date_livraison <= %s
@@ -1724,167 +1570,6 @@ class CommandeModel:
             print(f"Erreur liste commandes calendrier: {e}")
             return []
 
-    def supprimer_commande(
-        self,
-        commande_id: int,
-        admin_id: int,
-        salon_id_admin: Optional[str] = None,
-        motif: Optional[str] = None,
-    ) -> bool:
-        """
-        Suppression logique d'une commande par un administrateur.
-        """
-        try:
-            self._ensure_soft_delete_columns()
-            conn = self.db.get_connection()
-            cursor = conn.cursor()
-            cursor.execute(
-                "SELECT id, statut, salon_id, COALESCE(est_supprime, FALSE) FROM commandes WHERE id = %s",
-                (commande_id,),
-            )
-            row = cursor.fetchone()
-            if not row:
-                cursor.close()
-                return False
-            _, statut_avant, salon_id_cmd, est_supprime = row
-            if est_supprime or (salon_id_admin and str(salon_id_cmd) != str(salon_id_admin)):
-                cursor.close()
-                return False
-            cursor.execute(
-                """
-                UPDATE commandes
-                SET est_supprime = %s, supprime_par = %s, date_suppression = NOW(),
-                    motif_suppression = %s, statut = %s
-                WHERE id = %s
-                """,
-                (True, admin_id, motif, "Supprimée", commande_id),
-            )
-            cursor.execute(
-                """
-                INSERT INTO historique_commandes (
-                    commande_id, couturier_id, type_action, statut_avant, statut_apres, commentaire, date_creation
-                ) VALUES (%s, %s, %s, %s, %s, %s, NOW())
-                """,
-                (commande_id, admin_id, "suppression", statut_avant, "Supprimée", motif or "Suppression par administrateur"),
-            )
-            conn.commit()
-            cursor.close()
-            return True
-        except Exception as e:
-            print(f"Erreur suppression commande: {e}")
-            try:
-                self.db.get_connection().rollback()
-            except Exception:
-                pass
-            return False
-
-    def supprimer_commande_employe(
-        self,
-        commande_id: int,
-        employe_id: int,
-        salon_id_employe: Optional[str] = None,
-        motif: Optional[str] = None,
-    ) -> bool:
-        """
-        Suppression logique stricte par employé:
-        - uniquement ses propres commandes,
-        - uniquement dans son salon,
-        - exclut les commandes déjà supprimées.
-        """
-        try:
-            self._ensure_soft_delete_columns()
-            conn = self.db.get_connection()
-            cursor = conn.cursor()
-            cursor.execute(
-                """
-                SELECT id, statut, salon_id, couturier_id, COALESCE(est_supprime, FALSE)
-                FROM commandes
-                WHERE id = %s
-                """,
-                (commande_id,),
-            )
-            row = cursor.fetchone()
-            if not row:
-                cursor.close()
-                return False
-            _, statut_avant, salon_id_cmd, couturier_id_cmd, est_supprime = row
-            is_owner = str(couturier_id_cmd) == str(employe_id)
-            same_salon = (not salon_id_employe) or (str(salon_id_cmd) == str(salon_id_employe))
-            if est_supprime or not is_owner or not same_salon:
-                cursor.close()
-                return False
-            cursor.execute(
-                """
-                UPDATE commandes
-                SET est_supprime = %s, supprime_par = %s, date_suppression = NOW(),
-                    motif_suppression = %s, statut = %s
-                WHERE id = %s
-                """,
-                (True, employe_id, motif, "Supprimée", commande_id),
-            )
-            cursor.execute(
-                """
-                INSERT INTO historique_commandes (
-                    commande_id, couturier_id, type_action, statut_avant, statut_apres, commentaire, date_creation
-                ) VALUES (%s, %s, %s, %s, %s, %s, NOW())
-                """,
-                (commande_id, employe_id, "suppression_employe", statut_avant, "Supprimée", motif or "Suppression par employé"),
-            )
-            conn.commit()
-            cursor.close()
-            return True
-        except Exception as e:
-            print(f"Erreur suppression commande employé: {e}")
-            try:
-                self.db.get_connection().rollback()
-            except Exception:
-                pass
-            return False
-
-    def lister_commandes_supprimees(self, salon_id: Optional[str] = None) -> List[Dict]:
-        """Liste les commandes supprimées logiquement pour suivi admin/superadmin."""
-        try:
-            self._ensure_soft_delete_columns()
-            cursor = self.db.get_connection().cursor()
-            query = """
-                SELECT c.id, c.modele, c.prix_total, c.statut, c.salon_id,
-                       c.date_creation, c.date_suppression, c.motif_suppression,
-                       cl.nom, cl.prenom, co.code_couturier, co.nom, co.prenom
-                FROM commandes c
-                JOIN clients cl ON c.client_id = cl.id
-                LEFT JOIN couturiers co ON c.couturier_id = co.id
-                WHERE COALESCE(c.est_supprime, FALSE) = TRUE
-            """
-            params: List = []
-            if salon_id:
-                query += " AND c.salon_id = %s"
-                params.append(salon_id)
-            query += " ORDER BY c.date_suppression DESC NULLS LAST, c.date_creation DESC"
-            cursor.execute(query, tuple(params))
-            rows = cursor.fetchall()
-            cursor.close()
-            return [
-                {
-                    "id": row[0],
-                    "modele": row[1],
-                    "prix_total": float(row[2] or 0),
-                    "statut": row[3],
-                    "salon_id": row[4],
-                    "date_creation": row[5],
-                    "date_suppression": row[6],
-                    "motif_suppression": row[7],
-                    "client_nom": row[8],
-                    "client_prenom": row[9],
-                    "couturier_code": row[10],
-                    "couturier_nom": row[11],
-                    "couturier_prenom": row[12],
-                }
-                for row in rows
-            ]
-        except Exception as e:
-            print(f"Erreur liste commandes supprimées: {e}")
-            return []
-
     def lister_modeles_realises(
         self,
         couturier_id: Optional[int] = None,
@@ -1899,8 +1584,7 @@ class CommandeModel:
         """
         try:
             cursor = self.db.get_connection().cursor()
-            self._ensure_soft_delete_columns()
-            where_clauses = ["1=1", "COALESCE(c.est_supprime, FALSE) = FALSE"]
+            where_clauses = ["1=1"]
             params = []
             if salon_id:
                 where_clauses.append("co.salon_id = %s")
@@ -1955,8 +1639,7 @@ class CommandeModel:
         """
         try:
             cursor = self.db.get_connection().cursor()
-            self._ensure_soft_delete_columns()
-            where_clauses = ["(c.fabric_image IS NOT NULL OR c.model_image IS NOT NULL)", "COALESCE(c.est_supprime, FALSE) = FALSE"]
+            where_clauses = ["(c.fabric_image IS NOT NULL OR c.model_image IS NOT NULL)"]
             params = []
             if salon_id:
                 where_clauses.append("co.salon_id = %s")
@@ -2113,8 +1796,7 @@ class CommandeModel:
                        c.modele, c.prix_total, c.avance, c.reste,
                        cl.nom as client_nom, cl.prenom as client_prenom,
                        co.nom as couturier_nom, co.prenom as couturier_prenom,
-                       co.salon_id, s.nom as salon_nom,
-                       h.statut_validation
+                       co.salon_id, s.nom as salon_nom
                 FROM historique_commandes h
                 JOIN commandes c ON h.commande_id = c.id
                 JOIN clients cl ON c.client_id = cl.id
@@ -2150,7 +1832,6 @@ class CommandeModel:
                     'couturier_prenom': row[17],
                     'salon_id': row[18],
                     'salon_nom': row[19],
-                    'statut_validation': row[20],
                 })
             return demandes
         except (MySQLError, PGError, Exception) as e:
@@ -2168,11 +1849,6 @@ class CommandeModel:
         Liste les commandes avec avance > 0 et reste > 0 pour un couturier/salon.
         """
         try:
-            if self.db.db_type != 'mysql':
-                try:
-                    self.db.get_connection().rollback()
-                except Exception:
-                    pass
             cursor = self.db.get_connection().cursor()
             query = """
                 SELECT c.id, c.modele, c.prix_total, c.avance, c.reste, c.statut,
@@ -2183,7 +1859,6 @@ class CommandeModel:
                 JOIN couturiers co ON c.couturier_id = co.id
                 WHERE c.couturier_id = %s
                   AND co.salon_id = %s
-                  AND COALESCE(c.est_supprime, FALSE) = FALSE
                   AND c.statut != 'Fermé'
                   AND c.avance > 0
                   AND c.reste > 0
@@ -2251,11 +1926,6 @@ class CommandeModel:
         Liste les commandes terminées (reste <= 0, statut Terminé) prêtes pour demande/validation livraison.
         """
         try:
-            if self.db.db_type != 'mysql':
-                try:
-                    self.db.get_connection().rollback()
-                except Exception:
-                    pass
             cursor = self.db.get_connection().cursor()
             if vue_admin:
                 query = """
@@ -2267,7 +1937,6 @@ class CommandeModel:
                     JOIN clients cl ON c.client_id = cl.id
                     LEFT JOIN couturiers co ON c.couturier_id = co.id
                     WHERE co.salon_id = %s
-                      AND COALESCE(c.est_supprime, FALSE) = FALSE
                       AND c.reste <= 0
                       AND c.statut = 'Terminé'
                 """
@@ -2285,7 +1954,6 @@ class CommandeModel:
                     JOIN couturiers co ON c.couturier_id = co.id
                     WHERE c.couturier_id = %s
                       AND co.salon_id = %s
-                      AND COALESCE(c.est_supprime, FALSE) = FALSE
                       AND c.reste <= 0
                       AND c.statut = 'Terminé'
                 """
@@ -2403,11 +2071,6 @@ class CommandeModel:
         """
         try:
             connection = self.db.get_connection()
-            if self.db.db_type != 'mysql':
-                try:
-                    connection.rollback()
-                except Exception:
-                    pass
             cursor = connection.cursor()
             cursor.execute(
                 "UPDATE commandes SET statut = 'Livré et payé', date_fermeture = NOW() WHERE id = %s",
@@ -2434,11 +2097,6 @@ class CommandeModel:
         Liste les commandes validées (Livré et payé) pour téléchargement PDF.
         """
         try:
-            if self.db.db_type != 'mysql':
-                try:
-                    self.db.get_connection().rollback()
-                except Exception:
-                    pass
             cursor = self.db.get_connection().cursor()
             if vue_admin:
                 query = """
@@ -2451,7 +2109,6 @@ class CommandeModel:
                     JOIN clients cl ON c.client_id = cl.id
                     LEFT JOIN couturiers co ON c.couturier_id = co.id
                     WHERE co.salon_id = %s
-                      AND COALESCE(c.est_supprime, FALSE) = FALSE
                       AND c.statut = 'Livré et payé'
                 """
                 params = [salon_id]
@@ -2469,7 +2126,6 @@ class CommandeModel:
                     JOIN couturiers co ON c.couturier_id = co.id
                     WHERE c.couturier_id = %s
                       AND co.salon_id = %s
-                      AND COALESCE(c.est_supprime, FALSE) = FALSE
                       AND c.statut = 'Livré et payé'
                 """
                 params = [couturier_id, salon_id]
@@ -2532,68 +2188,6 @@ class ChargesModel:
 
     def __init__(self, db_connection: DatabaseConnection):
         self.db = db_connection
-        self.last_error: Optional[str] = None
-
-    def _ensure_charges_schema(self, cursor) -> None:
-        """Ajoute colonnes manquantes (anciennes BDD) pour aligner schéma et requêtes."""
-        try:
-            if self.db.db_type == "mysql":
-
-                def _mysql_col_exists(table: str, col: str) -> bool:
-                    cursor.execute(
-                        """
-                        SELECT COUNT(*) FROM information_schema.COLUMNS
-                        WHERE TABLE_SCHEMA = DATABASE()
-                          AND TABLE_NAME = %s
-                          AND COLUMN_NAME = %s
-                        """,
-                        (table, col),
-                    )
-                    row = cursor.fetchone()
-                    return bool(row and row[0] > 0)
-
-                if not _mysql_col_exists("charges", "reference"):
-                    cursor.execute(
-                        "ALTER TABLE charges ADD COLUMN reference VARCHAR(100) NULL"
-                    )
-
-                try:
-                    cursor.execute(
-                        "ALTER TABLE charge_documents MODIFY COLUMN file_path VARCHAR(500) NULL"
-                    )
-                except (MySQLError, PGError, Exception):
-                    pass
-
-                for col, ddl in (
-                    ("file_size", "BIGINT NULL"),
-                    ("file_data", "LONGBLOB NULL"),
-                    ("description", "VARCHAR(500) NULL"),
-                ):
-                    if not _mysql_col_exists("charge_documents", col):
-                        cursor.execute(
-                            f"ALTER TABLE charge_documents ADD COLUMN {col} {ddl}"
-                        )
-            else:
-                cursor.execute(
-                    "ALTER TABLE charges ADD COLUMN IF NOT EXISTS reference VARCHAR(100)"
-                )
-                try:
-                    cursor.execute(
-                        "ALTER TABLE charge_documents ALTER COLUMN file_path DROP NOT NULL"
-                    )
-                except (MySQLError, PGError, Exception):
-                    pass
-                cursor.execute(
-                    "ALTER TABLE charge_documents ADD COLUMN IF NOT EXISTS file_size BIGINT"
-                )
-                cursor.execute(
-                    "ALTER TABLE charge_documents ADD COLUMN IF NOT EXISTS file_data BYTEA"
-                )
-                cursor.execute(
-                    "ALTER TABLE charge_documents ADD COLUMN IF NOT EXISTS description TEXT"
-                )
-        except (MySQLError, PGError, Exception) as e:
-            print(f"Erreur migration schéma charges: {e}")
 
     def creer_tables(self) -> bool:
         """Crée les tables des charges et des documents liés"""
@@ -2665,9 +2259,7 @@ class ChargesModel:
                     )
                     """
                 )
-
-            self._ensure_charges_schema(cursor)
-
+            
             self.db.get_connection().commit()
             cursor.close()
             return True
@@ -2698,10 +2290,6 @@ class ChargesModel:
         Returns:
             ID de la charge créée ou None si erreur
         """
-        self.last_error = None
-        if couturier_id is None:
-            self.last_error = "Identifiant couturier manquant (impossible d'enregistrer la charge)."
-            return None
         try:
             cursor = self.db.get_connection().cursor()
             
@@ -2728,13 +2316,7 @@ class ChargesModel:
             cursor.close()
             return charge_id
         except (MySQLError, PGError, Exception) as e:
-            self.last_error = str(e)
             print(f"Erreur ajout charge: {e}")
-            try:
-                if getattr(self.db, "db_type", "") == "postgresql":
-                    self.db.get_connection().rollback()
-            except Exception:
-                pass
             return None
 
     def ajouter_document(self, charge_id: int, file_name: str, 
@@ -3150,10 +2732,6 @@ class AppLogoModel:
             return True
         except (MySQLError, PGError, Exception) as e:
             print(f"Erreur sauvegarde logo: {e}")
-            try:
-                self.db.get_connection().rollback()
-            except Exception:
-                pass
             return False
     
     def recuperer_logo(self, salon_id: str) -> Optional[Dict]:
@@ -3190,8 +2768,4 @@ class AppLogoModel:
             return None
         except (MySQLError, PGError, Exception) as e:
             print(f"Erreur récupération logo: {e}")
-            try:
-                self.db.get_connection().rollback()
-            except Exception:
-                pass
             return None

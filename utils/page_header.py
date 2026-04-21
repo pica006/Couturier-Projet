@@ -1,6 +1,6 @@
 """
-Fonction utilitaire pour generer l'en-tete banniere des pages.
-Style : Degrade violet #6C63FF -> turquoise #00C9A7 (Premium Glass).
+Fonction utilitaire pour générer l'en-tête encadré standardisé des pages
+Style : Dégradé violet clair (#B19CD9) vers bleu turquoise (#40E0D0)
 """
 
 import streamlit as st
@@ -8,39 +8,22 @@ import streamlit as st
 
 def afficher_header_page(titre: str, sous_titre: str = ""):
     """
-    Affiche un en-tete banner avec degrade violet->turquoise.
-
+    Affiche un en-tête encadré avec dégradé violet-bleu standardisé
+    
     Args:
-        titre    : Titre principal (avec emoji si souhaite)
-        sous_titre: Sous-titre optionnel
+        titre: Le titre principal de la page (avec emoji si souhaité)
+        sous_titre: Le sous-titre optionnel de la page
+    
+    Exemple:
+        afficher_header_page("➕ Nouvelle Commande", "Créer une nouvelle commande pour un client")
     """
-    sous_html = (
-        f"<p style='color:rgba(255,255,255,0.88);margin:0.4rem 0 0 0;"
-        f"font-size:0.95rem;font-family:Inter,sans-serif;'>{sous_titre}</p>"
-        if sous_titre else ""
-    )
-    st.markdown(
-        f"""
-        <div style='
-            background: linear-gradient(135deg, #6C63FF 0%, #00C9A7 100%);
-            padding: 1.75rem 2rem;
-            border-radius: 20px;
-            margin-bottom: 2rem;
-            box-shadow: 0 10px 32px rgba(108,99,255,0.22);
-            position: relative;
-            overflow: hidden;
-        '>
-            <div style='position:absolute;top:-50%;right:-5%;width:200px;height:200px;
-                border-radius:50%;background:rgba(255,255,255,0.08);'></div>
-            <div style='position:absolute;bottom:-40%;right:12%;width:110px;height:110px;
-                border-radius:50%;background:rgba(255,255,255,0.05);'></div>
-            <div style='position:relative;z-index:1;'>
-                <h1 style='color:white;margin:0;font-size:1.7rem;font-weight:700;
-                    font-family:Poppins,Inter,sans-serif;letter-spacing:-0.01em;
-                    text-shadow:0 2px 8px rgba(0,0,0,0.10);'>{titre}</h1>
-                {sous_html}
-            </div>
+    st.markdown(f"""
+        <div style='background: linear-gradient(135deg, #B19CD9 0%, #40E0D0 100%); 
+                    padding: 2rem; border-radius: 16px; margin-bottom: 2rem; 
+                    box-shadow: 0 4px 8px rgba(0,0,0,0.1); text-align: center;'>
+            <h1 style='color: white; margin: 0; font-size: 2.5rem; font-weight: 700; 
+                       font-family: Poppins, sans-serif; text-shadow: 0 2px 4px rgba(0,0,0,0.2);'>{titre}</h1>
+            {f"<p style='color: rgba(255,255,255,0.95); margin: 0.5rem 0 0 0; font-size: 1.1rem;'>{sous_titre}</p>" if sous_titre else ""}
         </div>
-        """,
-        unsafe_allow_html=True,
-    )
+    """, unsafe_allow_html=True)
+

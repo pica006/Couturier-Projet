@@ -83,8 +83,6 @@ APP_CONFIG = {
     # Le système cherchera automatiquement logo.png, puis logo.jpg, puis logo.jpeg
     'wallpaper_url': 'assets/background_dark.png',  # Image de fond (fichier local)
     # Si None, aucune image de fond ne sera affichée
-    # Page de connexion : False = dégradé maquette : login_use_wallpaper True pour forcer l'image
-    'login_use_wallpaper': False,
 }
 
 # ============================================================================
@@ -124,11 +122,11 @@ BRANDING = {
 #
 # Ces informations sont affichées sur la page de connexion.
 COMPANY_INFO = {
-    'name': "Nom de l'application: SpiritStitch",
+    'name': "An's Learning",
     'address': 'Douala - Kotto',
-    'manager': 'Mr Sango Justin',
-    'phone': '+237 698 19 25 07',
-    'email': 'support@ans-learning.com'
+    'manager': 'Sango Justin',
+    'phone': '698192507',
+    'email': 'andresgroup63@gmail.com'
 }
 
 # ============================================================================

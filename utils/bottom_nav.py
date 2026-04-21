@@ -15,25 +15,15 @@ def _safe_format(template: str, values: dict) -> str:
 
 
 @st.cache_data(show_spinner=False)
-def _load_site_content_cached(content_path: str, cache_key: float) -> dict:
-    # cache_key (mtime) force l'invalidation du cache quand le fichier change.
-    _ = cache_key
+def load_site_content() -> dict:
+    project_root = os.path.dirname(os.path.dirname(__file__))
+    content_path = os.path.join(project_root, "assets", "site_content.json")
+
     try:
         with open(content_path, "r", encoding="utf-8") as file:
             return json.load(file)
     except Exception:
         return {}
-
-
-def load_site_content() -> dict:
-    project_root = os.path.dirname(os.path.dirname(__file__))
-    content_path = os.path.join(project_root, "assets", "site_content.json")
-    try:
-        cache_key = os.path.getmtime(content_path)
-    except OSError:
-        cache_key = 0.0
-
-    return _load_site_content_cached(content_path, cache_key)
 
 
 def _build_bottom_nav_html(content: dict, app_values: dict) -> str:
@@ -94,79 +84,6 @@ def _build_bottom_nav_html(content: dict, app_values: dict) -> str:
     """).strip()
 
 
-def _build_footer_html(content: dict) -> str:
-    """Construit le HTML du footer (informations entreprise uniquement) pour affichage sur toutes les pages."""
-    company = content.get("company", {})
-    company_title = company.get("title", "")
-    fields_html = ""
-    for field in company.get("fields", []):
-        label = field.get("label", "")
-        value = field.get("value", "")
-        if label or value:
-            fields_html += (
-                "<div class='app-footer-item'>"
-                f"<span class='app-footer-label'>{label}</span>"
-                f"<span class='app-footer-value'>{value}</span>"
-                "</div>"
-            )
-    if not company_title and not fields_html:
-        return ""
-    return textwrap.dedent(f"""
-        <footer class="app-footer">
-            <div class="app-footer-inner">
-                {f'<div class="app-footer-title">{company_title}</div>' if company_title else ''}
-                {fields_html}
-            </div>
-        </footer>
-    """).strip()
-
-
-def render_app_footer() -> None:
-    """
-    Affiche le footer avec les informations de l'entreprise (nom, adresse, contact).
-    À appeler sur toutes les pages, y compris la page de connexion.
-    """
-    content = load_site_content()
-    footer_html = _build_footer_html(content)
-    if not footer_html:
-        return
-    st.markdown("""
-        <style>
-        .app-footer {
-            margin-top: 2.5rem;
-            padding: 1rem 0;
-            background: linear-gradient(135deg, #F3F0FB 0%, #E9FBF9 100%);
-            border-top: 2px solid rgba(177, 156, 217, 0.4);
-        }
-        .app-footer-inner {
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 0 1.5rem;
-            display: flex;
-            flex-wrap: wrap;
-            align-items: flex-start;
-            gap: 0.75rem 1.5rem;
-        }
-        .app-footer-title {
-            font-weight: 700;
-            color: #2C2C2C;
-            font-size: 1rem;
-            width: 100%;
-            margin-bottom: 0.25rem;
-        }
-        .app-footer-item {
-            display: inline-flex;
-            gap: 0.4rem;
-            font-size: 0.9rem;
-            color: rgba(44, 44, 44, 0.86);
-        }
-        .app-footer-label { font-weight: 600; color: #2C2C2C; }
-        .app-footer-value { color: rgba(44, 44, 44, 0.8); }
-        </style>
-    """, unsafe_allow_html=True)
-    st.markdown(footer_html, unsafe_allow_html=True)
-
-
 def render_bottom_nav(app_values: dict) -> None:
     content = load_site_content()
     bottom_nav_html = _build_bottom_nav_html(content, app_values)
@@ -177,7 +94,7 @@ def render_bottom_nav(app_values: dict) -> None:
         .bottom-nav {
             margin-top: 2.5rem;
             background: linear-gradient(135deg, #F3F0FB 0%, #E9FBF9 100%);
-            border-top: 2px solid #6C63FF;
+            border-top: 2px solid #B19CD9;
             padding: 1.1rem 0;
         }
 
@@ -203,7 +120,7 @@ def render_bottom_nav(app_values: dict) -> None:
             display: inline-block;
             padding: 0.32rem 0.85rem;
             border-radius: 999px;
-            background: linear-gradient(135deg, #6C63FF 0%, #00C9A7 100%);
+            background: linear-gradient(135deg, #B19CD9 0%, #40E0D0 100%);
             color: #FFFFFF;
             font-weight: 700;
             font-size: 0.86rem;

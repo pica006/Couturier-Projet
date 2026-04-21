@@ -142,21 +142,6 @@ class CommandeController:
     def lister_commandes_couturier(self, couturier_id: int) -> List[Dict]:
         """Liste toutes les commandes d'un couturier"""
         return self.commande_model.lister_commandes(couturier_id)
-
-    def supprimer_commande_employe(
-        self,
-        commande_id: int,
-        employe_id: int,
-        salon_id_employe: Optional[str] = None,
-        motif: Optional[str] = None,
-    ) -> bool:
-        """Suppression logique d'une commande par un employé (règles strictes)."""
-        return self.commande_model.supprimer_commande_employe(
-            commande_id=commande_id,
-            employe_id=employe_id,
-            salon_id_employe=salon_id_employe,
-            motif=motif,
-        )
     
     def calculer_reste(self, prix_total: float, avance: float) -> float:
         """Calcule le reste à payer"""
@@ -216,7 +201,6 @@ class CommandeController:
                 FROM commandes c
                 JOIN couturiers co ON c.couturier_id = co.id
                 WHERE c.reste <= 0
-                  AND COALESCE(c.est_supprime, FALSE) = FALSE
             """
             params = []
             
@@ -272,7 +256,6 @@ class CommandeController:
                 JOIN couturiers co ON c.couturier_id = co.id
                 WHERE hc.statut_validation = 'validee'
                 AND hc.type_action = 'fermeture_demande'
-                AND COALESCE(c.est_supprime, FALSE) = FALSE
             """
             params = []
             

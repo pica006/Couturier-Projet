@@ -58,19 +58,19 @@ class SuperAdminController:
                 nb_clients_total = cursor.fetchone()[0]
 
                 # Nombre total de commandes
-                cursor.execute("SELECT COUNT(*) FROM commandes WHERE COALESCE(est_supprime, FALSE) = FALSE")
+                cursor.execute("SELECT COUNT(*) FROM commandes")
                 nb_commandes_total = cursor.fetchone()[0]
 
                 # Chiffre d'affaires total
-                cursor.execute("SELECT COALESCE(SUM(prix_total), 0) FROM commandes WHERE COALESCE(est_supprime, FALSE) = FALSE")
+                cursor.execute("SELECT COALESCE(SUM(prix_total), 0) FROM commandes")
                 ca_total = float(cursor.fetchone()[0])
 
                 # Total des avances
-                cursor.execute("SELECT COALESCE(SUM(avance), 0) FROM commandes WHERE COALESCE(est_supprime, FALSE) = FALSE")
+                cursor.execute("SELECT COALESCE(SUM(avance), 0) FROM commandes")
                 avances_total = float(cursor.fetchone()[0])
 
                 # Total des restes
-                cursor.execute("SELECT COALESCE(SUM(reste), 0) FROM commandes WHERE COALESCE(est_supprime, FALSE) = FALSE")
+                cursor.execute("SELECT COALESCE(SUM(reste), 0) FROM commandes")
                 reste_total = float(cursor.fetchone()[0])
 
                 # Total des charges
@@ -217,7 +217,7 @@ class SuperAdminController:
                     COALESCE(SUM(avance), 0) as avances,
                     COALESCE(SUM(reste), 0) as reste
                 FROM commandes
-                {"WHERE COALESCE(est_supprime, FALSE) = FALSE AND " + " AND ".join(cmd_where) if cmd_where else "WHERE COALESCE(est_supprime, FALSE) = FALSE"}
+                {where_cmd_clause}
                 GROUP BY salon_id
             """
             cursor.execute(query_cmd, tuple(cmd_params))
@@ -483,10 +483,7 @@ class SuperAdminController:
                     cmd.id, cmd.modele, cmd.prix_total, cmd.avance, cmd.reste,
                     cmd.statut, cmd.date_creation, cmd.salon_id,
                     cl.nom as client_nom, cl.prenom as client_prenom,
-                    co.code_couturier, co.nom as couturier_nom,
-                    COALESCE(cmd.est_supprime, FALSE) as est_supprime,
-                    cmd.date_suppression,
-                    cmd.motif_suppression
+                    co.code_couturier, co.nom as couturier_nom
                 FROM commandes cmd
                 JOIN clients cl ON cmd.client_id = cl.id
                 JOIN couturiers co ON cmd.couturier_id = co.id
@@ -512,10 +509,7 @@ class SuperAdminController:
                     'client_nom': row[8],
                     'client_prenom': row[9],
                     'couturier_code': row[10],
-                    'couturier_nom': row[11],
-                    'est_supprime': bool(row[12]) if row[12] is not None else False,
-                    'date_suppression': row[13],
-                    'motif_suppression': row[14],
+                    'couturier_nom': row[11]
                 }
                 for row in results
             ]

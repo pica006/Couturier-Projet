@@ -3,7 +3,6 @@ Vue pour permettre aux employés de fermer leurs commandes
 """
 import streamlit as st
 import os
-from datetime import date, datetime
 from controllers.commande_controller import CommandeController
 from controllers.email_controller import EmailController
 from models.salon_model import SalonModel
@@ -16,13 +15,6 @@ def afficher_page_fermer_commandes():
     # En-tête encadré standardisé
     from utils.page_header import afficher_header_page
     afficher_header_page("🔒 Fermer mes commandes", "Gérez les paiements et demandez la fermeture de vos commandes")
-
-    st.info(
-        "**Parcours prévu :** 1) L’employé règle le **reste à payer** (onglet paiements) → statut **Terminé** quand tout est payé. "
-        "2) Il demande la **livraison** (onglet commandes terminées) → une entrée **en attente** apparaît chez l’**admin** "
-        "(Administration → Gestion des commandes → Demandes en attente). "
-        "3) L’admin **valide** → statut **Livré et payé** et PDF côté client si configuré."
-    )
     
     # Récupérer les données du couturier depuis la session
     couturier_data = st.session_state.get('couturier_data')
@@ -70,100 +62,6 @@ def afficher_page_fermer_commandes():
         "✅ Commandes terminées (en attente de livraison)", 
         "📄 Upload PDFs des commandes terminées"
     ])
-
-    def _badge_statut(statut: str) -> str:
-        s = (statut or "").strip().lower()
-        if s == "en cours":
-            return "⏳ En cours"
-        if s == "terminé":
-            return "✅ Terminé"
-        if s == "livré et payé":
-            return "🚚 Livré et payé"
-        if s == "supprimée":
-            return "🗑️ Supprimée"
-        return f"📌 {statut or 'Inconnu'}"
-
-    def _to_date(value):
-        if value is None:
-            return None
-        if isinstance(value, datetime):
-            return value.date()
-        if isinstance(value, date):
-            return value
-        if isinstance(value, str):
-            raw = value.strip()
-            for fmt in ("%Y-%m-%d", "%d/%m/%Y", "%Y-%m-%d %H:%M:%S", "%d-%m-%Y"):
-                try:
-                    return datetime.strptime(raw, fmt).date()
-                except ValueError:
-                    continue
-        return None
-
-    def _meta_urgence(commande):
-        # Priorité globale: rouge (0) > orange (1) > vert (2)
-        date_livraison = _to_date(commande.get("date_livraison"))
-        reste = float(commande.get("reste", 0) or 0)
-        today = date.today()
-        jours = None if date_livraison is None else (date_livraison - today).days
-
-        if jours is not None and jours < 0:
-            return {
-                "niveau": "rouge",
-                "emoji": "🔴",
-                "label": f"En retard de {abs(jours)} jour(s)",
-                "priorite": 0,
-                "jours": jours,
-            }
-        if jours is not None and jours <= 2:
-            return {
-                "niveau": "orange",
-                "emoji": "🟠",
-                "label": "Échéance proche (0-2 jours)",
-                "priorite": 1,
-                "jours": jours,
-            }
-        if reste > 0:
-            return {
-                "niveau": "orange",
-                "emoji": "🟠",
-                "label": "Paiement à finaliser",
-                "priorite": 1,
-                "jours": 9999 if jours is None else jours,
-            }
-        return {
-            "niveau": "vert",
-            "emoji": "🟢",
-            "label": "Situation stable",
-            "priorite": 2,
-            "jours": 9999 if jours is None else jours,
-        }
-
-    def _trier_commandes_urgentes(commandes):
-        def _safe_int(value, default=0):
-            try:
-                return int(value)
-            except Exception:
-                return default
-
-        return sorted(
-            commandes,
-            key=lambda c: (
-                _meta_urgence(c)["priorite"],
-                _meta_urgence(c)["jours"],
-                -float(c.get("reste", 0) or 0),
-                _safe_int(c.get("id", 0) or 0),
-            ),
-        )
-
-    def _bandeau_urgence(commande):
-        meta = _meta_urgence(commande)
-        message = f"{meta['emoji']} **Priorité {meta['niveau'].upper()}** — {meta['label']}"
-        if meta["niveau"] == "rouge":
-            st.error(message)
-        elif meta["niveau"] == "orange":
-            st.warning(message)
-        else:
-            st.success(message)
     
     # ========================================================================
     # ONGLET 1 : MODIFIER LES PAIEMENTS (Commandes avec avance)
@@ -171,12 +69,11 @@ def afficher_page_fermer_commandes():
     with tab1:
         st.markdown("### 💰 Modifier les paiements")
         st.markdown("Liste de vos commandes où une avance a été versée. Vous pouvez modifier directement le prix total, l'avance et le reste à payer.")
-        st.caption("Objectif : solder le reste à payer. Une commande soldée passe automatiquement au statut **Terminé**.")
         
         # Bouton de rafraîchissement
         col_refresh, _ = st.columns([1, 5])
         with col_refresh:
-            if st.button("🔄 Actualiser", key="refresh_commandes_paiement", use_container_width=True):
+            if st.button("🔄 Actualiser", key="refresh_commandes_paiement", width='stretch'):
                 st.rerun()
         
         st.markdown("---")
@@ -213,13 +110,6 @@ def afficher_page_fermer_commandes():
         if not commandes_avec_reste:
             st.info("📭 Aucune commande avec avance versée et reste à payer pour le moment.")
         else:
-            commandes_avec_reste = _trier_commandes_urgentes(commandes_avec_reste)
-            total_reste = sum(float(c.get("reste", 0) or 0) for c in commandes_avec_reste)
-            st.info(
-                f"💡 **{len(commandes_avec_reste)} commande(s)** à compléter, "
-                f"pour un **reste total de {total_reste:,.0f} FCFA**."
-            )
-            st.caption("Code couleur global: 🔴 urgence forte | 🟠 à traiter rapidement | 🟢 stable")
             st.markdown(f"#### 📋 Liste des commandes ({len(commandes_avec_reste)})")
             
             # Afficher chaque commande avec possibilité de modification
@@ -232,19 +122,18 @@ def afficher_page_fermer_commandes():
                     f"📦 Commande #{commande['id']} - {client_prenom} {client_nom} - {modele}",
                     expanded=False
                 ):
-                    _bandeau_urgence(commande)
-                    # NOTE: Streamlit n'autorise pas les expanders imbriqués.
-                    st.markdown("#### 💰 Informations de Paiement")
-                    col_info1, col_info2, col_info3 = st.columns(3)
-                    
-                    with col_info1:
-                        st.metric("Prix total", f"{commande['prix_total']:,.0f} FCFA")
-                    with col_info2:
-                        st.metric("Avance", f"{commande['avance']:,.0f} FCFA")
-                    with col_info3:
-                        pourcentage_reste = ((commande['reste']/commande['prix_total'])*100) if commande['prix_total'] > 0 else 0
-                        st.metric("Reste à payer", f"{commande['reste']:,.0f} FCFA", 
-                                 delta=f"{pourcentage_reste:.1f}%")
+                    # Affichage des informations de paiement comme dans "mes commandes"
+                    with st.expander("💰 Informations de Paiement", expanded=True):
+                        col_info1, col_info2, col_info3 = st.columns(3)
+                        
+                        with col_info1:
+                            st.metric("Prix total", f"{commande['prix_total']:,.0f} FCFA")
+                        with col_info2:
+                            st.metric("Avance", f"{commande['avance']:,.0f} FCFA")
+                        with col_info3:
+                            pourcentage_reste = ((commande['reste']/commande['prix_total'])*100) if commande['prix_total'] > 0 else 0
+                            st.metric("Reste à payer", f"{commande['reste']:,.0f} FCFA", 
+                                     delta=f"{pourcentage_reste:.1f}%")
                     
                     st.markdown("---")
                     st.markdown("#### ✏️ Modifier les montants")
@@ -374,7 +263,7 @@ def afficher_page_fermer_commandes():
         if is_admin_user and salon_id_user:
             from models.database import CouturierModel
             couturier_model = CouturierModel(st.session_state.db_connection)
-            couturiers_salon = couturier_model.lister_tous_couturiers(salon_id=salon_id_user) or []
+            couturiers_salon = couturier_model.lister_tous_couturiers(salon_id=salon_id_user)
             
             options_couturiers = ["👥 Tous les couturiers"] + [
                 f"{c['code_couturier']} - {c['prenom']} {c['nom']}"
@@ -422,12 +311,12 @@ def afficher_page_fermer_commandes():
                 historique_counts = {}
 
             for cmd in commandes_terminees:
-                # lister_demandes_validation() ne renvoie que des lignes en_attente (filtre SQL)
                 demande_existante = next(
                     (
                         d for d in demandes
                         if d.get("commande_id") == cmd["id"]
                         and d.get("type_action") == "fermeture_demande"
+                        and d.get("statut_validation") == "en_attente"
                     ),
                     None,
                 )
@@ -444,10 +333,8 @@ def afficher_page_fermer_commandes():
         if not commandes_terminees:
             st.info("📭 Aucune commande totalement payée pour le moment.")
         else:
-            commandes_terminees = _trier_commandes_urgentes(commandes_terminees)
             st.markdown(f"#### 📋 Commandes totalement payées ({len(commandes_terminees)})")
             st.info("💡 Cliquez sur le bouton pour demander la livraison. La commande passera en attente de confirmation par l'administrateur.")
-            st.caption("Tri automatique appliqué: les commandes les plus urgentes sont affichées en haut.")
             st.markdown("---")
             
             for commande in commandes_terminees:
@@ -465,7 +352,6 @@ def afficher_page_fermer_commandes():
                     f"📦 Commande #{commande['id']} - {client_prenom} {client_nom} - {modele}{couturier_info}",
                     expanded=True
                 ):
-                    _bandeau_urgence(commande)
                     col_d1, col_d2, col_d3 = st.columns(3)
                     
                     with col_d1:
@@ -474,7 +360,6 @@ def afficher_page_fermer_commandes():
                         st.metric("💵 Avance", f"{commande['avance']:,.0f} FCFA")
                     with col_d3:
                         st.metric("💸 Reste", f"{commande['reste']:,.0f} FCFA")
-                    st.caption(f"Statut actuel : **{_badge_statut(commande.get('statut', ''))}**")
                     
                     st.markdown("---")
                     
@@ -512,7 +397,7 @@ def afficher_page_fermer_commandes():
                             "✅ Valider et passer en 'Livré et payé' (PDF dispo)",
                             key=f"admin_valider_livraison_{commande['id']}",
                             type="primary",
-                            use_container_width=True
+                            width='stretch'
                         ):
                             try:
                                 success_validation = commande_controller.valider_commande_livree_payee(
@@ -525,161 +410,35 @@ def afficher_page_fermer_commandes():
                                 st.success("✅ Commande validée. Elle apparaît désormais dans l'onglet PDF.")
                                 
                                 # Envoi d'un email de livraison terminée au client
-                                commande_email = commande_model.obtenir_commande(commande["id"]) or {}
-                                client_email = (
-                                    commande_email.get("client_email")
-                                    or commande.get("client_email")
-                                )
+                                client_email = commande.get('client_email')
                                 if not client_email:
                                     st.warning("⚠️ Email de livraison non envoyé : adresse email du client manquante.")
                                 else:
-                                    salon_id_email = (
-                                        commande_email.get("salon_id")
-                                        or commande.get("salon_id")
-                                        or salon_id_user
+                                    subject = f"Commande #{commande['id']} livrée et terminée"
+                                    date_livraison = commande.get('date_livraison')
+                                    date_livraison_txt = (
+                                        date_livraison.strftime('%d/%m/%Y')
+                                        if hasattr(date_livraison, 'strftime')
+                                        else str(date_livraison) if date_livraison else "Non définie"
                                     )
-                                    email_controller_envoi = email_controller
-                                    try:
-                                        salon_model_email = SalonModel(db)
-
-                                        # Fallback robuste: retrouver le salon via couturier_id si salon_id absent
-                                        if not salon_id_email and commande_email.get("couturier_id"):
-                                            try:
-                                                from models.database import CouturierModel
-                                                couturier_model_email = CouturierModel(db)
-                                                couturier_info = couturier_model_email.obtenir_couturier_par_id(
-                                                    commande_email.get("couturier_id")
-                                                )
-                                                if couturier_info:
-                                                    salon_id_email = couturier_info.get("salon_id")
-                                            except Exception:
-                                                salon_id_email = salon_id_user
-
-                                        if salon_id_email:
-                                            smtp_config_email = salon_model_email.obtenir_config_email_salon(salon_id_email) or {}
-                                            salon_info_email = salon_model_email.obtenir_salon_by_id(salon_id_email) or {}
-
-                                            # Compléter explicitement depuis la BDD si des champs SMTP sont vides
-                                            smtp_user = (salon_info_email.get("smtp_user") or "").strip()
-                                            smtp_password = salon_info_email.get("smtp_password")
-                                            smtp_from = (salon_info_email.get("smtp_from") or "").strip()
-                                            salon_email = (salon_info_email.get("email") or "").strip()
-                                            smtp_host = (salon_info_email.get("smtp_host") or "").strip()
-                                            smtp_port = salon_info_email.get("smtp_port")
-
-                                            if smtp_host:
-                                                smtp_config_email["host"] = smtp_host
-                                            if smtp_port is not None and str(smtp_port).strip() != "":
-                                                try:
-                                                    smtp_config_email["port"] = int(smtp_port)
-                                                except Exception:
-                                                    pass
-
-                                            smtp_config_email["user"] = smtp_config_email.get("user") or smtp_user or salon_email
-                                            smtp_config_email["password"] = smtp_config_email.get("password") or smtp_password
-                                            smtp_config_email["from_email"] = (
-                                                smtp_config_email.get("from_email")
-                                                or smtp_from
-                                                or smtp_user
-                                                or salon_email
-                                            )
-                                            smtp_config_email["enabled"] = True
-
-                                            email_controller_envoi = EmailController(smtp_config=smtp_config_email)
-                                        else:
-                                            # Dernier fallback: lire la config SMTP du salon directement via la commande
-                                            conn = db.get_connection()
-                                            cursor = conn.cursor()
-                                            try:
-                                                cursor.execute(
-                                                    """
-                                                    SELECT
-                                                        s.smtp_host,
-                                                        s.smtp_port,
-                                                        s.smtp_user,
-                                                        s.smtp_password,
-                                                        s.smtp_from,
-                                                        s.smtp_use_tls,
-                                                        s.smtp_use_ssl,
-                                                        s.email
-                                                    FROM commandes c
-                                                    JOIN salons s ON s.salon_id = c.salon_id
-                                                    WHERE c.id = %s
-                                                    """,
-                                                    (commande["id"],)
-                                                )
-                                                row = cursor.fetchone()
-                                                if row:
-                                                    smtp_config_email = {
-                                                        "enabled": True,
-                                                        "host": row[0],
-                                                        "port": row[1],
-                                                        "user": row[2] or row[7],
-                                                        "password": row[3],
-                                                        "from_email": row[4] or row[2] or row[7],
-                                                        "use_tls": row[5],
-                                                        "use_ssl": row[6],
-                                                    }
-                                                    email_controller_envoi = EmailController(smtp_config=smtp_config_email)
-                                            finally:
-                                                cursor.close()
-                                    except Exception:
-                                        email_controller_envoi = email_controller
-
-                                    ok_config, msg_config = email_controller_envoi.verifier_configuration()
-                                    if not ok_config:
-                                        # Salon incomplet : tenter la config globale (.env / EMAIL_CONFIG)
-                                        email_controller_envoi = EmailController(smtp_config=None)
-                                        ok_config, msg_config = email_controller_envoi.verifier_configuration()
-                                    if not ok_config:
-                                        st.error(
-                                            f"❌ Email de livraison non envoyé : {msg_config} "
-                                            "(la commande est bien passée en « Livré et payé »)."
+                                    body = (
+                                        f"Bonjour {commande.get('client_prenom', '')} {commande.get('client_nom', '')},\n\n"
+                                        "Votre commande est maintenant livrée et terminée.\n\n"
+                                        f"Commande: #{commande['id']}\n"
+                                        f"Modèle: {commande.get('modele', 'N/A')}\n"
+                                        f"Date de livraison: {date_livraison_txt}\n\n"
+                                        "Merci pour votre confiance."
+                                    )
+                                    with st.spinner("📧 Envoi de l'email de livraison..."):
+                                        succes, message = email_controller.envoyer_email_avec_message(
+                                            client_email,
+                                            subject,
+                                            body
                                         )
+                                    if succes:
+                                        st.success(f"✅ {message}")
                                     else:
-                                        subject = f"Commande #{commande['id']} livrée et terminée"
-                                        date_livraison = commande.get('date_livraison')
-                                        date_livraison_txt = (
-                                            date_livraison.strftime('%d/%m/%Y')
-                                            if hasattr(date_livraison, 'strftime')
-                                            else str(date_livraison) if date_livraison else "Non définie"
-                                        )
-                                        body = (
-                                            f"Bonjour {commande.get('client_prenom', '')} {commande.get('client_nom', '')},\n\n"
-                                            "Votre commande est maintenant livrée et terminée.\n\n"
-                                            f"Commande: #{commande['id']}\n"
-                                            f"Modèle: {commande.get('modele', 'N/A')}\n"
-                                            f"Date de livraison: {date_livraison_txt}\n\n"
-                                            "Merci pour votre confiance."
-                                        )
-                                        with st.spinner("📧 Envoi de l'email de livraison..."):
-                                            attachments = []
-                                            try:
-                                                from controllers.pdf_controller import PDFController
-                                                pdf_controller = PDFController(st.session_state.db_connection)
-                                                commande_pdf = commande_email or commande_model.obtenir_commande(commande["id"])
-                                                if commande_pdf:
-                                                    commande_pdf["statut"] = "Livré et payé"
-                                                    pdf_livraison_path = pdf_controller.generer_pdf_livraison(commande_pdf)
-                                                    if pdf_livraison_path and os.path.exists(pdf_livraison_path):
-                                                        attachments.append(pdf_livraison_path)
-                                            except Exception:
-                                                attachments = []
-
-                                            succes, message = email_controller_envoi.envoyer_email_avec_message(
-                                                client_email,
-                                                subject,
-                                                body,
-                                                attachments=attachments
-                                            )
-                                        if succes:
-                                            if attachments:
-                                                st.success(f"✅ {message} PDF joint envoyé au client.")
-                                            else:
-                                                st.success(f"✅ {message}")
-                                                st.warning("⚠️ Email envoyé sans PDF joint (génération du PDF indisponible).")
-                                        else:
-                                            st.error(f"❌ Email de livraison non envoyé : {message}")
+                                        st.error(f"❌ Email de livraison non envoyé : {message}")
                                 st.rerun()
                             except Exception as e:
                                 st.error(f"❌ Erreur lors de la validation : {e}")
@@ -703,11 +462,13 @@ def afficher_page_fermer_commandes():
                             st.caption("📊 Aucune demande de fermeture envoyée pour cette commande.")
 
                         if demande_existante:
-                            # Demande déjà envoyée
-                            st.warning(
-                                "🟠 Demande de livraison en attente de confirmation. "
-                                "Votre demande est en attente de validation par l'administrateur."
-                            )
+                            # Demande déjà envoyée - afficher en orange
+                            st.markdown("""
+                                <div style='background-color: #FFA500; padding: 1rem; border-radius: 8px; color: white; text-align: center;'>
+                                    <strong>🟠 Demande de livraison en attente de confirmation</strong><br>
+                                    Votre demande a été envoyée et est en attente de validation par l'administrateur.
+                                </div>
+                            """, unsafe_allow_html=True)
                             if demande_existante.get('date_creation'):
                                 st.caption(f"📅 Demande envoyée le : {demande_existante.get('date_creation')}")
                         else:
@@ -720,7 +481,7 @@ def afficher_page_fermer_commandes():
                                 if st.button(
                                     "📤 Demande non envoyée (cliquer pour envoyer)",
                                     key=button_key,
-                                    use_container_width=True,
+                                    width='stretch',
                                     type="primary"
                                 ):
                                     # Créer la demande de livraison
@@ -731,61 +492,24 @@ def afficher_page_fermer_commandes():
                                                 couturier_id,
                                                 "Demande de livraison de la commande"
                                             )
-
-                                            result_id = None
-                                            created = True
-                                            if isinstance(result, dict):
-                                                result_id = result.get("id")
-                                                created = bool(result.get("created", False))
-                                            elif isinstance(result, int):
-                                                result_id = result
-                                                created = True
-
-                                            if result_id:
-                                                if created:
-                                                    st.success(
-                                                        f"🟢 Demande envoyée avec succès (ID: {result_id}) "
-                                                        f"pour la commande {commande['id']}"
-                                                    )
+                                            
+                                            if result and result.get("id"):
+                                                if result.get("created", False):
+                                                    st.success(f"🟢 Demande envoyée avec succès (ID: {result['id']}) pour la commande {commande['id']}")
                                                     st.caption("État : envoyée, la ligne va disparaître.")
                                                     st.balloons()
+                                                    st.rerun()
                                                 else:
-                                                    st.warning(
-                                                        f"⚠️ Une demande de fermeture existe déjà pour la commande "
-                                                        f"{commande['id']} (ID demande: {result_id})"
-                                                    )
+                                                    st.warning(f"⚠️ Une demande de fermeture existe déjà pour la commande {commande['id']} (ID demande: {result['id']})")
                                                     st.caption("État : déjà envoyée, la ligne va disparaître.")
-                                                st.rerun()
-
-                                            # Fallback robuste : vérifier si une demande en attente existe maintenant
-                                            demandes_apres = commande_model.lister_demandes_validation() or []
-                                            deja_en_attente = next(
-                                                (
-                                                    d for d in demandes_apres
-                                                    if d.get("commande_id") == commande["id"]
-                                                    and d.get("type_action") == "fermeture_demande"
-                                                    and d.get("statut_validation") == "en_attente"
-                                                ),
-                                                None,
-                                            )
-                                            if deja_en_attente:
-                                                st.warning(
-                                                    f"⚠️ Une demande existe déjà (ID: {deja_en_attente.get('id')})."
-                                                )
-                                                st.caption("État : déjà envoyée, la ligne va disparaître.")
-                                                st.rerun()
-
-                                            st.error(
-                                                "❌ Demande non envoyée. Vérifiez que la commande est totalement soldée "
-                                                "et réessayez."
-                                            )
-                                            st.caption("État : échec")
+                                                    st.rerun()
+                                            else:
+                                                st.error("❌ Demande non envoyée (aucun ID retourné).")
+                                                st.caption("État : échec")
                                         except Exception as e:
                                             st.error(f"❌ Erreur : {e}")
                                 else:
                                     st.info("💡 État actuel : demande non envoyée.")
-                    if commande.get("statut"):
-                        st.caption(f"État commande : **{_badge_statut(commande.get('statut'))}**")
     
     # ========================================================================
     # ONGLET 3 : TÉLÉCHARGER PDFs DES COMMANDES VALIDÉES
@@ -793,7 +517,6 @@ def afficher_page_fermer_commandes():
     with tab3:
         st.markdown("### 📄 Télécharger les PDFs des commandes validées")
         st.markdown("**Fonctionnalité :** Téléchargez les PDFs des commandes qui ont été **validées par l'administrateur** (statut : Livré et payé). Le PDF indique que la commande est **livrée et terminée**.")
-        st.caption("Seules les commandes au statut **Livré et payé** sont affichées ici.")
         st.markdown("---")
         
         # Filtres
@@ -825,7 +548,7 @@ def afficher_page_fermer_commandes():
         if is_admin_user and salon_id_user:
             from models.database import CouturierModel
             couturier_model = CouturierModel(st.session_state.db_connection)
-            couturiers_salon = couturier_model.lister_tous_couturiers(salon_id=salon_id_user) or []
+            couturiers_salon = couturier_model.lister_tous_couturiers(salon_id=salon_id_user)
             
             options_couturiers = ["👥 Tous les couturiers"] + [
                 f"{c['code_couturier']} - {c['prenom']} {c['nom']}"
@@ -872,11 +595,7 @@ def afficher_page_fermer_commandes():
             if date_debut or date_fin or nom_client_filter:
                 st.info(f"💡 Filtres appliqués : Date début={date_debut}, Date fin={date_fin}, Nom client='{nom_client_filter}'")
         else:
-            commandes_terminees = _trier_commandes_urgentes(commandes_terminees)
-            total_ca_pdf = sum(float(c.get("prix_total", 0) or 0) for c in commandes_terminees)
             st.success(f"✅ {len(commandes_terminees)} commande(s) validée(s) trouvée(s)")
-            st.info(f"📊 Montant cumulé des commandes listées : **{total_ca_pdf:,.0f} FCFA**")
-            st.caption("Tri automatique appliqué: priorité visuelle rouge/orange/vert.")
             st.markdown(f"#### 📋 Commandes validées (Livré et payé) ({len(commandes_terminees)})")
             
             for commande in commandes_terminees:
@@ -893,7 +612,6 @@ def afficher_page_fermer_commandes():
                     f"📦 Commande #{commande['id']} - {client_prenom} {client_nom} - {modele}{couturier_info}",
                     expanded=True
                 ):
-                    _bandeau_urgence(commande)
                     # Informations principales du client
                     st.markdown("### 👤 Informations Client")
                     col_client1, col_client2 = st.columns(2)
@@ -936,7 +654,7 @@ def afficher_page_fermer_commandes():
                             else:
                                 st.markdown(f"**Date de commande:** {date_creation}")
                     with col_date2:
-                        st.markdown(f"**Statut:** {_badge_statut(commande.get('statut', ''))}")
+                        st.markdown(f"**Statut:** ✅ {commande['statut']}")
                     
                     st.markdown("---")
                     
@@ -953,37 +671,39 @@ def afficher_page_fermer_commandes():
                     
                     # Générer le PDF automatiquement et afficher le bouton de téléchargement
                     try:
-                        pdf_path = commande.get("pdf_path")
-                        if pdf_path and os.path.exists(pdf_path):
-                            with open(pdf_path, "rb") as pdf_file:
-                                pdf_bytes = pdf_file.read()
-                        else:
-                            # Fallback : régénération si le fichier n'est pas présent sur disque
-                            commande_complete = commande_model.obtenir_commande(commande_id)
-                            if not commande_complete:
-                                st.error("❌ Impossible de récupérer les données de la commande")
-                                continue
-
+                        # Récupérer les données complètes de la commande
+                        commande_complete = commande_model.obtenir_commande(commande_id)
+                        
+                        if commande_complete:
                             from controllers.pdf_controller import PDFController
                             pdf_controller = PDFController(st.session_state.db_connection)
+                            
+                            # S'assurer que le statut indique "Livré et payé" dans le PDF
+                            # Le PDF affichera toujours "Livré et payé" pour indiquer que la commande est livrée et terminée
                             commande_complete['statut'] = 'Livré et payé'
+                            
+                            # Générer le PDF
                             pdf_path = pdf_controller.generer_pdf_commande(commande_complete)
-                            if not pdf_path or not os.path.exists(pdf_path):
+                            
+                            if pdf_path and os.path.exists(pdf_path):
+                                with open(pdf_path, "rb") as pdf_file:
+                                    pdf_bytes = pdf_file.read()
+                                
+                                # Afficher le bouton de téléchargement
+                                st.download_button(
+                                    label="📥 Télécharger le PDF (Commande livrée et terminée)",
+                                    data=pdf_bytes,
+                                    file_name=f"Commande_{commande_id}_Livree_Terminee.pdf",
+                                    mime="application/pdf",
+                                    width='stretch',
+                                    key=f"download_pdf_terminée_{commande_id}",
+                                    type="primary"
+                                )
+                                st.caption("💡 Le PDF indique que la commande est **livrée et terminée**")
+                            else:
                                 st.error("❌ Erreur lors de la génération du PDF")
-                                continue
-                            with open(pdf_path, "rb") as pdf_file:
-                                pdf_bytes = pdf_file.read()
-
-                        st.download_button(
-                            label="📥 Télécharger le PDF (Commande livrée et terminée)",
-                            data=pdf_bytes,
-                            file_name=f"Commande_{commande_id}_Livree_Terminee.pdf",
-                            mime="application/pdf",
-                            use_container_width=True,
-                            key=f"download_pdf_terminée_{commande_id}",
-                            type="primary"
-                        )
-                        st.caption("💡 Le PDF indique que la commande est **livrée et terminée**")
+                        else:
+                            st.error("❌ Impossible de récupérer les données de la commande")
                     except Exception as e:
                         st.error(f"❌ Erreur lors de la génération du PDF : {e}")
                         import traceback

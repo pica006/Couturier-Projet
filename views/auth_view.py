@@ -25,16 +25,8 @@ import os
 import logging
 import streamlit as st
 from controllers.auth_controller import AuthController
-from config import DATABASE_CONFIG, APP_CONFIG, BRANDING, VISUAL_SAFE_MODE, IS_RENDER
-from utils.bottom_nav import load_site_content, render_app_footer
-from utils.theme import (
-    get_login_css,
-    LOGIN_DISPLAY_TITLE_1,
-    LOGIN_DISPLAY_TITLE_2,
-    LOGIN_DISPLAY_SUBTITLE,
-    LOGIN_SUPPORT_LINE1,
-    LOGIN_SUPPORT_CONTACT_HTML,
-)
+from config import DATABASE_CONFIG, APP_CONFIG, BRANDING, VISUAL_SAFE_MODE
+from utils.bottom_nav import load_site_content
 from services.db_bootstrap_service import connect_and_initialize, validate_required_config
 from utils.ui import (
     appliquer_style_pages_critiques,
@@ -125,7 +117,7 @@ hide_st_style = """
     
     /* Boutons avec dégradé violet-bleu (pas de rouge !) */
     .login-scope .stButton > button {
-        background: linear-gradient(135deg, #6C63FF 0%, #00C9A7 100%) !important;
+        background: linear-gradient(135deg, #B19CD9 0%, #40E0D0 100%) !important;
         color: #FFFFFF !important;
         border: none !important;
         border-radius: 12px !important;
@@ -136,7 +128,7 @@ hide_st_style = """
     }
 
     .login-scope .stButton > button:hover {
-        background: linear-gradient(135deg, #6C63FF 0%, #00C9A7 100%) !important;
+        background: linear-gradient(135deg, #B19CD9 0%, #40E0D0 100%) !important;
         color: #FFFFFF !important;
         transform: translateY(-2px);
         box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1) !important;
@@ -146,7 +138,7 @@ hide_st_style = """
     /* Boutons primaires - dégradé inversé */
     .login-scope button[kind="primary"],
     .login-scope button[data-baseweb="button"][kind="primary"] {
-        background: linear-gradient(135deg, #00C9A7 0%, #6C63FF 100%) !important;
+        background: linear-gradient(135deg, #40E0D0 0%, #B19CD9 100%) !important;
         color: #FFFFFF !important;
         border: none !important;
     }
@@ -154,20 +146,20 @@ hide_st_style = """
     .login-scope button[kind="primary"]:hover,
     .login-scope button[kind="primary"]:active,
     .login-scope button[kind="primary"]:focus {
-        background: linear-gradient(135deg, #00C9A7 0%, #6C63FF 100%) !important;
+        background: linear-gradient(135deg, #40E0D0 0%, #B19CD9 100%) !important;
         color: #FFFFFF !important;
     }
     
     /* Empêcher Streamlit de mettre du rouge par défaut */
     .login-scope button[data-baseweb="button"] {
-        background: linear-gradient(135deg, #6C63FF 0%, #00C9A7 100%) !important;
+        background: linear-gradient(135deg, #B19CD9 0%, #40E0D0 100%) !important;
         color: #FFFFFF !important;
     }
     
     .login-scope button[data-baseweb="button"]:hover,
     .login-scope button[data-baseweb="button"]:active,
     .login-scope button[data-baseweb="button"]:focus {
-        background: linear-gradient(135deg, #6C63FF 0%, #00C9A7 100%) !important;
+        background: linear-gradient(135deg, #B19CD9 0%, #40E0D0 100%) !important;
         color: #FFFFFF !important;
     }
 
@@ -175,7 +167,7 @@ hide_st_style = """
        PAGE DE CONNEXION - DESIGN PREMIUM
        ===================================================================== */
     .login-header {
-        background: linear-gradient(135deg, #6C63FF 0%, #00C9A7 100%);
+        background: linear-gradient(135deg, #B19CD9 0%, #40E0D0 100%);
         padding: 2rem;
         border-radius: 16px;
         margin-bottom: 2rem;
@@ -267,42 +259,44 @@ hide_st_style = """
     }
 
     .login-scope .login-card {
-        background: var(--lux-accent);
-        border-radius: 22px;
-        border: 1px solid rgba(201, 162, 39, 0.3);
-        padding: 2.8rem;
-        box-shadow: 0 16px 32px rgba(0, 0, 0, 0.18);
+        background: linear-gradient(165deg, #ffffff 0%, #f8f6ff 50%, #f0eeff 100%);
+        border-radius: 24px;
+        border: 2px solid rgba(177, 156, 217, 0.4);
+        padding: 3.5rem 4rem;
+        box-shadow: 0 20px 50px rgba(64, 224, 208, 0.15), 0 12px 28px rgba(177, 156, 217, 0.2);
         text-align: center;
-        max-width: 560px;
-        min-width: 380px;
+        max-width: 720px;
+        min-width: 520px;
         margin: 0 auto;
         width: 100%;
     }
 
     .login-scope .login-card h3 {
-        font-size: 2.1rem !important;
+        font-size: 2.4rem !important;
         font-weight: 700 !important;
         margin-bottom: 0.5rem !important;
+        color: #2d2a3a;
     }
 
     .login-scope .login-card h4 {
-        font-size: 1.35rem !important;
+        font-size: 1.5rem !important;
         font-weight: 600 !important;
-        margin-top: 1rem !important;
-        margin-bottom: 1rem !important;
+        margin-top: 1.2rem !important;
+        margin-bottom: 1.2rem !important;
+        color: #3d3a4a;
     }
 
     .login-scope .login-card [data-testid="stForm"] label,
     .login-scope .login-card [data-testid="stForm"] p {
-        font-size: 1.15rem !important;
+        font-size: 1.2rem !important;
     }
 
     .login-scope .login-muted {
-        color: rgba(26, 20, 15, 0.7);
-        font-size: 1.2rem;
-        margin-top: -0.6rem;
-        margin-bottom: 1.2rem;
-        line-height: 1.45;
+        color: rgba(45, 42, 58, 0.75);
+        font-size: 1.25rem;
+        margin-top: -0.4rem;
+        margin-bottom: 1.5rem;
+        line-height: 1.5;
     }
 
     .login-scope .login-support {
@@ -337,37 +331,52 @@ hide_st_style = """
 
     .login-scope .stTextInput > div > div input,
     .login-scope .stPasswordInput > div > div input {
-        border-radius: 12px !important;
-        border: 1px solid rgba(201, 162, 39, 0.35) !important;
-        padding: 0.75rem 1rem !important;
+        border-radius: 14px !important;
+        border: 2px solid rgba(177, 156, 217, 0.35) !important;
+        padding: 1rem 1.25rem !important;
         background: #FFFFFF !important;
-        font-size: 1.1rem !important;
+        font-size: 1.15rem !important;
     }
 
     .login-scope .stTextInput > div > div input:focus,
     .login-scope .stPasswordInput > div > div input:focus {
-        border-color: var(--lux-primary) !important;
-        box-shadow: 0 0 0 0.15rem rgba(201, 162, 39, 0.25) !important;
+        border-color: #40E0D0 !important;
+        box-shadow: 0 0 0 3px rgba(64, 224, 208, 0.25) !important;
     }
 
     .login-scope .stButton > button,
     .login-scope button[kind="primary"],
     .login-scope button[data-baseweb="button"][kind="primary"] {
-        background: linear-gradient(135deg, var(--lux-primary) 0%, #E3C873 100%) !important;
-        color: #1A140F !important;
+        background: linear-gradient(135deg, #B19CD9 0%, #40E0D0 100%) !important;
+        color: #FFFFFF !important;
         border: none !important;
         font-weight: 700 !important;
-        letter-spacing: 0.2px;
-        font-size: 1.08rem !important;
-        padding: 0.65rem 1.25rem !important;
+        letter-spacing: 0.3px;
+        font-size: 1.15rem !important;
+        padding: 0.9rem 2rem !important;
+        border-radius: 14px !important;
     }
 
     .login-scope .stButton > button:hover,
     .login-scope button[kind="primary"]:hover,
     .login-scope button[data-baseweb="button"][kind="primary"]:hover {
-        background: linear-gradient(135deg, #E3C873 0%, var(--lux-primary) 100%) !important;
-        color: #1A140F !important;
+        background: linear-gradient(135deg, #40E0D0 0%, #B19CD9 100%) !important;
+        color: #FFFFFF !important;
         opacity: 0.95;
+        transform: translateY(-1px);
+    }
+
+    .login-scope .login-forgot {
+        margin-top: 1rem;
+        font-size: 1rem;
+    }
+    .login-scope .login-forgot a {
+        color: #40E0D0;
+        text-decoration: none;
+        font-weight: 500;
+    }
+    .login-scope .login-forgot a:hover {
+        text-decoration: underline;
     }
 
     </style>
@@ -427,11 +436,14 @@ def afficher_page_connexion():
     """
     appliquer_style_pages_critiques()
 
-    # Appliquer le thème SpiritStitch (Premium Glass / Ultra Minimal) — couche présentation uniquement
+    # Appliquer les styles CSS (doit être dans la fonction, pas au niveau module,
+    # pour éviter les erreurs d'import sur Render : st.* avant set_page_config)
     try:
-        st.markdown(get_login_css(), unsafe_allow_html=True)
+        st.markdown(_get_lux_vars_style(), unsafe_allow_html=True)
         if not VISUAL_SAFE_MODE:
-            st.markdown(_get_lux_vars_style(), unsafe_allow_html=True)
+            st.markdown(hide_st_style, unsafe_allow_html=True)
+        from utils.page_header import afficher_header_page
+        afficher_header_page("🔐 Authentification", "Accédez à votre espace atelier")
     except Exception as e:
         logger.exception("Erreur affichage initial page connexion: %s", e)
         # En cas d'erreur UI, on réaffiche les éléments Streamlit natifs.
@@ -442,7 +454,39 @@ def afficher_page_connexion():
         afficher_erreur_minimale("Erreur d'initialisation de l'interface de connexion.")
 
     content = load_site_content()
-
+    
+    # ========================================================================
+    # FOND D'ÉCRAN PLEIN ÉCRAN (image en arrière-plan, formulaire par-dessus)
+    # ========================================================================
+    
+    # Fond d'écran : cache pour éviter 4-13 s de chargement à chaque requête
+    wallpaper_path = APP_CONFIG.get('wallpaper_url')
+    data_uri = _load_wallpaper_data_uri(wallpaper_path) if wallpaper_path else None
+    if data_uri:
+        st.markdown(f"""
+            <style>
+            .stApp {{
+                background-image: url("{data_uri}") !important;
+                background-size: cover !important;
+                background-position: center !important;
+                background-attachment: fixed !important;
+                background-repeat: no-repeat !important;
+                background-color: transparent !important;
+                min-height: 100vh;
+            }}
+            .main .block-container {{
+                background: transparent !important;
+                padding-top: 2rem;
+                max-width: 1200px;
+            }}
+            </style>
+        """, unsafe_allow_html=True)
+    
+    if st.session_state.get("db_connection") is None:
+        afficher_info_minimale(
+            "La connexion base de données sera établie uniquement au clic sur « Se connecter »."
+        )
+    
     # ========================================================================
     # AUTHENTIFICATION DU COUTURIER
     # ========================================================================
@@ -455,44 +499,46 @@ def afficher_page_connexion():
     # ====================================================================
     
     # POURQUOI ? Pour vérifier l'identité du couturier
-    # COMMENT ? Une seule carte glass centrée (design maquette SpiritStitch)
-    st.markdown('<div class="login-page-wrapper">', unsafe_allow_html=True)
+    # COMMENT ? L'user entre son code + password, on vérifie dans la base de données
+    st.markdown('<div class="login-scope">', unsafe_allow_html=True)
+    
+    _, form_col, _ = st.columns([0.6, 2, 0.6], gap="large")
 
-    # Carte login centrée : titre gradient, label Authentification, formulaire
-    st.markdown(
-        f'<div class="login-theme-card">'
-        f'<div class="login-theme-title">{LOGIN_DISPLAY_TITLE_1}{LOGIN_DISPLAY_TITLE_2}</div>'
-        f'<div class="login-theme-subtitle">{LOGIN_DISPLAY_SUBTITLE}</div>',
-        unsafe_allow_html=True,
-    )
-
-    with st.form("auth_form", clear_on_submit=False):
+    with form_col:
+        st.markdown('<div class="login-card">', unsafe_allow_html=True)
+        afficher_titre_section("Connexion sécurisée")
+        st.markdown(
+            "<div class='login-muted'>Accédez à votre atelier et gérez vos commandes en toute sérénité.</div>",
+            unsafe_allow_html=True
+        )
+        
+        with st.form("auth_form", clear_on_submit=False):
+            afficher_titre_section("🔑 Identifiants de connexion", niveau=4)
+            
             # Champ de saisie du code couturier
             code_couturier = st.text_input(
-                "Code Couturier",
+                "Code Couturier *",
                 placeholder="Ex: COUT001",
                 help="Votre code d'identification unique",
-                key="code_input",
+                key="code_input"
             )
-
+            
             # Champ de saisie du mot de passe
             password_input = st.text_input(
-                "Mot de passe",
+                "Mot de passe *",
                 type="password",
                 placeholder="Entrez votre mot de passe",
                 help="Votre mot de passe sécurisé",
-                key="password_input",
+                key="password_input"
             )
             
             # Bouton de soumission
             submit_auth = st.form_submit_button(
-                "Se connecter",
+                "🔓 Se connecter",
                 type="primary"
             )
-            
-            # Lien "Mot de passe oublié ?"
             st.markdown(
-                '<div class="login-theme-forgot"><a href="#">Mot de passe oublié ?</a></div>',
+                '<p class="login-forgot">Mot de passe oublié ? <a href="#">Contactez votre responsable</a></p>',
                 unsafe_allow_html=True
             )
             
@@ -568,43 +614,14 @@ def afficher_page_connexion():
                         "Une erreur inattendue est survenue pendant la connexion. Veuillez reessayer."
                     )
         
-    support_line1 = (content.get("support_text") or "").strip() or LOGIN_SUPPORT_LINE1
-    st.markdown(
-        f'<div class="login-theme-support">'
-        f'<p class="login-theme-support-line1">{support_line1}</p>'
-        f'<p class="login-theme-support-contact">{LOGIN_SUPPORT_CONTACT_HTML}</p>'
-        f"</div>",
-        unsafe_allow_html=True,
-    )
-    st.markdown("</div><!-- login-theme-card -->", unsafe_allow_html=True)
-
-    st.markdown("</div><!-- login-page-wrapper -->", unsafe_allow_html=True)
-
-    # Footer : informations de l'entreprise sur la page de connexion aussi
-    render_app_footer()
-
-    # Fond image optionnel (désactivé par défaut : la maquette utilise un dégradé doux).
-    # Pour réactiver : APP_CONFIG['login_use_wallpaper'] = True dans config.py
-    if not IS_RENDER and APP_CONFIG.get("login_use_wallpaper"):
-        wallpaper_path = APP_CONFIG.get('wallpaper_url')
-        data_uri = _load_wallpaper_data_uri(wallpaper_path) if wallpaper_path else None
-        if data_uri:
+        support_text = content.get("support_text", "")
+        if support_text:
             st.markdown(f"""
-                <style>
-                .stApp {{
-                    background-image: url("{data_uri}") !important;
-                    background-size: cover !important;
-                    background-position: center !important;
-                    background-attachment: fixed !important;
-                    background-repeat: no-repeat !important;
-                    background-color: transparent !important;
-                    min-height: 100vh;
-                }}
-                .main .block-container {{
-                    background: transparent !important;
-                    padding-top: 2rem;
-                    max-width: 1200px;
-                }}
-                </style>
+                <div class="login-support">
+                    {support_text}
+                </div>
             """, unsafe_allow_html=True)
+        st.markdown("</div>", unsafe_allow_html=True)
+    
+    st.markdown("</div>", unsafe_allow_html=True)
 

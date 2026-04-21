@@ -14,7 +14,7 @@
     "fields": [
       {
         "label": "📌 Nom",
-        "value": "Nom de l'application: SpiritStitch"
+        "value": "An's Learning"
       },
       {
         "label": "📍 Adresse",
@@ -22,17 +22,17 @@
       },
       {
         "label": "👤 Responsable",
-        "value": "Mr Sango Justin"
+        "value": "Sango Justin"
       },
       {
         "label": "📞 Téléphone",
-        "value": "+237 698 19 25 07"
+        "value": "698192507"
       },
       {
-        "label": "✉️ Courriel",
-        "value": "support@ans-learning.com"
+        "label": "✉️ Email",
+        "value": "andresgroup63@gmail.com"
       }
     ]
   },
-  "support_text": "Besoin d'aide ? Contactez l'administrateur de votre atelier."
+  "support_text": "Besoin d'aide ? Contactez l'administrateur ou votre responsable d'atelier."
 }

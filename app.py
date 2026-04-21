@@ -20,11 +20,10 @@ if load_dotenv is not None:
         pass
 
 from utils.role_utils import est_admin
-from utils.bottom_nav import render_app_footer
+from utils.bottom_nav import render_bottom_nav
 from utils.permissions import est_super_admin
 from config import APP_CONFIG, PAGE_BACKGROUND_IMAGES, VISUAL_SAFE_MODE
 from services.session_service import initialize_session_state, sanitize_session_state, logout_user
-from utils.theme import get_sidebar_bg_css as theme_sidebar_bg_css
 
 logger = logging.getLogger(__name__)
 
@@ -44,8 +43,6 @@ st.set_page_config(
 # Aucun JavaScript personnalisé n'est utilisé pour éviter d'aggraver le problème
 
 SIDEBAR_BG_PLAIN = "background: #FAFAFA !important;"
-# Sidebar après connexion : dark navy premium (Linear / Stripe)
-SIDEBAR_BG_DARK = "background: linear-gradient(180deg, #ede9fe 0%, #d1faf3 100%) \!important;"
 
 
 @st.cache_data(show_spinner=False)
@@ -69,162 +66,50 @@ def _get_sidebar_bg_css_with_image() -> str:
         return SIDEBAR_BG_PLAIN
 
 def _safe_visual_css() -> str:
-    """CSS applique toujours (VISUAL_SAFE_MODE=True sur Render).
-    Contient le design complet Premium Glass."""
+    """
+    Mode visuel safe: style minimal, stable et non intrusif.
+    """
     return """
     <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Poppins:wght@400;500;600;700;800&display=swap');
-
-    :root {
-        --v: #6C63FF;
-        --t: #00C9A7;
-        --g: linear-gradient(135deg, #6C63FF 0%, #00C9A7 100%);
-        --bg: linear-gradient(160deg, #f0eeff 0%, #e4f9f5 50%, #eef5ff 100%);
-        --surface: #FFFFFF;
-        --text: #111827;
-        --soft: #6B7280;
-        --border: #E5E7EB;
-        --sh-xs: 0 2px 8px rgba(108,99,255,0.08);
-        --sh-sm: 0 6px 18px rgba(108,99,255,0.14);
-        --sh-md: 0 12px 32px rgba(108,99,255,0.20);
-        --r-sm: 10px;
-        --r-md: 16px;
+    .stApp, .main .block-container {
+        background: #FEFEFE !important;
+        color: #2C2C2C !important;
+        font-family: 'Inter', 'Segoe UI', sans-serif;
     }
 
-    .stApp { background: var(--bg) \!important; font-family: 'Inter', 'Segoe UI', sans-serif; }
-    .main .block-container { background: transparent \!important; padding-top: 1.5rem; padding-bottom: 2rem; max-width: min(1920px, 98vw); }
-
-    /* BOUTONS */
-    .stButton > button, button[data-baseweb="button"], div[data-testid="stButton"] > button {
-        background: var(--g) \!important;
-        color: #fff \!important;
-        border: none \!important;
-        border-radius: var(--r-md) \!important;
-        padding: 0.65rem 1.35rem \!important;
-        font-weight: 600 \!important;
-        font-size: 0.9rem \!important;
-        box-shadow: var(--sh-xs) \!important;
-        transition: transform 0.15s ease, box-shadow 0.2s ease \!important;
+    .main .block-container {
+        max-width: 1100px;
+        padding-top: 1.5rem;
+        padding-bottom: 1.5rem;
     }
-    .stButton > button:hover, div[data-testid="stButton"] > button:hover {
-        transform: translateY(-2px) \!important;
-        box-shadow: var(--sh-sm) \!important;
-    }
-    .stButton > button:active { transform: translateY(0) \!important; }
 
-    /* SIDEBAR */
     [data-testid="stSidebar"] {
-        background: linear-gradient(180deg, #ede9fe 0%, #d1faf3 100%) \!important;
-        border-right: 1px solid rgba(108,99,255,0.12) \!important;
-    }
-    [data-testid="stSidebar"] [data-testid="stSidebarContent"] { background: transparent \!important; }
-    [data-testid="stSidebar"] h3 {
-        font-size: 0.70rem \!important; font-weight: 700 \!important; color: #9CA3AF \!important;
-        text-transform: uppercase \!important; letter-spacing: 0.09em \!important;
-        margin: 0.8rem 0 0.25rem 0 \!important;
-    }
-    [data-testid="stSidebar"] .stButton > button {
-        background: transparent \!important;
-        color: #374151 \!important;
-        border: none \!important;
-        border-radius: 10px \!important;
-        padding: 0.6rem 0.9rem \!important;
-        font-size: 0.88rem \!important;
-        font-weight: 500 \!important;
-        text-align: left \!important;
-        box-shadow: none \!important;
-        transform: none \!important;
-    }
-    [data-testid="stSidebar"] .stButton > button:hover {
-        background: rgba(108,99,255,0.10) \!important;
-        color: #6C63FF \!important;
-        box-shadow: none \!important;
-        transform: none \!important;
-    }
-    [data-testid="stSidebar"] .stButton:last-of-type > button {
-        color: #EF4444 \!important;
-        border: 1px solid rgba(239,68,68,0.22) \!important;
-        background: rgba(255,255,255,0.55) \!important;
-    }
-    [data-testid="stSidebar"] .stButton:last-of-type > button:hover {
-        background: rgba(239,68,68,0.07) \!important;
-        color: #DC2626 \!important;
-    }
-    [data-testid="stSidebar"] hr { border-color: rgba(108,99,255,0.15) \!important; margin: 0.5rem 0 \!important; }
-    [data-testid="stSidebar"] .stAlert {
-        border-radius: 10px \!important; padding: 0.45rem 0.75rem \!important;
-        font-size: 0.82rem \!important; border-left-width: 3px \!important;
+        background: #FAFAFA !important;
+        border-right: 1px solid #EAEAEA;
     }
 
-    /* ONGLETS */
-    .stTabs [data-baseweb="tab-list"] {
-        background: rgba(108,99,255,0.07); border-radius: var(--r-md);
-        padding: 0.35rem; gap: 0.3rem; margin-bottom: 1.5rem;
-        border: 1px solid rgba(108,99,255,0.10);
-    }
-    .stTabs [data-baseweb="tab"] {
-        background: transparent \!important; border-radius: var(--r-sm) \!important;
-        padding: 0.6rem 1.2rem \!important; color: var(--text) \!important; font-weight: 500 \!important;
-    }
-    .stTabs [data-baseweb="tab"]:hover { background: rgba(108,99,255,0.09) \!important; color: var(--v) \!important; }
-    .stTabs [aria-selected="true"] { background: var(--g) \!important; color: #fff \!important; box-shadow: var(--sh-xs) \!important; }
-
-    /* METRIQUES */
-    [data-testid="stMetric"] {
-        background: var(--surface); border: 1px solid var(--border);
-        border-radius: var(--r-md); padding: 1.2rem 1.3rem; box-shadow: var(--sh-xs);
-        transition: box-shadow 0.2s ease, transform 0.15s ease;
-    }
-    [data-testid="stMetric"]:hover {
-        box-shadow: var(--sh-sm);
-        transform: translateY(-2px);
-    }
-    [data-testid="stMetricValue"] {
-        font-family: 'Poppins', 'Inter', sans-serif \!important;
-        font-size: 2rem \!important; font-weight: 700 \!important; color: var(--v) \!important;
-    }
-    [data-testid="stMetricLabel"] {
-        font-size: 0.72rem \!important; color: var(--soft) \!important;
-        font-weight: 700 \!important; text-transform: uppercase; letter-spacing: 0.07em;
+    .stButton > button, button[kind="primary"] {
+        background: #B19CD9 !important;
+        color: #FFFFFF !important;
+        border: 1px solid #B19CD9 !important;
+        border-radius: 10px !important;
+        box-shadow: none !important;
+        transition: none !important;
+        transform: none !important;
     }
 
-    /* FORMULAIRES */
-    .stTextInput > div > div, .stNumberInput > div > div,
-    .stSelectbox > div > div, .stMultiSelect > div > div,
-    .stTextArea > div > div, .stDateInput > div > div {
-        background: var(--surface) \!important;
-        border: 1.5px solid var(--border) \!important;
-        border-radius: var(--r-sm) \!important;
-    }
-    .stTextInput > div > div:focus-within, .stNumberInput > div > div:focus-within,
-    .stTextArea > div > div:focus-within, .stDateInput > div > div:focus-within,
-    .stSelectbox > div > div:focus-within, .stMultiSelect > div > div:focus-within {
-        border-color: var(--v) \!important;
-        box-shadow: 0 0 0 3px rgba(108,99,255,0.13) \!important;
+    .stButton > button:hover, button[kind="primary"]:hover {
+        background: #9F87D3 !important;
+        color: #FFFFFF !important;
+        opacity: 1 !important;
     }
 
-    /* TABLEAUX */
-    .stDataFrame { border-radius: var(--r-md); overflow: hidden; box-shadow: var(--sh-xs); border: 1px solid var(--border); }
-    .stDataFrame th { background: rgba(108,99,255,0.06) \!important; color: var(--text) \!important; font-weight: 700 \!important; font-size: 0.78rem \!important; text-transform: uppercase; letter-spacing: 0.04em; }
-
-    /* EXPANDERS */
-    [data-testid="stExpander"] { border-radius: var(--r-md) \!important; border: 1px solid var(--border) \!important; box-shadow: var(--sh-xs) \!important; overflow: hidden; }
-    [data-testid="stExpander"] summary { font-weight: 600 \!important; color: var(--text) \!important; }
-
-    /* ALERTES */
-    .stAlert { border-radius: var(--r-md) \!important; border-left-width: 4px \!important; }
-
-    /* TYPOGRAPHIE */
-    h1, h2, h3, h4, h5, h6 { font-family: 'Poppins', 'Inter', sans-serif \!important; color: var(--text) \!important; font-weight: 600; }
-    a, a:visited { color: var(--v) \!important; }
-    a:hover { color: var(--t) \!important; }
-    hr { border: none; border-top: 1px solid var(--border); margin: 1.5rem 0; }
-    ::-webkit-scrollbar { width: 7px; }
-    ::-webkit-scrollbar-track { background: transparent; }
-    ::-webkit-scrollbar-thumb { background: rgba(108,99,255,0.22); border-radius: 6px; }
-    ::-webkit-scrollbar-thumb:hover { background: rgba(108,99,255,0.40); }
+    a, a:visited, a:hover {
+        color: #40E0D0 !important;
+    }
     </style>
     """
+
 
 _apply_rich_theme = bool(st.session_state.get("authentifie", False))
 
@@ -233,206 +118,342 @@ if VISUAL_SAFE_MODE:
 elif _apply_rich_theme:
     st.markdown("""
     <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Poppins:wght@400;500;600;700;800&display=swap');
-
-    /* ========================================================
-       PALETTE CLAUDE.md : violet #6C63FF → turquoise #00C9A7
-       ======================================================== */
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Poppins:wght@400;500;600;700&display=swap');
+    
+    /* ========================================================================
+       PALETTE DE COULEURS - DESIGN PROFESSIONNEL 2025
+       ======================================================================== */
     :root {
-        --v:          #6C63FF;
-        --t:          #00C9A7;
-        --g:          linear-gradient(135deg, #6C63FF 0%, #00C9A7 100%);
-        --bg:         linear-gradient(160deg, #f0eeff 0%, #e4f9f5 50%, #eef5ff 100%);
-        --surface:    #FFFFFF;
-        --text:       #111827;
-        --soft:       #6B7280;
-        --border:     #E5E7EB;
-        --sh-xs:      0 2px 8px rgba(108,99,255,0.08);
-        --sh-sm:      0 6px 18px rgba(108,99,255,0.14);
-        --sh-md:      0 12px 32px rgba(108,99,255,0.20);
-        --r-sm:       10px;
-        --r-md:       16px;
-        --r-lg:       20px;
+        /* Couleurs principales */
+        --violet-clair: #B19CD9;
+        --bleu-turquoise: #40E0D0;
+        --beige: #FEFEFE;
+        --beige-fonce: #FAFAFA;
+        --beige-tres-fonce: #F5F5F5;
+        
+        /* Couleurs complémentaires */
+        --blanc: #FFFFFF;
+        --noir: #2C2C2C;
+        --gris-clair: #F8F8F8;
+        --gris-moyen: #E0E0E0;
+        --gris-fonce: #6C6C6C;
+        
+        /* Dégradés */
+        --gradient-primary: linear-gradient(135deg, #B19CD9 0%, #40E0D0 100%);
+        --gradient-soft: linear-gradient(135deg, #F5F5DC 0%, #E8E8D3 100%);
+        --gradient-accent: linear-gradient(135deg, #40E0D0 0%, #B19CD9 100%);
+        
+        /* Ombres */
+        --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.05);
+        --shadow-md: 0 4px 8px rgba(0, 0, 0, 0.1);
+        --shadow-lg: 0 8px 16px rgba(0, 0, 0, 0.15);
+        
+        /* Espacements */
+        --radius-sm: 8px;
+        --radius-md: 12px;
+        --radius-lg: 16px;
     }
-
-    /* App background */
+    
+    /* ========================================================================
+       FOND GLOBAL - BEIGE DOMINANT (60%)
+       ======================================================================== */
     .stApp {
-        background: var(--bg) \!important;
+        background: #FEFEFE !important;
         font-family: 'Inter', 'Segoe UI', sans-serif;
     }
+    
     .main .block-container {
-        background: transparent \!important;
-        padding-top: 1.5rem;
-        padding-bottom: 2.5rem;
-        max-width: min(1920px, 98vw);
+        background: #FEFEFE !important;
+        padding-top: 2rem;
+        padding-bottom: 2rem;
+        max-width: 1200px;
     }
-
-    /* ---- BOUTONS ---- */
-    .stButton > button,
-    button[data-baseweb="button"],
-    div[data-testid="stButton"] > button {
-        background: var(--g) \!important;
-        color: #fff \!important;
-        border: none \!important;
-        border-radius: var(--r-md) \!important;
-        padding: 0.65rem 1.35rem \!important;
-        font-weight: 600 \!important;
-        font-size: 0.9rem \!important;
-        box-shadow: var(--sh-xs) \!important;
-        transition: transform 0.15s ease, box-shadow 0.2s ease \!important;
-        letter-spacing: 0.01em;
+    
+    /* ========================================================================
+       HEADERS DE PAGE - GRADIENT VIOLET-BLEU
+       (Styles appliqués en inline pour éviter les conflits DOM)
+       ======================================================================== */
+    
+    /* ========================================================================
+       SIDEBAR - BEIGE FONCÉ (valeur par défaut, surchargée ensuite)
+       ======================================================================== */
+    [data-testid="stSidebar"] {
+        border-right: 2px solid #F5F5F5;
     }
-    .stButton > button:hover,
-    button[data-baseweb="button"]:hover,
-    div[data-testid="stButton"] > button:hover {
-        transform: translateY(-2px) \!important;
-        box-shadow: var(--sh-sm) \!important;
+    
+    /* Styles pour le header de la sidebar - Supprimés car utilisés en inline uniquement */
+    
+    /* ========================================================================
+       BOUTONS - GRADIENT VIOLET-BLEU (PAS DE NOIR !)
+       ======================================================================== */
+    .stButton > button {
+        background: linear-gradient(135deg, #B19CD9 0%, #40E0D0 100%) !important;
+        color: #FFFFFF !important;
+        border: none !important;
+        border-radius: var(--radius-md) !important;
+        padding: 0.75rem 1.5rem !important;
+        font-weight: 500 !important;
+        transition: all 0.3s ease !important;
+        box-shadow: var(--shadow-sm) !important;
     }
-    .stButton > button:active { transform: translateY(0) \!important; }
-
-    /* ---- ONGLETS ---- */
-    .stTabs [data-baseweb="tab-list"] {
-        background: rgba(108,99,255,0.07);
-        border-radius: var(--r-md);
-        padding: 0.35rem;
-        gap: 0.3rem;
-        margin-bottom: 1.5rem;
-        border: 1px solid rgba(108,99,255,0.10);
-    }
-    .stTabs [data-baseweb="tab"] {
-        background: transparent \!important;
-        border-radius: var(--r-sm) \!important;
-        padding: 0.6rem 1.2rem \!important;
-        color: var(--text) \!important;
-        font-weight: 500 \!important;
-        transition: all 0.18s ease \!important;
-    }
-    .stTabs [data-baseweb="tab"]:hover {
-        background: rgba(108,99,255,0.09) \!important;
-        color: var(--v) \!important;
-    }
-    .stTabs [aria-selected="true"] {
-        background: var(--g) \!important;
-        color: #fff \!important;
-        box-shadow: var(--sh-xs) \!important;
-    }
-    .stTabs [aria-selected="true"]:hover { opacity: 0.95 \!important; }
-
-    /* ---- METRIQUES ---- */
-    [data-testid="stMetric"] {
-        background: var(--surface);
-        border: 1px solid var(--border);
-        border-radius: var(--r-md);
-        padding: 1.2rem 1.3rem;
-        box-shadow: var(--sh-xs);
-        transition: box-shadow 0.2s ease, transform 0.15s ease;
-    }
-    [data-testid="stMetric"]:hover {
-        box-shadow: var(--sh-sm);
+    
+    .stButton > button:hover {
+        background: linear-gradient(135deg, #B19CD9 0%, #40E0D0 100%) !important;
+        color: #FFFFFF !important;
         transform: translateY(-2px);
+        box-shadow: var(--shadow-md) !important;
+        opacity: 0.9;
     }
+    
+    .stButton > button:active,
+    .stButton > button:focus {
+        background: linear-gradient(135deg, #B19CD9 0%, #40E0D0 100%) !important;
+        color: #FFFFFF !important;
+        border: none !important;
+        outline: none !important;
+    }
+    
+    /* Boutons primaires - toujours violet-bleu (FORCER pour éviter le rouge) */
+    button[kind="primary"],
+    button[data-baseweb="button"][kind="primary"],
+    button[data-baseweb="button"][data-testid="baseButton-primary"],
+    .stButton > button[kind="primary"],
+    div[data-testid="stButton"] > button[kind="primary"],
+    button.st-emotion-cache-1[data-baseweb="button"][kind="primary"] {
+        background: linear-gradient(135deg, #40E0D0 0%, #B19CD9 100%) !important;
+        background-color: transparent !important;
+        color: #FFFFFF !important;
+        border: none !important;
+    }
+    
+    button[kind="primary"]:hover,
+    button[kind="primary"]:active,
+    button[kind="primary"]:focus,
+    button[data-baseweb="button"][kind="primary"]:hover,
+    button[data-baseweb="button"][kind="primary"]:active,
+    button[data-baseweb="button"][kind="primary"]:focus {
+        background: linear-gradient(135deg, #40E0D0 0%, #B19CD9 100%) !important;
+        background-color: transparent !important;
+        color: #FFFFFF !important;
+    }
+    
+    /* Empêcher Streamlit de mettre du rouge ou du noir - TOUS les boutons */
+    button[data-baseweb="button"],
+    button[data-testid="baseButton"],
+    .stButton > button,
+    div[data-testid="stButton"] > button {
+        background: linear-gradient(135deg, #B19CD9 0%, #40E0D0 100%) !important;
+        background-color: transparent !important;
+        color: #FFFFFF !important;
+    }
+    
+    button[data-baseweb="button"]:hover,
+    button[data-baseweb="button"]:active,
+    button[data-baseweb="button"]:focus,
+    button[data-testid="baseButton"]:hover,
+    button[data-testid="baseButton"]:active,
+    button[data-testid="baseButton"]:focus {
+        background: linear-gradient(135deg, #B19CD9 0%, #40E0D0 100%) !important;
+        background-color: transparent !important;
+        color: #FFFFFF !important;
+    }
+    
+    /* Forcer le style sur les boutons de formulaire aussi */
+    form button[data-baseweb="button"],
+    form button[kind="primary"],
+    form .stButton > button {
+        background: linear-gradient(135deg, #40E0D0 0%, #B19CD9 100%) !important;
+        background-color: transparent !important;
+        color: #FFFFFF !important;
+        border: none !important;
+    }
+    
+    form button[data-baseweb="button"]:hover,
+    form button[kind="primary"]:hover {
+        background: linear-gradient(135deg, #40E0D0 0%, #B19CD9 100%) !important;
+        background-color: transparent !important;
+        color: #FFFFFF !important;
+    }
+    
+    /* ========================================================================
+       FORCER LE DÉGRADÉ SUR TOUS LES BOUTONS (même les rouges de Streamlit)
+       ======================================================================== */
+    /* Cibler spécifiquement les boutons qui pourraient être rouges */
+    button[data-baseweb="button"][style*="background"],
+    button[data-baseweb="button"][style*="rgb"],
+    button[data-baseweb="button"][style*="red"],
+    button[data-baseweb="button"][style*="#ff"],
+    button[data-baseweb="button"][style*="#FF"] {
+        background: linear-gradient(135deg, #B19CD9 0%, #40E0D0 100%) !important;
+        background-color: transparent !important;
+        background-image: linear-gradient(135deg, #B19CD9 0%, #40E0D0 100%) !important;
+    }
+    
+    /* Forcer sur les boutons primaires même avec styles inline */
+    button[kind="primary"][style],
+    button[data-baseweb="button"][kind="primary"][style] {
+        background: linear-gradient(135deg, #40E0D0 0%, #B19CD9 100%) !important;
+        background-color: transparent !important;
+        background-image: linear-gradient(135deg, #40E0D0 0%, #B19CD9 100%) !important;
+    }
+    
+    /* ========================================================================
+       ONGLETS (TABS)
+       ======================================================================== */
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 0.5rem;
+        background: #FAFAFA;
+        padding: 0.5rem;
+        border-radius: var(--radius-md);
+        margin-bottom: 1.5rem;
+    }
+    
+    .stTabs [data-baseweb="tab"] {
+        background: transparent !important;
+        border-radius: var(--radius-sm) !important;
+        padding: 0.75rem 1.5rem !important;
+        color: var(--noir) !important;
+        font-weight: 500 !important;
+        transition: all 0.3s ease !important;
+    }
+    
+    .stTabs [data-baseweb="tab"]:hover {
+        background: #FEFEFE !important;
+    }
+    
+    .stTabs [aria-selected="true"] {
+        background: linear-gradient(135deg, #B19CD9 0%, #40E0D0 100%) !important;
+        color: #FFFFFF !important;
+        box-shadow: var(--shadow-sm) !important;
+    }
+    
+    .stTabs [aria-selected="true"]:hover,
+    .stTabs [aria-selected="true"]:active,
+    .stTabs [aria-selected="true"]:focus {
+        background: linear-gradient(135deg, #B19CD9 0%, #40E0D0 100%) !important;
+        color: #FFFFFF !important;
+    }
+    
+    /* ========================================================================
+       MÉTRIQUES
+       ======================================================================== */
     [data-testid="stMetricValue"] {
-        font-family: 'Poppins', 'Inter', sans-serif \!important;
-        font-size: 2rem \!important;
-        font-weight: 700 \!important;
-        color: var(--v) \!important;
+        font-size: 2.5rem;
+        font-weight: 700;
+        color: var(--noir);
+        font-family: 'Poppins', sans-serif;
     }
+    
     [data-testid="stMetricLabel"] {
-        font-size: 0.72rem \!important;
-        color: var(--soft) \!important;
-        font-weight: 700 \!important;
-        text-transform: uppercase;
-        letter-spacing: 0.07em;
+        font-size: 1rem;
+        color: var(--gris-fonce);
+        font-weight: 500;
     }
-
-    /* ---- FORMULAIRES ---- */
-    .stTextInput > div > div,
-    .stNumberInput > div > div,
-    .stSelectbox > div > div,
-    .stMultiSelect > div > div,
-    .stTextArea > div > div,
-    .stDateInput > div > div {
-        background: var(--surface) \!important;
-        border: 1.5px solid var(--border) \!important;
-        border-radius: var(--r-sm) \!important;
-        transition: border-color 0.2s ease, box-shadow 0.2s ease \!important;
+    
+    /* ========================================================================
+       FORMULAIRES
+       ======================================================================== */
+    .stTextInput > div > div > input,
+    .stNumberInput > div > div > input,
+    .stSelectbox > div > div > select,
+    .stTextArea > div > div > textarea {
+        background: var(--blanc) !important;
+        border: 2px solid #F5F5F5 !important;
+        border-radius: var(--radius-sm) !important;
+        transition: all 0.3s ease !important;
     }
-    .stTextInput > div > div:focus-within,
-    .stNumberInput > div > div:focus-within,
-    .stTextArea > div > div:focus-within,
-    .stDateInput > div > div:focus-within,
-    .stSelectbox > div > div:focus-within {
-        border-color: var(--v) \!important;
-        box-shadow: 0 0 0 3px rgba(108,99,255,0.13) \!important;
+    
+    .stTextInput > div > div > input:focus,
+    .stNumberInput > div > div > input:focus {
+        border-color: #B19CD9 !important;
+        box-shadow: 0 0 0 3px rgba(177, 156, 217, 0.1) !important;
+        outline: none !important;
     }
-
-    /* ---- TABLEAUX ---- */
+    
+    /* ========================================================================
+       TABLEAUX
+       ======================================================================== */
     .stDataFrame {
-        border-radius: var(--r-md);
+        border-radius: var(--radius-md);
         overflow: hidden;
-        box-shadow: var(--sh-xs);
-        border: 1px solid var(--border);
+        box-shadow: var(--shadow-sm);
+        background: var(--blanc);
     }
+    
+    .stDataFrame thead {
+        background: var(--gradient-soft);
+    }
+    
     .stDataFrame th {
-        background: rgba(108,99,255,0.06) \!important;
-        color: var(--text) \!important;
-        font-weight: 700 \!important;
-        font-size: 0.78rem \!important;
-        text-transform: uppercase;
-        letter-spacing: 0.05em;
+        background: var(--beige-fonce) !important;
+        color: var(--noir) !important;
+        font-weight: 600 !important;
     }
-
-    /* ---- EXPANDERS ---- */
-    [data-testid="stExpander"] {
-        border-radius: var(--r-md) \!important;
-        border: 1px solid var(--border) \!important;
-        box-shadow: var(--sh-xs) \!important;
-        background: var(--surface) \!important;
-        overflow: hidden;
-    }
-    [data-testid="stExpander"] summary {
-        font-weight: 600 \!important;
-        color: var(--text) \!important;
-        padding: 0.85rem 1rem \!important;
-    }
-
-    /* ---- ALERTES ---- */
-    .stAlert {
-        border-radius: var(--r-md) \!important;
-        border-left-width: 4px \!important;
-        box-shadow: var(--sh-xs) \!important;
-    }
-
-    /* ---- TYPOGRAPHIE ---- */
+    
+    /* ========================================================================
+       TYPOGRAPHIE
+       ======================================================================== */
     h1, h2, h3, h4, h5, h6 {
-        font-family: 'Poppins', 'Inter', sans-serif \!important;
-        color: var(--text) \!important;
+        font-family: 'Poppins', sans-serif;
+        color: var(--noir);
         font-weight: 600;
-        letter-spacing: -0.01em;
     }
-
-    /* ---- LIENS ---- */
-    a, a:visited { color: var(--v) \!important; }
-    a:hover      { color: var(--t) \!important; }
-
-    /* ---- SEPARATEURS & SCROLLBAR ---- */
-    hr { border: none; border-top: 1px solid var(--border); margin: 1.5rem 0; }
-    ::-webkit-scrollbar       { width: 7px; height: 7px; }
-    ::-webkit-scrollbar-track { background: transparent; }
-    ::-webkit-scrollbar-thumb { background: rgba(108,99,255,0.22); border-radius: 6px; }
-    ::-webkit-scrollbar-thumb:hover { background: rgba(108,99,255,0.40); }
+    
+    p, span, div {
+        color: var(--noir);
+    }
+    
+    /* ========================================================================
+       ÉLÉMENTS CLIQUABLES - TOUJOURS VIOLET, JAMAIS NOIR
+       ======================================================================== */
+    a, a:visited, a:hover, a:active, a:focus {
+        color: #B19CD9 !important;
+    }
+    
+    /* Empêcher les styles noirs par défaut de Streamlit sur les boutons */
+    [data-baseweb="button"] {
+        background: linear-gradient(135deg, #B19CD9 0%, #40E0D0 100%) !important;
+        color: #FFFFFF !important;
+    }
+    
+    [data-baseweb="button"]:hover,
+    [data-baseweb="button"]:active,
+    [data-baseweb="button"]:focus {
+        background: linear-gradient(135deg, #B19CD9 0%, #40E0D0 100%) !important;
+        color: #FFFFFF !important;
+    }
+    
+    /* Liens et éléments interactifs */
+    [role="button"],
+    [role="link"],
+    [role="tab"] {
+        color: #B19CD9 !important;
+    }
+    
+    [role="button"]:hover,
+    [role="link"]:hover,
+    [role="tab"]:hover {
+        color: #40E0D0 !important;
+    }
+    
+    /* ========================================================================
+       ALERTES
+       ======================================================================== */
+    .stAlert {
+        border-radius: var(--radius-md);
+        border-left: 4px solid;
+    }
+    
+    /* ========================================================================
+       SÉPARATEURS
+       ======================================================================== */
+    hr {
+        border: none;
+        border-top: 2px solid var(--beige-tres-fonce);
+        margin: 2rem 0;
+    }
     </style>
 """, unsafe_allow_html=True)
-
-# Injection du CSS premium modernise (utils/theme.get_app_premium_css)
-# en complement du CSS ci-dessus. Couvre metrics, tabs, inputs, scrollbar, etc.
-if _apply_rich_theme and not VISUAL_SAFE_MODE:
-    try:
-        from utils.theme import get_app_premium_css as _get_app_premium_css
-        st.markdown(_get_app_premium_css(), unsafe_allow_html=True)
-    except Exception:
-        # Ne bloque jamais le demarrage si le theme a un probleme.
-        pass
 
 if (not VISUAL_SAFE_MODE) and (not _apply_rich_theme):
     # Ecran de connexion: style leger pour accelerer le premier rendu.
@@ -445,7 +466,7 @@ if (not VISUAL_SAFE_MODE) and (not _apply_rich_theme):
             font-family: 'Inter', 'Segoe UI', sans-serif;
         }
         .main .block-container {
-            max-width: min(1920px, 98vw);
+            max-width: 980px;
             padding-top: 1.2rem;
             padding-bottom: 1.2rem;
         }
@@ -454,104 +475,9 @@ if (not VISUAL_SAFE_MODE) and (not _apply_rich_theme):
         unsafe_allow_html=True,
     )
 
-# Surcharge du fond de la sidebar + harmonisation des boutons
-# En VISUAL_SAFE_MODE, _safe_visual_css() définit déjà le thème ; ne pas réinjecter
-# d'anciens styles sidebar (ex. #F3EEF9) qui écrasent le mockup après le chargement.
-def _sidebar_styles_css(sidebar_bg_css, is_authenticated=False):
-    if is_authenticated:
-        return f"""
-        <style>
-        /* =========================================================
-           SIDEBAR AUTHENTIFIEE  — Premium Glass Light
-           ========================================================= */
-        [data-testid="stSidebar"] {{
-            {sidebar_bg_css}
-            border-right: 1px solid rgba(108,99,255,0.12) \!important;
-        }}
-        [data-testid="stSidebar"] [data-testid="stSidebarContent"] {{
-            background: transparent \!important;
-            padding: 0.25rem 0 \!important;
-        }}
-
-        /* Brand title */
-        [data-testid="stSidebar"] [data-testid="stMarkdownContainer"] div[style*="gradient"] {{
-            font-family: Poppins, Inter, sans-serif \!important;
-        }}
-
-        /* Badges utilisateur (st.success / st.info) */
-        [data-testid="stSidebar"] [data-testid="stNotification"] {{
-            border-radius: 10px \!important;
-            padding: 0.45rem 0.75rem \!important;
-            font-size: 0.82rem \!important;
-            margin-bottom: 0.3rem \!important;
-        }}
-        [data-testid="stSidebar"] .stAlert {{
-            border-radius: 10px \!important;
-            padding: 0.45rem 0.75rem \!important;
-            font-size: 0.82rem \!important;
-            margin-bottom: 0.3rem \!important;
-            border-left-width: 3px \!important;
-        }}
-
-        /* En-têtes de section h3 */
-        [data-testid="stSidebar"] h3 {{
-            font-size: 0.70rem \!important;
-            font-weight: 700 \!important;
-            color: #9CA3AF \!important;
-            text-transform: uppercase \!important;
-            letter-spacing: 0.09em \!important;
-            margin: 0.8rem 0 0.25rem 0 \!important;
-            padding: 0 \!important;
-        }}
-
-        /* Boutons de navigation */
-        [data-testid="stSidebar"] .stButton > button {{
-            background: transparent \!important;
-            color: #374151 \!important;
-            border: none \!important;
-            border-radius: 10px \!important;
-            padding: 0.6rem 0.9rem \!important;
-            font-size: 0.88rem \!important;
-            font-weight: 500 \!important;
-            text-align: left \!important;
-            box-shadow: none \!important;
-            transition: background 0.18s ease, color 0.18s ease \!important;
-            transform: none \!important;
-            margin-bottom: 0.1rem \!important;
-        }}
-        [data-testid="stSidebar"] .stButton > button:hover {{
-            background: rgba(108,99,255,0.10) \!important;
-            color: #6C63FF \!important;
-            box-shadow: none \!important;
-            transform: none \!important;
-        }}
-        [data-testid="stSidebar"] .stButton > button:active {{
-            background: rgba(108,99,255,0.18) \!important;
-            transform: none \!important;
-        }}
-
-        /* Bouton Déconnexion */
-        [data-testid="stSidebar"] [data-testid="stButton"][key="btn_deconnexion"] button,
-        [data-testid="stSidebar"] .stButton:last-of-type > button {{
-            color: #EF4444 \!important;
-            border: 1px solid rgba(239,68,68,0.22) \!important;
-            background: rgba(255,255,255,0.55) \!important;
-            margin-top: 0.5rem \!important;
-        }}
-        [data-testid="stSidebar"] .stButton:last-of-type > button:hover {{
-            background: rgba(239,68,68,0.07) \!important;
-            color: #DC2626 \!important;
-        }}
-
-        /* Séparateurs */
-        [data-testid="stSidebar"] hr {{
-            border-color: rgba(108,99,255,0.15) \!important;
-            margin: 0.5rem 0 \!important;
-        }}
-        </style>
-        """
-
-    # Page de connexion en mode safe : ne pas surcharger les règles sidebar de _safe_visual_css().
+# Surcharge du fond de la sidebar + harmonisation des boutons (palette atelier couture)
+# Note: le fond avec image (nav.png) est injecté dans main() uniquement pour la page de connexion
+def _sidebar_styles_css(sidebar_bg_css):
     if VISUAL_SAFE_MODE:
         return f"""
         <style>
@@ -560,6 +486,20 @@ def _sidebar_styles_css(sidebar_bg_css, is_authenticated=False):
         }}
         [data-testid="stSidebar"] [data-testid="stSidebarContent"] {{
             background: transparent !important;
+        }}
+        [data-testid="stSidebar"] .stButton > button {{
+            background: #F3EEF9 !important;
+            color: #2C2C2C !important;
+            border: 1px solid #D8CCE9 !important;
+            border-radius: 10px !important;
+            box-shadow: none !important;
+            transition: none !important;
+            transform: none !important;
+            opacity: 1 !important;
+        }}
+        [data-testid="stSidebar"] .stButton > button:hover {{
+            background: #ECE4F8 !important;
+            color: #2C2C2C !important;
         }}
         </style>
         """
@@ -572,24 +512,55 @@ def _sidebar_styles_css(sidebar_bg_css, is_authenticated=False):
     [data-testid="stSidebar"] [data-testid="stSidebarContent"] {{
         background: transparent !important;
     }}
+
+    /* ========================================================================
+       BOUTONS SIDEBAR - Palette pastel harmonisée (beige, bleu pastel, violet doux)
+       Cohérence avec l'image de fond atelier couture, tons chauds, ambiance textile
+       ======================================================================== */
     [data-testid="stSidebar"] .stButton > button {{
-        background: linear-gradient(135deg, rgba(246, 239, 232, 0.9) 0%, rgba(143, 186, 217, 0.88) 50%, rgba(154, 143, 216, 0.87) 100%) !important;
+        background: linear-gradient(180deg, rgba(246, 239, 232, 0.9) 0%, rgba(143, 186, 217, 0.88) 50%, rgba(154, 143, 216, 0.87) 100%) !important;
+        background-color: transparent !important;
         color: #3B2F4A !important;
         border: 1px solid rgba(59, 47, 74, 0.12) !important;
         border-radius: 12px !important;
         padding: 0.7rem 1rem !important;
         font-weight: 500 !important;
+        opacity: 0.88 !important;
+        transition: all 0.25s ease !important;
+        box-shadow: 0 1px 3px rgba(59, 47, 74, 0.08) !important;
+        filter: saturate(0.92);
     }}
     [data-testid="stSidebar"] .stButton > button:hover {{
+        opacity: 0.92 !important;
         background: linear-gradient(175deg, rgba(246, 239, 232, 0.95) 0%, rgba(143, 186, 217, 0.9) 45%, rgba(154, 143, 216, 0.9) 100%) !important;
+        box-shadow: 0 2px 8px rgba(59, 47, 74, 0.12) !important;
+        border-color: rgba(59, 47, 74, 0.18) !important;
     }}
+    [data-testid="stSidebar"] .stButton > button:active,
+    [data-testid="stSidebar"] .stButton > button:focus {{
+        outline: none !important;
+        border-color: rgba(59, 47, 74, 0.2) !important;
+    }}
+    /* Bouton actif (page courante) - dégradé plus marqué, ombre douce, bordure fine */
     [data-testid="stSidebar"] .stButton > button.sidebar-btn-active {{
         background: linear-gradient(175deg, rgba(246, 239, 232, 0.98) 0%, rgba(143, 186, 217, 0.92) 40%, rgba(154, 143, 216, 0.92) 100%) !important;
+        color: #3B2F4A !important;
+        opacity: 0.95 !important;
+        box-shadow: 0 3px 12px rgba(59, 47, 74, 0.15) !important;
+        border: 1px solid rgba(59, 47, 74, 0.22) !important;
     }}
-    [data-testid="stSidebar"] .stMarkdown h3 { color: #3B2F4A !important; }
+    /* Texte et icônes sidebar - tons doux */
+    [data-testid="stSidebar"] .stButton > button,
+    [data-testid="stSidebar"] .stButton > button span {{
+        color: #3B2F4A !important;
+    }}
+    [data-testid="stSidebar"] .stMarkdown h3 {{
+        color: #3B2F4A !important;
+    }}
     [data-testid="stSidebar"] .stSuccess, [data-testid="stSidebar"] .stInfo {{
         background: rgba(246, 239, 232, 0.85) !important;
         color: #3B2F4A !important;
+        border-color: rgba(107, 100, 122, 0.3) !important;
     }}
     </style>
     """
@@ -665,7 +636,7 @@ def get_page_background_html(page_id):
         border-radius: 12px !important;
         padding-top: 2rem !important;
         padding-bottom: 2rem !important;
-        max-width: min(1920px, 98vw) !important;
+        max-width: 1200px !important;
         box-shadow: 0 2px 14px rgba(0, 0, 0, 0.05) !important;
     }}
     </style>
@@ -720,9 +691,6 @@ def _render_authenticated_page(page_id: str):
     elif page_id == 'administration':
         from views.admin_view import afficher_page_administration
         afficher_page_administration()
-    elif page_id == 'salons':
-        from views.salons_view import afficher_page_salons
-        afficher_page_salons()
 
 
 def deconnecter_utilisateur():
@@ -932,19 +900,9 @@ def afficher_header_app():
 
 
 def afficher_sidebar():
-    """Affiche la barre latérale avec navigation (branding + menu premium après connexion)."""
+    """Affiche la barre latérale avec navigation"""
     with st.sidebar:
         if st.session_state.authentifie:
-            # Logo SpiritStitch en haut (premium dark sidebar)
-            from utils.theme import LOGIN_DISPLAY_TITLE_1, LOGIN_DISPLAY_TITLE_2
-            st.markdown(
-                f'<div style="margin-bottom: 1.5rem;">'
-                f'<span style="font-size: 1.35rem; font-weight: 800; letter-spacing: -0.02em; '
-                f'background: linear-gradient(135deg, #6C63FF 0%, #00C9A7 100%); '
-                f'-webkit-background-clip: text; -webkit-text-fill-color: transparent; '
-                f'background-clip: text;">{LOGIN_DISPLAY_TITLE_1}{LOGIN_DISPLAY_TITLE_2}</span></div>',
-                unsafe_allow_html=True,
-            )
             # Informations du couturier connecté
             st.success(f"**Connecté:** {st.session_state.couturier_data['prenom']} {st.session_state.couturier_data['nom']}")
             role_display = st.session_state.couturier_data.get('role', 'employe')
@@ -955,14 +913,10 @@ def afficher_sidebar():
             if est_super_admin():
                 st.markdown("### 🔧 SUPER ADMINISTRATION")
                 
-                if st.button("📊 Dashboard Super Admin", use_container_width=True):
+                if st.button("📊 Dashboard Super Admin", width='stretch'):
                     st.session_state.page = 'super_admin_dashboard'
                     st.rerun()
-
-                if st.button("🏢 Gestion des Salons", use_container_width=True):
-                    st.session_state.page = 'salons'
-                    st.rerun()
-
+                
                 st.markdown("---")
                 st.markdown("### 📋 Navigation")
             else:
@@ -970,31 +924,31 @@ def afficher_sidebar():
                 st.markdown("### 📋 Navigation")
             
             # Boutons de navigation standard (pour tous)
-            if st.button("📊 Tableau de bord", use_container_width=True):
+            if st.button("📊 Tableau de bord", width='stretch'):
                 st.session_state.page = 'dashboard'
                 st.rerun()
             
-            if st.button("➕ Nouvelle commande", use_container_width=True):
+            if st.button("➕ Nouvelle commande", width='stretch'):
                 st.session_state.page = 'nouvelle_commande'
                 st.rerun()
             
-            if st.button("📜 Mes commandes", use_container_width=True):
+            if st.button("📜 Mes commandes", width='stretch'):
                 st.session_state.page = 'liste_commandes'
                 st.rerun()
             
-            if st.button("💰 Comptabilité", use_container_width=True):
+            if st.button("💰 Comptabilité", width='stretch'):
                 st.session_state.page = 'comptabilite'
                 st.rerun()
             
-            if st.button("📄 Mes charges", use_container_width=True):
+            if st.button("📄 Mes charges", width='stretch'):
                 st.session_state.page = 'charges'
                 st.rerun()
             
-            if st.button("🔒 Fermer mes commandes", use_container_width=True):
+            if st.button("🔒 Fermer mes commandes", width='stretch'):
                 st.session_state.page = 'fermer_commandes'
                 st.rerun()
             
-            if st.button("📋 Modèles & Calendrier", use_container_width=True):
+            if st.button("📋 Modèles & Calendrier", width='stretch'):
                 st.session_state.page = 'calendrier'
                 st.rerun()
             
@@ -1002,36 +956,30 @@ def afficher_sidebar():
             if est_admin(st.session_state.couturier_data) and not est_super_admin():
                 st.markdown("---")
                 st.markdown("### 👑 Administration")
-                if st.button("👑 Administration", use_container_width=True):
+                if st.button("👑 Administration", width='stretch'):
                     st.session_state.page = 'administration'
                     st.rerun()
             
             st.markdown("---")
             
             # Bouton de déconnexion avec approche simplifiée
-            if st.button("🚪 Déconnexion", use_container_width=True, key="btn_deconnexion"):
+            if st.button("🚪 Déconnexion", width='stretch', key="btn_deconnexion"):
                 logout_user()
                 # Rediriger vers la page de connexion
                 st.rerun()
         else:
-            # Sidebar page de connexion : branding SpiritStitch (deux tons, plus vide)
-            from utils.theme import LOGIN_DISPLAY_TITLE_1, LOGIN_DISPLAY_TITLE_2, LOGIN_DISPLAY_SUBTITLE
-            st.markdown(
-                "<div style='padding: 2rem 1rem; text-align: center;'>"
-                f"<p style='font-size: 1.5rem; font-weight: 700; margin-bottom: 0.2rem;'>"
-                f"<span style='color: #6C63FF;'>{LOGIN_DISPLAY_TITLE_1}</span>"
-                f"<span style='color: #00C9A7;'>{LOGIN_DISPLAY_TITLE_2}</span>"
-                "</p>"
-                f"<p style='color: #6B7280; font-size: 0.9rem; margin-bottom: 1.5rem; line-height: 1.4;'>{LOGIN_DISPLAY_SUBTITLE}</p>"
-                "<p style='color: #9CA3AF; font-size: 0.85rem; line-height: 1.5;'>"
-                "Connectez-vous pour accéder à votre atelier et gérer vos commandes."
-                "</p>"
-                "<p style='color: #6C63FF; font-size: 0.8rem; margin-top: 1.5rem;'>"
-                "— Votre espace couture —"
-                "</p>"
-                "</div>",
-                unsafe_allow_html=True,
-            )
+            # Sidebar page de connexion : contenu utile au lieu d'un vide
+            app_name = APP_CONFIG.get("name", "Gestion Couturier")
+            app_sub = APP_CONFIG.get("subtitle", "Gestion d'atelier")
+            st.markdown(f"### ✂️ **{app_name}**")
+            st.markdown(f"*{app_sub}*")
+            st.markdown("---")
+            st.markdown("🔐 **Connectez-vous** pour accéder au menu et gérer votre atelier.")
+            st.markdown("")
+            st.info("Utilisez votre **code couturier** et votre **mot de passe** fournis par votre responsable.")
+            st.markdown("---")
+            st.markdown("**Besoin d'aide ?**")
+            st.markdown("Contactez l'administrateur ou votre responsable d'atelier.")
 
 
 def afficher_header_principal():
@@ -1049,13 +997,13 @@ def main():
     """Fonction principale de l'application"""
     initialiser_session_state()
     
-    # Sidebar : thème SpiritStitch (Premium / Ultra Minimal) en mode safe, sinon image nav ou plain
+    # Sidebar : image de fond (nav.png) uniquement sur la page de connexion
     sidebar_bg_css = (
-        theme_sidebar_bg_css()
+        SIDEBAR_BG_PLAIN
         if VISUAL_SAFE_MODE
-        else (SIDEBAR_BG_DARK if st.session_state.authentifie else _get_sidebar_bg_css_with_image())
+        else (_get_sidebar_bg_css_with_image() if not st.session_state.authentifie else SIDEBAR_BG_PLAIN)
     )
-    st.markdown(_sidebar_styles_css(sidebar_bg_css, is_authenticated=st.session_state.authentifie), unsafe_allow_html=True)
+    st.markdown(_sidebar_styles_css(sidebar_bg_css), unsafe_allow_html=True)
     
     # Afficher la sidebar
     afficher_sidebar()
@@ -1109,13 +1057,6 @@ def main():
                 st.error("❌ Accès refusé. Cette page est réservée aux administrateurs.")
                 st.session_state.page = 'dashboard'
                 st.rerun()
-        elif st.session_state.page == 'salons':
-            if est_super_admin():
-                _render_authenticated_page('salons')
-            else:
-                st.error("❌ Accès refusé. Cette page est réservée au Super Administrateur.")
-                st.session_state.page = 'dashboard'
-                st.rerun()
         else:
             # Page par défaut après connexion
             if est_super_admin():
@@ -1125,17 +1066,17 @@ def main():
             st.rerun()
 
     if VISUAL_SAFE_MODE:
-        st.markdown('---')
+        st.markdown("---")
         st.caption(
             f"{APP_CONFIG.get('name', 'Gestion Couturier')} - "
             f"{APP_CONFIG.get('subtitle', 'Systeme de gestion d atelier')}"
         )
+    else:
+        render_bottom_nav({
+            "app_name": APP_CONFIG.get("name", ""),
+            "app_subtitle": APP_CONFIG.get("subtitle", "")
+        })
 
-    # Footer global uniquement sur pages authentifiées.
-    # La page de connexion gère déjà son propre footer.
-    if st.session_state.authentifie:
-        render_app_footer()
 
-
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

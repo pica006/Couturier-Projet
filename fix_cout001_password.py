@@ -1,4 +1,4 @@
-"""
+tu es"""
 Script unique : vérifie/met à jour le mot de passe de COUT001 vers admin123 (bcrypt).
 À exécuter depuis la racine du projet : python fix_cout001_password.py
 """

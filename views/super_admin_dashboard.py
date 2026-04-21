@@ -8,7 +8,7 @@
 """
 import streamlit as st
 from models.salon_model import SalonModel
-from models.database import CouturierModel, CommandeModel, AppLogoModel
+from models.database import CouturierModel, CommandeModel
 from controllers.super_admin_controller import SuperAdminController
 from utils.permissions import est_super_admin
 import pandas as pd
@@ -386,7 +386,7 @@ def afficher_vue_ensemble(super_admin_ctrl, salon_model):
             df_comp = df_comp.rename(columns={k: v for k, v in mapping_noms.items() if k in df_comp.columns})
 
             st.markdown("#### 📋 Tableau comparatif (tous les salons)")
-            st.dataframe(df_comp, use_container_width=True, hide_index=True)
+            st.dataframe(df_comp, width='stretch', hide_index=True)
 
             st.markdown("---")
 
@@ -398,7 +398,7 @@ def afficher_vue_ensemble(super_admin_ctrl, salon_model):
                 if 'CA (FCFA)' in df_comp.columns:
                     st.dataframe(
                         df_comp[['Salon', 'CA (FCFA)']].sort_values('CA (FCFA)', ascending=False).head(10),
-                        use_container_width=True,
+                        width='stretch',
                         hide_index=True,
                     )
 
@@ -407,7 +407,7 @@ def afficher_vue_ensemble(super_admin_ctrl, salon_model):
                 if 'Clients' in df_comp.columns:
                     st.dataframe(
                         df_comp[['Salon', 'Clients']].sort_values('Clients', ascending=False).head(10),
-                        use_container_width=True,
+                        width='stretch',
                         hide_index=True,
                     )
 
@@ -416,7 +416,7 @@ def afficher_vue_ensemble(super_admin_ctrl, salon_model):
                 if 'Commandes' in df_comp.columns:
                     st.dataframe(
                         df_comp[['Salon', 'Commandes']].sort_values('Commandes', ascending=False).head(10),
-                        use_container_width=True,
+                        width='stretch',
                         hide_index=True,
                     )
 
@@ -429,7 +429,7 @@ def afficher_vue_ensemble(super_admin_ctrl, salon_model):
                 if 'Total encaissé (FCFA)' in df_comp.columns:
                     st.dataframe(
                         df_comp[['Salon', 'Total encaissé (FCFA)']].sort_values('Total encaissé (FCFA)', ascending=False).head(10),
-                        use_container_width=True,
+                        width='stretch',
                         hide_index=True,
                     )
 
@@ -438,7 +438,7 @@ def afficher_vue_ensemble(super_admin_ctrl, salon_model):
                 if 'Bénéfice (FCFA)' in df_comp.columns:
                     st.dataframe(
                         df_comp[['Salon', 'Bénéfice (FCFA)']].sort_values('Bénéfice (FCFA)', ascending=False).head(10),
-                        use_container_width=True,
+                        width='stretch',
                         hide_index=True,
                     )
 
@@ -454,24 +454,6 @@ def afficher_gestion_salons(salon_model):
             f"✅ Salon créé avec succès ! Salon ID: {created_salon_flash.get('salon_id')} | "
             f"Code admin: {created_salon_flash.get('code_admin')}"
         )
-
-    logo_saved_flash = st.session_state.pop("super_admin_logo_saved", None)
-    if logo_saved_flash:
-        st.success(
-            f"✅ Logo enregistré en base pour le salon {logo_saved_flash} (affichage app et PDFs)."
-        )
-
-    logo_warn_flash = st.session_state.pop("super_admin_logo_warn", None)
-    if logo_warn_flash:
-        if logo_warn_flash is True:
-            st.warning(
-                "⚠️ Salon créé, mais l’enregistrement du logo a échoué. "
-                "Ajoutez-le depuis l’admin du salon (onglet Gestion du logo)."
-            )
-        else:
-            st.warning(
-                f"⚠️ Salon créé, mais le logo n’a pas pu être enregistré : {logo_warn_flash}"
-            )
 
     updated_salon_flash = st.session_state.pop("super_admin_updated_salon", None)
     if updated_salon_flash:
@@ -508,7 +490,7 @@ def afficher_gestion_salons(salon_model):
             
             st.dataframe(
                 df_salons[colonnes_existantes],
-                use_container_width=True,
+                width='stretch',
                 hide_index=True
             )
             
@@ -564,39 +546,6 @@ def afficher_gestion_salons(salon_model):
                     st.write(f"**Téléphone** : {salon.get('telephone', 'N/A')}")
                     st.write(f"**Email** : {salon.get('email', 'N/A')}")
                     st.write(f"**Code Admin** : {salon.get('code_admin', 'N/A')}")
-                    statut_salon = "✅ Actif" if salon.get('actif', True) else "⛔ Désactivé"
-                    st.write(f"**Statut** : {statut_salon}")
-
-                st.markdown("---")
-                st.markdown("#### ⚙️ Actions rapides")
-                col_action_1, col_action_2 = st.columns(2)
-
-                if salon.get('actif', True):
-                    with col_action_1:
-                        if st.button("⛔ Désactiver ce salon", key=f"deactivate_salon_{salon['salon_id']}"):
-                            try:
-                                ok = salon_model.modifier_salon(salon_id=salon['salon_id'], actif=False)
-                                if ok:
-                                    st.success(f"Salon {salon['salon_id']} désactivé avec succès.")
-                                    st.rerun()
-                                else:
-                                    st.error("Échec de la désactivation du salon.")
-                            except Exception as e:
-                                st.error(f"Erreur pendant la désactivation : {e}")
-                                st.exception(e)
-                else:
-                    with col_action_1:
-                        if st.button("✅ Réactiver ce salon", key=f"activate_salon_{salon['salon_id']}"):
-                            try:
-                                ok = salon_model.modifier_salon(salon_id=salon['salon_id'], actif=True)
-                                if ok:
-                                    st.success(f"Salon {salon['salon_id']} réactivé avec succès.")
-                                    st.rerun()
-                                else:
-                                    st.error("Échec de la réactivation du salon.")
-                            except Exception as e:
-                                st.error(f"Erreur pendant la réactivation : {e}")
-                                st.exception(e)
     
     # ========================================================================
     # CRÉER UN SALON
@@ -606,20 +555,6 @@ def afficher_gestion_salons(salon_model):
         
         # Prévisualiser l'ID du prochain salon (readonly pour l'utilisateur)
         next_id_preview = salon_model.obtenir_prochain_salon_id() or "Jaind_000"
-
-        st.markdown("##### 🖼️ Logo du salon (optionnel)")
-        st.caption(
-            "Le logo est enregistré en base (`app_logo`), comme sur Render : en-tête de l’app et PDFs pour ce salon. "
-            "Formats : PNG, JPG, JPEG. Choisissez le fichier avant de valider le formulaire ci‑dessous."
-        )
-        uploaded_logo = st.file_uploader(
-            "Fichier logo",
-            type=["png", "jpg", "jpeg"],
-            key="super_admin_create_salon_logo",
-            help="Stocké dans PostgreSQL (même mécanisme que la gestion du logo côté admin salon).",
-        )
-        if uploaded_logo is not None:
-            st.image(uploaded_logo, caption="Aperçu", width=160)
         
         with st.form("form_creer_salon", clear_on_submit=True):
             st.markdown("#### 🏢 Informations du salon")
@@ -716,32 +651,6 @@ def afficher_gestion_salons(salon_model):
                         )
                         
                         if result and result.get('success'):
-                            salon_id_new = result.get("salon_id")
-                            if uploaded_logo is not None and salon_id_new:
-                                try:
-                                    logo_model = AppLogoModel(st.session_state.db_connection)
-                                    logo_model.creer_tables()
-                                    file_bytes = uploaded_logo.getvalue()
-                                    file_ext = uploaded_logo.name.split(".")[-1].lower()
-                                    mime_map = {
-                                        "png": "image/png",
-                                        "jpg": "image/jpeg",
-                                        "jpeg": "image/jpeg",
-                                    }
-                                    mime_type = mime_map.get(file_ext, "image/png")
-                                    if logo_model.sauvegarder_logo(
-                                        salon_id=salon_id_new,
-                                        logo_data=file_bytes,
-                                        logo_name=uploaded_logo.name,
-                                        mime_type=mime_type,
-                                        uploaded_by=None,
-                                        description="Logo défini à la création du salon (Super Admin)",
-                                    ):
-                                        st.session_state["super_admin_logo_saved"] = salon_id_new
-                                    else:
-                                        st.session_state["super_admin_logo_warn"] = True
-                                except Exception as logo_err:
-                                    st.session_state["super_admin_logo_warn"] = str(logo_err)
                             st.balloons()
                             st.session_state["super_admin_created_salon"] = {
                                 "salon_id": result.get("salon_id"),
@@ -927,7 +836,7 @@ def afficher_gestion_utilisateurs(super_admin_ctrl, salon_model, couturier_model
 
             st.dataframe(
                 df_users[colonnes_existantes],
-                use_container_width=True,
+                width='stretch',
                 hide_index=True
             )
 
@@ -959,66 +868,6 @@ def afficher_gestion_utilisateurs(super_admin_ctrl, salon_model, couturier_model
                                 st.rerun()
                             else:
                                 st.error("Erreur lors de l'activation de l'utilisateur.")
-
-            st.markdown("---")
-            st.markdown("### 🔑 Réinitialiser le mot de passe d'un employé")
-            employes = [u for u in users if u.get('role') == 'employe']
-
-            if not employes:
-                st.info("ℹ️ Aucun employé disponible pour une réinitialisation de mot de passe.")
-            else:
-                employe_options = {
-                    f"{u['code_couturier']} - {u.get('prenom', '')} {u.get('nom', '')} ({u.get('salon_id', 'N/A')})": u
-                    for u in employes
-                }
-
-                with st.form("form_reset_password_employe"):
-                    selected_employe_label = st.selectbox(
-                        "Employé *",
-                        options=list(employe_options.keys()),
-                        help="Choisissez l'employé dont vous voulez réinitialiser le mot de passe."
-                    )
-                    nouveau_password = st.text_input(
-                        "Nouveau mot de passe *",
-                        type="password",
-                        help="Minimum recommandé : 6 caractères."
-                    )
-                    confirmer_password = st.text_input(
-                        "Confirmer le nouveau mot de passe *",
-                        type="password"
-                    )
-
-                    submitted_reset = st.form_submit_button("🔄 Réinitialiser le mot de passe")
-
-                    if submitted_reset:
-                        employe_data = employe_options[selected_employe_label]
-                        employe_id = employe_data.get("id")
-
-                        if not nouveau_password or not confirmer_password:
-                            st.error("❌ Veuillez renseigner les deux champs de mot de passe.")
-                        elif nouveau_password != confirmer_password:
-                            st.error("❌ Les mots de passe ne correspondent pas.")
-                        elif len(nouveau_password) < 6:
-                            st.error("❌ Le mot de passe doit contenir au moins 6 caractères.")
-                        elif not employe_id:
-                            st.error("❌ Impossible d'identifier l'employé sélectionné.")
-                        else:
-                            try:
-                                ok = couturier_model.reinitialiser_mot_de_passe(
-                                    couturier_id=employe_id,
-                                    nouveau_password=nouveau_password
-                                )
-                                if ok:
-                                    st.success(
-                                        f"✅ Mot de passe réinitialisé pour {employe_data.get('code_couturier')}."
-                                    )
-                                else:
-                                    st.error(
-                                        "❌ Échec de la réinitialisation du mot de passe (vérifiez l'état de la base)."
-                                    )
-                            except Exception as e:
-                                st.error(f"❌ Exception pendant la réinitialisation : {e}")
-                                st.exception(e)
     
     # ========================================================================
     # CRÉER UN ADMIN
@@ -1069,36 +918,29 @@ def afficher_gestion_utilisateurs(super_admin_ctrl, salon_model, couturier_model
                         st.error("❌ Veuillez remplir tous les champs obligatoires (*)")
                     else:
                         salon_id = salon_options[selected_salon]
-                        try:
-                            user_id = couturier_model.creer_utilisateur(
-                                code_couturier=code_couturier,
-                                password=password,
-                                nom=nom,
-                                prenom=prenom,
-                                role='admin',
-                                email=email,
-                                telephone=telephone,
-                                salon_id=salon_id
-                            )
+                        
+                        user_id = couturier_model.creer_utilisateur(
+                            code_couturier=code_couturier,
+                            password=password,
+                            nom=nom,
+                            prenom=prenom,
+                            role='admin',
+                            email=email,
+                            telephone=telephone,
+                            salon_id=salon_id
+                        )
+                        
+                        if user_id:
+                            st.success(f"""
+                            ✅ Admin créé avec succès !
                             
-                            if user_id:
-                                st.success(f"""
-                                ✅ Admin créé avec succès !
-                                
-                                **ID** : {user_id}  
-                                **Code** : {code_couturier}  
-                                **Salon** : {salon_id}
-                                """)
-                                st.balloons()
-                            else:
-                                detail = getattr(couturier_model, "last_error", None)
-                                if detail:
-                                    st.error(f"❌ Création admin impossible : {detail}")
-                                else:
-                                    st.error("❌ Erreur lors de la création (cause non remontée par le modèle).")
-                        except Exception as e:
-                            st.error(f"❌ Exception inattendue pendant la création admin : {e}")
-                            st.exception(e)
+                            **ID** : {user_id}  
+                            **Code** : {code_couturier}  
+                            **Salon** : {salon_id}
+                            """)
+                            st.balloons()
+                        else:
+                            st.error("❌ Erreur lors de la création (code déjà existant ?)")
     
     # ========================================================================
     # CRÉER UN EMPLOYÉ
@@ -1153,39 +995,32 @@ def afficher_gestion_utilisateurs(super_admin_ctrl, salon_model, couturier_model
                         st.error("❌ Veuillez remplir tous les champs obligatoires (*)")
                     else:
                         salon_id = salon_options[selected_salon]
-                        try:
-                            user_id = couturier_model.creer_utilisateur(
-                                code_couturier=code_couturier,
-                                password=password,
-                                nom=nom,
-                                prenom=prenom,
-                                role='employe',
-                                email=email,
-                                telephone=telephone,
-                                salon_id=salon_id
-                            )
+                        
+                        user_id = couturier_model.creer_utilisateur(
+                            code_couturier=code_couturier,
+                            password=password,
+                            nom=nom,
+                            prenom=prenom,
+                            role='employe',
+                            email=email,
+                            telephone=telephone,
+                            salon_id=salon_id
+                        )
+                        
+                        if user_id:
+                            st.success(f"""
+                            ✅ Employé créé avec succès !
                             
-                            if user_id:
-                                st.success(f"""
-                                ✅ Employé créé avec succès !
-                                
-                                **ID** : {user_id}  
-                                **Code** : {code_couturier}  
-                                **Salon** : {salon_id}
-                                **Role** : Employé
-                                
-                                L'employé peut maintenant se connecter avec ce code.
-                                """)
-                                st.balloons()
-                            else:
-                                detail = getattr(couturier_model, "last_error", None)
-                                if detail:
-                                    st.error(f"❌ Création employé impossible : {detail}")
-                                else:
-                                    st.error("❌ Erreur lors de la création (cause non remontée par le modèle).")
-                        except Exception as e:
-                            st.error(f"❌ Exception inattendue pendant la création employé : {e}")
-                            st.exception(e)
+                            **ID** : {user_id}  
+                            **Code** : {code_couturier}  
+                            **Salon** : {salon_id}
+                            **Role** : Employé
+                            
+                            L'employé peut maintenant se connecter avec ce code.
+                            """)
+                            st.balloons()
+                        else:
+                            st.error("❌ Erreur lors de la création (code déjà existant ?)")
 
 
 def afficher_toutes_commandes(super_admin_ctrl, salon_model):
@@ -1320,7 +1155,7 @@ def afficher_toutes_commandes(super_admin_ctrl, salon_model):
                     })
 
                     st.markdown("### 🏆 Comparatif des salons (commandes & chiffres d'affaires)")
-                    st.dataframe(df_comp, use_container_width=True, hide_index=True)
+                    st.dataframe(df_comp, width='stretch', hide_index=True)
 
                     # Nuage de points CA vs Commandes pour voir rapidement les salons vendeurs
                     if all(col in df_salons.columns for col in ['ca_total', 'nb_commandes', 'nom_salon']):
@@ -1360,20 +1195,15 @@ def afficher_toutes_commandes(super_admin_ctrl, salon_model):
         
         # Tableau des commandes
         df_cmd = pd.DataFrame(commandes)
-        if 'est_supprime' in df_cmd.columns:
-            df_cmd['statut'] = df_cmd.apply(
-                lambda row: "Supprimée (admin)" if bool(row.get('est_supprime', False)) else row.get('statut'),
-                axis=1
-            )
         
         colonnes = ['id', 'modele', 'prix_total', 'avance', 'reste', 'statut',
                    'date_creation', 'salon_id', 'client_nom', 'client_prenom',
-                   'couturier_code', 'date_suppression', 'motif_suppression']
+                   'couturier_code']
         colonnes_existantes = [c for c in colonnes if c in df_cmd.columns]
         
         st.dataframe(
             df_cmd[colonnes_existantes],
-            use_container_width=True,
+            width='stretch',
             hide_index=True,
         )
 
@@ -1919,7 +1749,7 @@ def afficher_statistiques_avancees(super_admin_ctrl, salon_model):
         'Commandes': df_synthese['nb_commandes']
     })
     
-    st.dataframe(df_display, use_container_width=True, hide_index=True)
+    st.dataframe(df_display, width='stretch', hide_index=True)
 
 
 def afficher_rapports(super_admin_ctrl, salon_model):
@@ -2006,7 +1836,7 @@ def afficher_rapports(super_admin_ctrl, salon_model):
         - Archivage structuré
         """)
         
-        if st.button("📥 Générer rapport JSON", use_container_width=True):
+        if st.button("📥 Générer rapport JSON", width='stretch'):
             with st.spinner("Génération du rapport..."):
                 rapport = super_admin_ctrl.generer_rapport_complet(salon_id_rapport)
                 
@@ -2018,7 +1848,7 @@ def afficher_rapports(super_admin_ctrl, salon_model):
                     data=json_str,
                     file_name=f"rapport_{'global' if not salon_id_rapport else salon_id_rapport}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json",
                     mime="application/json",
-                    use_container_width=True
+                    width='stretch'
                 )
                 
                 st.success("✅ Rapport JSON généré avec succès !")
@@ -2043,7 +1873,7 @@ def afficher_rapports(super_admin_ctrl, salon_model):
         - Import dans des bases de données
         """)
         
-        if st.button("📥 Générer rapport CSV", use_container_width=True):
+        if st.button("📥 Générer rapport CSV", width='stretch'):
             with st.spinner("Génération du rapport..."):
                 rapport = super_admin_ctrl.generer_rapport_complet(salon_id_rapport)
                 
@@ -2057,14 +1887,14 @@ def afficher_rapports(super_admin_ctrl, salon_model):
                         data=csv,
                         file_name=f"rapport_salons_{'global' if not salon_id_rapport else salon_id_rapport}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
                         mime="text/csv",
-                        use_container_width=True
+                        width='stretch'
                     )
                     
                     st.success("✅ Rapport CSV généré avec succès !")
                     
                     # Aperçu du tableau
                     with st.expander("👁️ Aperçu du tableau (premiers salons)"):
-                        st.dataframe(df_salons.head(10), use_container_width=True, hide_index=True)
+                        st.dataframe(df_salons.head(10), width='stretch', hide_index=True)
                 else:
                     st.warning("⚠️ Aucun salon à exporter")
 

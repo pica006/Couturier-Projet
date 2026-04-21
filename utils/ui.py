@@ -22,7 +22,7 @@ def appliquer_style_pages_critiques() -> None:
         """
         <style>
         .main .block-container {
-            max-width: min(1920px, 98vw);
+            max-width: 1200px;
             padding-top: 1.6rem;
             padding-bottom: 1.6rem;
         }

@@ -448,13 +448,9 @@ def afficher_page_commande():
                         try:
                             commande_data = commande_controller.obtenir_details_commande(commande_id)
                             if not commande_data:
-                                # Fallback: la commande est déjà créée, on continue avec les données du formulaire.
-                                statut_fonctions['base_donnees']['succes'] = True
-                                statut_fonctions['base_donnees']['message'] = (
-                                    "⚠️ Commande enregistrée, mais relecture immédiate indisponible "
-                                    "(utilisation des données du formulaire)."
-                                )
-                                st.warning(statut_fonctions['base_donnees']['message'])
+                                statut_fonctions['base_donnees']['succes'] = False
+                                statut_fonctions['base_donnees']['message'] = '❌ Erreur: Impossible de récupérer les données de la commande'
+                                st.error(statut_fonctions['base_donnees']['message'])
                         except Exception as e:
                             statut_fonctions['base_donnees']['succes'] = False
                             statut_fonctions['base_donnees']['message'] = f'❌ Erreur base de données: {str(e)}'
@@ -469,11 +465,6 @@ def afficher_page_commande():
                         # Préparer les données pour le PDF
                         # Récupérer les données du couturier depuis la session
                         couturier_data = st.session_state.couturier_data
-                        try:
-                            from utils.role_utils import obtenir_salon_id
-                            salon_id_courant = obtenir_salon_id(couturier_data)
-                        except Exception:
-                            salon_id_courant = couturier_data.get('salon_id') if couturier_data else None
                         
                         # Utiliser commande_data si disponible (avec les valeurs de la BDD), sinon utiliser les données du formulaire
                         if commande_data:
@@ -510,8 +501,6 @@ def afficher_page_commande():
                                 'couturier_nom': couturier_data.get('nom', ''),
                                 'couturier_prenom': couturier_data.get('prenom', ''),
                                 'couturier_code': couturier_data.get('code_couturier', ''),
-                                'couturier_id': couturier_data.get('id'),
-                                'salon_id': salon_id_courant,
                                 'fabric_image_path': fabric_image_path,
                                 'fabric_image_name': fabric_image.name if fabric_image else 'fabric.jpg',
                                 'model_image_path': model_image_path,
@@ -682,7 +671,7 @@ def afficher_page_commande():
                 data=pdf_bytes,
                 file_name=st.session_state.get('pdf_filename', 'commande.pdf'),
                 mime="application/pdf",
-                use_container_width=True,
+                width='stretch',
                 key="download_pdf_outside",
                 type="primary"
             )
@@ -711,7 +700,7 @@ def afficher_page_commande():
         
         with col_upload2:
             ajouter_espace_vertical()
-            if st.button("📤 Copier le PDF", use_container_width=True, key="btn_upload_pdf_outside"):
+            if st.button("📤 Copier le PDF", width='stretch', key="btn_upload_pdf_outside"):
                 try:
                     if not pdf_path_upload or not os.path.exists(pdf_path_upload):
                         st.error("❌ Le PDF n'est plus disponible. Regénérez-le avant la copie.")

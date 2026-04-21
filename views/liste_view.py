@@ -5,7 +5,6 @@ import streamlit as st
 import pandas as pd
 import os
 import re
-import json
 from datetime import datetime
 from controllers.commande_controller import CommandeController
 from controllers.pdf_controller import PDFController
@@ -74,7 +73,7 @@ def afficher_page_liste_commandes():
         with st.container():
             afficher_info_minimale("Aucune commande enregistrée pour le moment")
             st.markdown("---")
-            if st.button("➕ Créer une nouvelle commande", use_container_width=True, type="primary"):
+            if st.button("➕ Créer une nouvelle commande", width='stretch', type="primary"):
                 st.session_state.page = 'nouvelle_commande'
                 st.rerun()
     else:
@@ -145,7 +144,7 @@ def afficher_page_liste_commandes():
             with col1:
                 filtre_statut = st.selectbox(
                     "📌 Filtrer par statut",
-                    options=["Tous", "En cours", "Terminé", "Livré et payé"],
+                    options=["Tous", "En cours", "Terminé", "Livré"],
                     index=0,
                     key="filtre_statut_liste"
                 )
@@ -159,7 +158,7 @@ def afficher_page_liste_commandes():
             
             with col3:
                 ajouter_espace_vertical()
-                if st.button("🔄 Actualiser", use_container_width=True, key="btn_actualiser_liste"):
+                if st.button("🔄 Actualiser", width='stretch', key="btn_actualiser_liste"):
                     if 'commandes_liste' in st.session_state:
                         del st.session_state.commandes_liste
                     st.rerun()
@@ -188,7 +187,7 @@ def afficher_page_liste_commandes():
             
             with col_date3:
                 ajouter_espace_vertical()
-                if st.button("🗑️ Effacer dates", use_container_width=True, key="btn_effacer_dates"):
+                if st.button("🗑️ Effacer dates", width='stretch', key="btn_effacer_dates"):
                     if 'filtre_date_debut_liste' in st.session_state:
                         del st.session_state.filtre_date_debut_liste
                     if 'filtre_date_fin_liste' in st.session_state:
@@ -198,15 +197,9 @@ def afficher_page_liste_commandes():
         # Filtrer les commandes
         commandes_filtrees = commandes
         
-        # Filtrer par statut (aligné sur les valeurs en base : « Livré et payé »)
+        # Filtrer par statut
         if filtre_statut != "Tous":
-            if filtre_statut == "Livré et payé":
-                commandes_filtrees = [
-                    c for c in commandes_filtrees
-                    if c.get("statut") in ("Livré et payé", "Livré")
-                ]
-            else:
-                commandes_filtrees = [c for c in commandes_filtrees if c.get("statut") == filtre_statut]
+            commandes_filtrees = [c for c in commandes_filtrees if c['statut'] == filtre_statut]
         
         # Filtrer par recherche client
         if recherche:
@@ -236,7 +229,7 @@ def afficher_page_liste_commandes():
                     # Si c'est un objet avec une méthode date() (comme datetime)
                     try:
                         date_commande = date_creation.date()
-                    except Exception:
+                    except:
                         pass
                 elif isinstance(date_creation, str):
                     # Si c'est une chaîne, essayer de la convertir
@@ -246,10 +239,10 @@ def afficher_page_liste_commandes():
                             date_commande = datetime.strptime(date_creation.split()[0], '%Y-%m-%d').date()
                         else:
                             date_commande = datetime.strptime(date_creation, '%Y-%m-%d').date()
-                    except Exception:
+                    except:
                         try:
                             date_commande = datetime.strptime(date_creation, '%Y-%m-%d %H:%M:%S').date()
-                        except Exception:
+                        except:
                             continue
                 elif hasattr(date_creation, 'year') and hasattr(date_creation, 'month') and hasattr(date_creation, 'day'):
                     # C'est déjà une date
@@ -288,7 +281,7 @@ def afficher_page_liste_commandes():
             if hasattr(date_creation, 'date') and callable(getattr(date_creation, 'date')):
                 try:
                     return datetime.combine(date_creation.date(), datetime.min.time())
-                except Exception:
+                except:
                     return datetime.min
             if isinstance(date_creation, str):
                 try:
@@ -296,16 +289,16 @@ def afficher_page_liste_commandes():
                         return datetime.strptime(date_creation.split()[0], '%Y-%m-%d')
                     else:
                         return datetime.strptime(date_creation, '%Y-%m-%d')
-                except Exception:
+                except:
                     try:
                         return datetime.strptime(date_creation, '%Y-%m-%d %H:%M:%S')
-                    except Exception:
+                    except:
                         return datetime.min
             if hasattr(date_creation, 'year') and hasattr(date_creation, 'month') and hasattr(date_creation, 'day'):
                 # C'est déjà une date
                 try:
                     return datetime.combine(date_creation, datetime.min.time())
-                except Exception:
+                except:
                     return datetime.min
             return datetime.min
         
@@ -346,8 +339,7 @@ def afficher_page_liste_commandes():
                     statut_icon = {
                         'En cours': '⏳',
                         'Terminé': '✅',
-                        'Livré et payé': '🚚',
-                        'Livré': '🚚',
+                        'Livré': '🚚'
                     }.get(cmd['statut'], '📋')
                     
                     df_data.append({
@@ -364,7 +356,7 @@ def afficher_page_liste_commandes():
                 # Afficher le tableau avec style
                 st.dataframe(
                     df,
-                    use_container_width=True,
+                    width='stretch',
                     hide_index=True,
                     height=400
                 )
@@ -379,23 +371,24 @@ def afficher_page_liste_commandes():
             if not commande_ids:
                 afficher_info_minimale("Sélectionnez des filtres pour voir les commandes")
             else:
+                # Fonction pour forcer la mise à jour quand la sélection change
+                def on_commande_change():
+                    # Forcer un rerun pour mettre à jour l'affichage
+                    st.rerun()
+                
                 commande_selectionnee = st.selectbox(
                     "Sélectionnez une commande",
                     options=commande_ids,
                     format_func=lambda x: f"Commande #{x} - {next((c['client_prenom'] + ' ' + c['client_nom'] for c in commandes_filtrees if c['id'] == x), 'N/A')}",
                     key="select_commande_details",
+                    on_change=on_commande_change
                 )
                 
                 if commande_selectionnee:
                     # Récupérer les détails complets (toujours récupérer les données fraîches)
                     details = commande_controller.obtenir_details_commande(commande_selectionnee)
                     
-                    if not details:
-                        st.error(
-                            "❌ Impossible de charger le détail de cette commande. "
-                            "Réessayez après actualisation ou contactez un administrateur."
-                        )
-                    elif details:
+                    if details:
                         # Afficher directement sans placeholder pour éviter les problèmes de cache
                         # Utiliser des expanders pour organiser les informations
                         with st.expander("👤 Informations Client", expanded=True):
@@ -443,24 +436,14 @@ def afficher_page_liste_commandes():
                                     st.markdown(f"**Statut:** ⏳ {statut}")
                                 elif statut == 'Terminé':
                                     st.markdown(f"**Statut:** ✅ {statut}")
-                                elif statut in ('Livré et payé', 'Livré'):
+                                elif statut == 'Livré':
                                     st.markdown(f"**Statut:** 🚚 {statut}")
                                 else:
                                     st.markdown(f"**Statut:** {statut}")
                         
                         with st.expander("📏 Mesures", expanded=False):
                             mesures_cols = st.columns(3)
-                            mesures_dict = details.get("mesures") or {}
-                            if isinstance(mesures_dict, str):
-                                try:
-                                    mesures_dict = json.loads(mesures_dict)
-                                except Exception:
-                                    mesures_dict = {}
-                            if not isinstance(mesures_dict, dict):
-                                mesures_dict = {}
-                            mesures_items = list(mesures_dict.items())
-                            if not mesures_items:
-                                st.caption("Aucune mesure enregistrée pour cette commande.")
+                            mesures_items = list(details['mesures'].items())
                             
                             for idx, (mesure, valeur) in enumerate(mesures_items):
                                 col_idx = idx % 3
@@ -475,7 +458,7 @@ def afficher_page_liste_commandes():
                         col1, col2 = st.columns(2)
                         
                         with col1:
-                            if st.button("📄 Générer PDF", use_container_width=True, type="primary", key=f"btn_gen_pdf_{commande_selectionnee}"):
+                            if st.button("📄 Générer PDF", width='stretch', type="primary", key=f"btn_gen_pdf_{commande_selectionnee}"):
                                 with etat_chargement("Génération du PDF en cours..."):
                                     pdf_path = pdf_controller.generer_pdf_commande(details)
                                     
@@ -493,7 +476,7 @@ def afficher_page_liste_commandes():
                                             data=pdf_bytes,
                                             file_name=nom_fichier,
                                             mime="application/pdf",
-                                            use_container_width=True,
+                                            width='stretch',
                                             key=f"download_pdf_liste_{commande_selectionnee}",
                                             type="primary"
                                         )
@@ -503,51 +486,7 @@ def afficher_page_liste_commandes():
                                         st.error("❌ Erreur lors de la génération du PDF")
                         
                         with col2:
-                            if st.button("🔄 Actualiser", use_container_width=True, key=f"btn_actualiser_details_{commande_selectionnee}"):
+                            if st.button("🔄 Actualiser", width='stretch', key=f"btn_actualiser_details_{commande_selectionnee}"):
                                 if 'commandes_liste' in st.session_state:
                                     del st.session_state.commandes_liste
                                 st.rerun()
-
-                        st.markdown("---")
-                        st.markdown("#### 🗑️ Supprimer cette commande (employé)")
-                        st.warning(
-                            "Suppression logique stricte : uniquement vos propres commandes. "
-                            "La commande reste visible chez l'admin/superadmin comme supprimée et n'est plus comptabilisée."
-                        )
-                        with st.form(f"form_supprimer_commande_employe_{commande_selectionnee}", clear_on_submit=True):
-                            motif_suppression = st.text_area(
-                                "Motif de suppression *",
-                                placeholder="Ex: erreur de saisie / doublon",
-                                height=80,
-                            )
-                            confirmer_suppression = st.checkbox(
-                                "Je confirme la suppression de cette commande.",
-                                key=f"confirm_delete_emp_{commande_selectionnee}",
-                            )
-                            submit_delete = st.form_submit_button("🗑️ Supprimer la commande")
-
-                            if submit_delete:
-                                if not motif_suppression or len(motif_suppression.strip()) < 3:
-                                    st.error("❌ Veuillez renseigner un motif de suppression (au moins 3 caractères).")
-                                elif not confirmer_suppression:
-                                    st.error("❌ Veuillez confirmer la suppression.")
-                                else:
-                                    try:
-                                        employe_id = st.session_state.couturier_data.get("id")
-                                        ok = commande_controller.supprimer_commande_employe(
-                                            commande_id=commande_selectionnee,
-                                            employe_id=employe_id,
-                                            salon_id_employe=salon_id,
-                                            motif=motif_suppression.strip(),
-                                        )
-                                        if ok:
-                                            st.success("✅ Commande supprimée avec succès.")
-                                            if 'commandes_liste' in st.session_state:
-                                                del st.session_state.commandes_liste
-                                            st.rerun()
-                                        else:
-                                            st.error(
-                                                "❌ Suppression refusée : vous ne pouvez supprimer que vos propres commandes."
-                                            )
-                                    except Exception as e:
-                                        st.error(f"❌ Erreur pendant la suppression : {e}")

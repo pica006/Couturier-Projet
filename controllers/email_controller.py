@@ -1,185 +1,55 @@
-"""Controleur d'envoi d'e-mails (SMTP) - version robuste.
-
-Objectifs:
-    * Compatible Gmail / Outlook / SendGrid / OVH / Mailjet / tout serveur SMTP.
-    * Fallback propre entre config salon, config globale (EMAIL_CONFIG) et
-      variables d'environnement.
-    * Retry automatique avec backoff exponentiel pour absorber les coupures
-      reseau passageres (erreur courante sur Render / wifi instable).
-    * Construction MIME multipart (alternative texte + HTML) pour que les
-      clients mail modernes affichent un rendu propre.
-    * Pieces jointes PDF correctement encodees (RFC 2231) pour garder les
-      accents dans le nom de fichier et forcer application/pdf.
-    * Validation d'adresse email cote client pour eviter les envois evidents
-      qui feront echouer le SMTP.
-    * Logs explicites (succes + echec) pour debug en production.
-    * API 100% retro-compatible: les signatures publiques
-      envoyer_email, envoyer_email_avec_message, verifier_configuration
-      sont conservees (utilisees par views/commande_view,
-      views/comptabilite_view, views/fermer_commandes_view et
-      controllers/rappel_service).
 """
-from __future__ import annotations
-
-import logging
-import mimetypes
+Contrôleur d'envoi d'e-mails (SMTP)
+"""
 import os
-import re
 import smtplib
-import socket
-import ssl
-import time
 from email.message import EmailMessage
-from email.utils import formataddr, formatdate, make_msgid
-from html import escape as _html_escape
+from typing import Optional, List
 from pathlib import Path
-from typing import Iterable, List, Optional, Tuple, Union
+import logging
 
 from config import EMAIL_CONFIG
 
 
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-if not logger.handlers:
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
-    )
-
-
-_EMAIL_RE = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]{2,}$")
-_BOOL_TRUE = {"1", "true", "yes", "oui", "on", "y", "vrai"}
-_BOOL_FALSE = {"0", "false", "no", "non", "off", "n", "faux", ""}
-_DEFAULT_TIMEOUT = 20
-_DEFAULT_RETRIES = 2
-_DEFAULT_RETRY_DELAY = 1.5
-
-
-def _to_bool(value, default: bool = False) -> bool:
-    if value is None:
-        return default
-    if isinstance(value, bool):
-        return value
-    if isinstance(value, (int, float)):
-        return value != 0
-    if isinstance(value, str):
-        v = value.strip().lower()
-        if v in _BOOL_TRUE:
-            return True
-        if v in _BOOL_FALSE:
-            return False
-    return bool(value)
-
-
-def _valid_email(addr):
-    if not addr:
-        return False
-    return bool(_EMAIL_RE.match(str(addr).strip()))
-
-
-def _split_addresses(value):
-    if not value:
-        return []
-    if isinstance(value, str):
-        parts = re.split(r"[,;]\s*", value)
-    else:
-        parts = list(value)
-    return [p.strip() for p in parts if p and str(p).strip()]
-
-
-def _body_to_html(body: str) -> str:
-    if not body:
-        return ""
-    safe = _html_escape(body).replace("\r\n", "\n").replace("\r", "\n")
-    safe = re.sub(
-        r"(https?://[^\s<]+)",
-        r'<a href="\1" style="color:#6C63FF;">\1</a>',
-        safe,
-    )
-    safe = safe.replace("\n", "<br>")
-    return (
-        '<!DOCTYPE html><html><body style="font-family:Segoe UI,Arial,sans-serif;'
-        'font-size:14px;color:#1f2937;line-height:1.55;">'
-        + "<div>" + safe + "</div>"
-        + "</body></html>"
-    )
 
 
 class EmailController:
-    """Envoie des e-mails via SMTP avec priorite config salon > globale > env."""
+    """Gère l'envoi d'e-mails via SMTP (multi-salons).
+
+    PRIORITÉ :
+    1. Configuration spécifique au salon (passée en paramètre)
+    2. Configuration globale EMAIL_CONFIG / variables d'environnement (fallback)
+    """
 
     def __init__(self, smtp_config: Optional[dict] = None):
+        # Base = configuration globale (fallback)
         base = dict(EMAIL_CONFIG) if EMAIL_CONFIG else {}
+
+        # Surcharger avec la configuration spécifique au salon si fournie
         if smtp_config:
             for key, value in smtp_config.items():
                 if value not in (None, ""):
                     base[key] = value
 
-        def pick(*keys, default=None):
-            for k in keys:
-                if k in base and base.get(k) not in (None, ""):
-                    return base.get(k)
-            return default
-
-        self.enabled = _to_bool(pick("enabled", default=True), default=True)
-        self.host = (
-            pick("host", "smtp_host", default="")
-            or os.getenv("EMAIL_HOST", "")
-        ).strip()
-        try:
-            self.port = int(pick("port", "smtp_port", default=587) or 587)
-        except (TypeError, ValueError):
-            self.port = 587
-        self.user = (
-            pick("user", "smtp_user", "utilisateur", default="")
-            or os.getenv("EMAIL_USER", "")
-        ).strip()
-        self.password = (
-            pick("password", "smtp_password", "mot_de_passe", default="")
-            or os.getenv("EMAIL_PASSWORD", "")
-        )
-        from_raw = (
-            pick("from_email", "smtp_from", "expediteur", default="")
-            or os.getenv("EMAIL_FROM", "")
-            or self.user
-        )
-        self.from_email = from_raw.strip() if isinstance(from_raw, str) else from_raw
-        self.from_name = (
-            pick("from_name", "smtp_from_name", "expediteur_nom", default="")
-            or os.getenv("EMAIL_FROM_NAME", "")
-            or ""
-        ).strip()
-
-        self.use_ssl = _to_bool(pick("use_ssl", "smtp_use_ssl", default=False), default=False)
-        self.use_tls = _to_bool(pick("use_tls", "smtp_use_tls", default=True), default=True)
-        if self.use_ssl:
-            self.use_tls = False
-
-        try:
-            self.timeout = int(pick("timeout", default=_DEFAULT_TIMEOUT) or _DEFAULT_TIMEOUT)
-        except (TypeError, ValueError):
-            self.timeout = _DEFAULT_TIMEOUT
-        try:
-            self.retries = int(pick("retries", default=_DEFAULT_RETRIES) or _DEFAULT_RETRIES)
-        except (TypeError, ValueError):
-            self.retries = _DEFAULT_RETRIES
-
-        if self.port == 465 and not self.use_ssl:
-            self.use_ssl = True
-            self.use_tls = False
+        # Charger config finale
+        self.enabled = bool(base.get("enabled", False))
+        self.host = base.get("host", "") or os.getenv("EMAIL_HOST", "")
+        self.port = int(base.get("port", 587) or 587)
+        self.user = base.get("user", "") or os.getenv("EMAIL_USER", "")
+        self.password = base.get("password", "") or os.getenv("EMAIL_PASSWORD", "")
+        self.from_email = base.get("from_email", "") or os.getenv("EMAIL_FROM", self.user)
+        self.use_tls = bool(base.get("use_tls", True))
+        self.use_ssl = bool(base.get("use_ssl", False))
 
     def _verifier_configuration(self) -> bool:
-        return bool(
-            self.enabled
-            and self.host
-            and self.port
-            and self.user
-            and self.password
-            and self.from_email
-        )
+        return self.enabled and self.host and self.port and self.user and self.password and self.from_email
 
-    def verifier_configuration(self):
+    def verifier_configuration(self) -> tuple[bool, str]:
+        """Retourne (ok, message) pour afficher une explication claire en UI."""
         if not self.enabled:
-            return False, "Envoi email desactive dans la configuration."
+            return False, "Envoi email désactivé dans la configuration."
         missing = []
         if not self.host:
             missing.append("host")
@@ -192,216 +62,127 @@ class EmailController:
         if not self.from_email:
             missing.append("from_email")
         if missing:
-            return False, (
-                "Configuration email incomplete: " + ", ".join(missing)
-                + ". Renseignez EMAIL_USER et EMAIL_PASSWORD (fichier .env ou "
-                "variables d'environnement), ou completez les parametres SMTP "
-                "du salon dans l'administration (utilisez un mot de passe "
-                "d'application pour Gmail / Outlook)."
-            )
-        if not _valid_email(self.from_email):
-            return False, "Adresse expediteur invalide: " + str(self.from_email)
+            return False, f"Configuration email incomplète : {', '.join(missing)}."
         return True, "Configuration email OK."
 
-    def envoyer_email(self, to_email, subject, body, attachments=None,
-                      cc=None, bcc=None, html_body=None, reply_to=None):
-        ok, _ = self.envoyer_email_avec_message(
-            to_email, subject, body,
-            attachments=attachments, cc=cc, bcc=bcc,
-            html_body=html_body, reply_to=reply_to,
-        )
-        return ok
-
-    def envoyer_email_avec_message(self, to_email, subject, body,
-                                   attachments=None, cc=None, bcc=None,
-                                   html_body=None, reply_to=None):
-        ok_cfg, msg_cfg = self.verifier_configuration()
-        if not ok_cfg:
-            return False, msg_cfg
-
-        to_list = _split_addresses(to_email)
-        cc_list = _split_addresses(cc)
-        bcc_list = _split_addresses(bcc)
-
-        if not to_list:
-            return False, "Adresse email du destinataire manquante."
-
-        invalid = [a for a in to_list + cc_list + bcc_list if not _valid_email(a)]
-        if invalid:
-            return False, "Adresse(s) email invalide(s): " + ", ".join(invalid)
-
+    def envoyer_email(self, to_email: str, subject: str, body: str,
+                      attachments: Optional[List[str]] = None) -> bool:
+        """
+        Envoie un e-mail avec pièces jointes optionnelles.
+        """
         try:
-            msg, bad_attachments = self._construire_message(
-                to_list, subject, body,
-                attachments=attachments, cc=cc_list, bcc=bcc_list,
-                html_body=html_body, reply_to=reply_to,
-            )
-        except Exception as e:
-            logger.exception("Erreur lors de la construction du message email")
-            return False, "Erreur de construction du message: " + str(e)
+            if not self._verifier_configuration():
+                logger.warning("⚠️ Configuration email manquante ou désactivée.")
+                return False
 
-        all_recipients = to_list + cc_list + bcc_list
-        ok, err = self._envoyer_avec_retry(msg, all_recipients)
+            if not to_email:
+                return False
 
-        if ok:
-            suffix = ""
-            if attachments:
-                nb_ok = len([a for a in attachments if a and a not in bad_attachments])
-                if nb_ok:
-                    suffix = " (" + str(nb_ok) + " piece(s) jointe(s))"
-                if bad_attachments:
-                    suffix += " - ignorees: " + ", ".join(Path(p).name for p in bad_attachments)
-            logger.info("Email envoye a %s%s", ", ".join(to_list), suffix)
-            return True, "Email envoye avec succes" + suffix + "."
-        logger.warning("Envoi email echoue vers %s : %s", ", ".join(to_list), err)
-        return False, err
-
-    def _construire_message(self, to_list, subject, body,
-                            attachments=None, cc=None, bcc=None,
-                            html_body=None, reply_to=None):
-        msg = EmailMessage()
-        if self.from_name:
-            msg["From"] = formataddr((self.from_name, self.from_email))
-        else:
+            msg = EmailMessage()
+            msg["Subject"] = subject
             msg["From"] = self.from_email
-        msg["To"] = ", ".join(to_list)
-        if cc:
-            msg["Cc"] = ", ".join(cc)
-        msg["Subject"] = subject or "(sans objet)"
-        msg["Date"] = formatdate(localtime=True)
-        msg["Message-ID"] = make_msgid()
-        if reply_to and _valid_email(reply_to):
-            msg["Reply-To"] = reply_to
+            msg["To"] = to_email
+            msg.set_content(body)
 
-        text_body = body or ""
-        msg.set_content(text_body, subtype="plain", charset="utf-8")
-        html_final = html_body if html_body else _body_to_html(text_body)
-        if html_final:
-            msg.add_alternative(html_final, subtype="html")
-
-        bad = []
-        for file_path in attachments or []:
-            if not file_path:
-                continue
-            path = Path(str(file_path))
-            if not path.is_file():
-                logger.warning("Piece jointe introuvable, ignoree: %s", file_path)
-                bad.append(str(file_path))
-                continue
-            try:
-                data = path.read_bytes()
-            except OSError as e:
-                logger.warning("Lecture impossible %s : %s", file_path, e)
-                bad.append(str(file_path))
-                continue
-
-            maintype, subtype = self._guess_mime(path)
-            msg.add_attachment(
-                data, maintype=maintype, subtype=subtype, filename=path.name,
-            )
-        return msg, bad
-
-    @staticmethod
-    def _guess_mime(path):
-        if path.suffix.lower() == ".pdf":
-            return "application", "pdf"
-        ctype, _ = mimetypes.guess_type(path.name)
-        if ctype and "/" in ctype:
-            main, sub = ctype.split("/", 1)
-            return main, sub
-        return "application", "octet-stream"
-
-    def _envoyer_avec_retry(self, msg, recipients):
-        last_err = "Erreur inconnue."
-        for attempt in range(self.retries + 1):
-            try:
-                self._send_once(msg, recipients)
-                return True, ""
-            except smtplib.SMTPAuthenticationError as e:
-                code = getattr(e, "smtp_code", "?")
-                return False, (
-                    "Authentification SMTP echouee (code " + str(code) + "). "
-                    "Pour Gmail: activez la validation en 2 etapes puis creez un "
-                    "mot de passe d'application. Pour Outlook: utilisez egalement "
-                    "un mot de passe d'application. Verifiez aussi que l'email "
-                    "expediteur correspond au compte SMTP."
+            # Ajouter pièces jointes
+            for file_path in attachments or []:
+                path = Path(file_path)
+                if not path.is_file():
+                    continue
+                with open(path, "rb") as f:
+                    data = f.read()
+                msg.add_attachment(
+                    data,
+                    maintype="application",
+                    subtype="pdf",
+                    filename=path.name
                 )
-            except smtplib.SMTPRecipientsRefused as e:
-                return False, "Destinataire(s) refuse(s) par le SMTP: " + str(e.recipients)
-            except smtplib.SMTPSenderRefused:
-                return False, (
-                    "Expediteur refuse par le SMTP (" + self.from_email
-                    + "). Verifiez que l'email FROM est bien autorise."
-                )
-            except (smtplib.SMTPConnectError, socket.gaierror, socket.timeout, TimeoutError) as e:
-                last_err = (
-                    "Impossible de joindre le serveur SMTP ("
-                    + self.host + ":" + str(self.port) + "): " + str(e)
-                )
-            except ssl.SSLError as e:
-                last_err = (
-                    "Erreur SSL/TLS avec " + self.host + ":" + str(self.port)
-                    + ": " + str(e) + ". Verifiez use_ssl / use_tls (465=SSL, 587=TLS)."
-                )
-            except smtplib.SMTPException as e:
-                last_err = "Erreur SMTP (" + type(e).__name__ + "): " + str(e)
-            except OSError as e:
-                last_err = "Erreur reseau: " + str(e)
-            except Exception as e:
-                logger.exception("Erreur inattendue lors de l'envoi email")
-                last_err = "Erreur inattendue: " + str(e)
 
-            if attempt < self.retries:
-                delay = _DEFAULT_RETRY_DELAY * (2 ** attempt)
-                logger.info(
-                    "Retry envoi email dans %.1fs (tentative %d/%d) - %s",
-                    delay, attempt + 2, self.retries + 1, last_err,
-                )
-                time.sleep(delay)
-        return False, last_err
-
-    def _send_once(self, msg, recipients):
-        context = ssl.create_default_context()
-        if self.use_ssl:
-            with smtplib.SMTP_SSL(
-                self.host, self.port, timeout=self.timeout, context=context
-            ) as server:
-                server.ehlo()
-                server.login(self.user, self.password)
-                server.send_message(msg, from_addr=self.from_email, to_addrs=recipients)
-        else:
-            with smtplib.SMTP(self.host, self.port, timeout=self.timeout) as server:
-                server.ehlo()
-                if self.use_tls:
-                    server.starttls(context=context)
-                    server.ehlo()
-                server.login(self.user, self.password)
-                server.send_message(msg, from_addr=self.from_email, to_addrs=recipients)
-
-    def tester_connexion(self):
-        ok_cfg, msg_cfg = self.verifier_configuration()
-        if not ok_cfg:
-            return False, msg_cfg
-        try:
-            context = ssl.create_default_context()
+            # Connexion SMTP
             if self.use_ssl:
-                with smtplib.SMTP_SSL(
-                    self.host, self.port, timeout=self.timeout, context=context
-                ) as server:
-                    server.ehlo()
+                with smtplib.SMTP_SSL(self.host, self.port) as server:
                     server.login(self.user, self.password)
+                    server.send_message(msg)
             else:
-                with smtplib.SMTP(self.host, self.port, timeout=self.timeout) as server:
+                with smtplib.SMTP(self.host, self.port) as server:
                     server.ehlo()
                     if self.use_tls:
-                        server.starttls(context=context)
+                        server.starttls()
                         server.ehlo()
                     server.login(self.user, self.password)
-            return True, "Connexion SMTP et authentification reussies."
-        except smtplib.SMTPAuthenticationError:
-            return False, (
-                "Connexion OK mais authentification refusee. Verifiez "
-                "l'utilisateur / mot de passe d'application."
-            )
+                    server.send_message(msg)
+
+            logger.info(f"✅ Email envoyé à {to_email}")
+            return True
+
         except Exception as e:
-            return False, "Echec test SMTP: " + str(e)
+            logger.error(f"❌ Erreur envoi email: {e}")
+            return False
+
+    def envoyer_email_avec_message(self, to_email: str, subject: str, body: str,
+                                   attachments: Optional[List[str]] = None) -> tuple[bool, str]:
+        """Envoie un e-mail et retourne un message explicite pour l'UI."""
+        ok_config, msg_config = self.verifier_configuration()
+        if not ok_config:
+            return False, msg_config
+        if not to_email:
+            return False, "Adresse email du client manquante."
+        try:
+            succes, erreur = self._envoyer_email_detail(to_email, subject, body, attachments)
+            if succes:
+                return True, "Email envoyé avec succès."
+            if erreur:
+                return False, erreur
+            return False, "Email non envoyé. Vérifiez la configuration SMTP et la connexion."
+        except Exception as e:
+            return False, f"Erreur lors de l'envoi de l'email : {e}"
+
+    def _envoyer_email_detail(self, to_email: str, subject: str, body: str,
+                              attachments: Optional[List[str]] = None) -> tuple[bool, str]:
+        """Envoie un e-mail et retourne (succes, erreur) sans masquer l'exception SMTP."""
+        msg = EmailMessage()
+        msg["Subject"] = subject
+        msg["From"] = self.from_email
+        msg["To"] = to_email
+        msg.set_content(body)
+
+        for file_path in attachments or []:
+            path = Path(file_path)
+            if not path.is_file():
+                continue
+            with open(path, "rb") as f:
+                data = f.read()
+            msg.add_attachment(
+                data,
+                maintype="application",
+                subtype="pdf",
+                filename=path.name
+            )
+
+        try:
+            if self.use_ssl:
+                with smtplib.SMTP_SSL(self.host, self.port) as server:
+                    server.login(self.user, self.password)
+                    server.send_message(msg)
+            else:
+                with smtplib.SMTP(self.host, self.port) as server:
+                    server.ehlo()
+                    if self.use_tls:
+                        server.starttls()
+                        server.ehlo()
+                    server.login(self.user, self.password)
+                    server.send_message(msg)
+            logger.info(f"✅ Email envoyé à {to_email}")
+            return True, ""
+        except smtplib.SMTPAuthenticationError as e:
+            return False, (
+                "Authentification SMTP échouée. Pour Gmail, utilisez un mot de passe "
+                "d'application et vérifiez l'email/mot de passe."
+            )
+        except smtplib.SMTPConnectError as e:
+            return False, f"Impossible de se connecter au serveur SMTP ({self.host}:{self.port})."
+        except smtplib.SMTPException as e:
+            return False, f"Erreur SMTP: {e}"
+        except Exception as e:
+            return False, f"Erreur inattendue: {e}"
+

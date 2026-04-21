@@ -17,13 +17,6 @@ from utils.role_utils import est_admin, obtenir_salon_id, obtenir_couturier_id
 from utils.page_header import afficher_header_page
 
 
-def _safe_float(value, default=0.0):
-    try:
-        return float(value or 0)
-    except Exception:
-        return default
-
-
 def afficher_page_calendrier(onglet_admin: bool = False):
     """
     Page unifiée : Modèles réalisés + Calendrier.
@@ -63,7 +56,7 @@ def afficher_page_calendrier(onglet_admin: bool = False):
     with col_rappel_a:
         st.caption("Les rappels sont declenches automatiquement 1 fois/jour par session.")
     with col_rappel_b:
-        if st.button("🔔 Relancer les rappels", use_container_width=True, key="btn_relancer_rappels"):
+        if st.button("🔔 Relancer les rappels", width="stretch", key="btn_relancer_rappels"):
             nb_rappels, msg_rappels = executer_rappels_automatiques(st.session_state.db_connection)
             if msg_rappels:
                 if nb_rappels > 0:
@@ -120,7 +113,7 @@ def _afficher_modeles_realises(commande_model, couturier_model, couturier_id, sa
 
     couturier_id_filtre = couturier_id
     if est_admin_user and salon_id:
-        tous_couturiers = couturier_model.lister_tous_couturiers(salon_id=salon_id) or []
+        tous_couturiers = couturier_model.lister_tous_couturiers(salon_id=salon_id)
         options = ["👥 Tous les couturiers"] + [
             f"{c['code_couturier']} - {c['prenom']} {c['nom']}"
             for c in tous_couturiers
@@ -180,76 +173,43 @@ def _afficher_galerie_photos(commande_model, couturier_id_filtre, salon_id, date
         return
 
     nb_photos = len(images_liste)
+    key_idx = f"galerie_photo_idx_{key_prefix}"
+    if key_idx not in st.session_state:
+        st.session_state[key_idx] = 0
 
     st.markdown("#### 📷 Galerie photos des réalisations")
-    st.caption(
-        f"{nb_photos} photo(s) — utilisez le curseur ci-dessous (un seul rechargement par changement, "
-        "sans boucle « Running »)."
-    )
+    st.caption(f"{nb_photos} photo(s) — Cliquez sur Suivant ou En arrière pour naviguer")
 
-    idx = st.slider(
-        "Photo affichée",
-        min_value=1,
-        max_value=nb_photos,
-        value=1,
-        step=1,
-        key=f"galerie_slider_{key_prefix}",
-    )
-    img_data = images_liste[idx - 1]
+    with st.expander("📷 Voir les photos", expanded=False):
+        idx = st.session_state[key_idx] % nb_photos
+        img_data = images_liste[idx]
 
-    col_img, _ = st.columns([2, 1])
-    with col_img:
-        raw_image = None
-        try:
-            raw_image = img_data.get('bytes')
-            if raw_image is None:
-                st.warning("⚠️ Image vide ou indisponible pour cette commande.")
-            else:
-                if isinstance(raw_image, memoryview):
-                    raw_image = raw_image.tobytes()
-                elif isinstance(raw_image, bytearray):
-                    raw_image = bytes(raw_image)
-                elif not isinstance(raw_image, bytes):
-                    raw_image = bytes(raw_image)
-
-                st.image(raw_image, caption=img_data['label'], use_container_width=True)
-        except Exception:
+        col_img, _ = st.columns([2, 1])
+        with col_img:
             try:
-                if raw_image is not None:
-                    st.image(io.BytesIO(raw_image), caption=img_data['label'], use_container_width=True)
-                else:
-                    st.error("❌ Impossible d'afficher l'image (données absentes).")
-            except Exception as e:
-                st.error(f"❌ Impossible d'afficher l'image : {e}")
+                st.image(img_data['bytes'], caption=img_data['label'], use_container_width=True)
+            except Exception:
+                st.image(io.BytesIO(img_data['bytes']), caption=img_data['label'], use_container_width=True)
 
-    st.caption(f"Photo {idx} / {nb_photos}")
+        st.caption(f"Photo {idx + 1} / {nb_photos}")
+
+        col_prev, col_spacer, col_next = st.columns([1, 2, 1])
+        with col_prev:
+            if st.button("⬅️ En arrière", key=f"galerie_prev_{key_prefix}"):
+                st.session_state[key_idx] = (st.session_state[key_idx] - 1 + nb_photos) % nb_photos
+                st.rerun()
+        with col_next:
+            if st.button("Suivant ➡️", key=f"galerie_next_{key_prefix}"):
+                st.session_state[key_idx] = (st.session_state[key_idx] + 1) % nb_photos
+                st.rerun()
 
 
 def _afficher_calendrier(commande_model, couturier_model, couturier_id, salon_id, est_admin_user):
     """Affiche le calendrier des livraisons avec rappels."""
     st.markdown("### 📅 Calendrier des livraisons")
-    st.info(
-        "**Lecture rapide :** en haut, les livraisons **dans les X prochains jours** sans rappel encore envoyé "
-        "(pour le suivi). En dessous, **Par date** groupe chaque jour avec 🔴 retard, 🟢 aujourd'hui, 🟠 à venir. "
-        "Les rappels email J-2 sont lancés automatiquement une fois par session (bouton manuel possible en haut de page)."
-    )
 
     aujourd_hui = datetime.now().date()
-    col_r1, col_r2 = st.columns([1, 2])
-    with col_r1:
-        nb_jours_rappel = st.number_input(
-            "Rappel dans X jours",
-            min_value=1,
-            max_value=30,
-            value=2,
-            step=1,
-            key="cal_rappel_x_jours",
-            help="Afficher les commandes à livrer dans X jours."
-        )
-    with col_r2:
-        st.caption("Le rappel automatique quotidien reste actif. Ce filtre permet de visualiser les échéances ciblées.")
-
-    date_cible_max = aujourd_hui + timedelta(days=int(nb_jours_rappel))
+    date_rappel = aujourd_hui + timedelta(days=2)
 
     col1, col2, col3 = st.columns(3)
     with col1:
@@ -267,7 +227,7 @@ def _afficher_calendrier(commande_model, couturier_model, couturier_id, salon_id
     with col3:
         couturier_id_filtre = couturier_id
         if est_admin_user and salon_id:
-            tous_couturiers = couturier_model.lister_tous_couturiers(salon_id=salon_id) or []
+            tous_couturiers = couturier_model.lister_tous_couturiers(salon_id=salon_id)
             options = ["👥 Tous les couturiers"] + [
                 f"{c['code_couturier']} - {c['prenom']} {c['nom']}"
                 for c in tous_couturiers
@@ -286,70 +246,33 @@ def _afficher_calendrier(commande_model, couturier_model, couturier_id, salon_id
 
     st.markdown("---")
 
-    # Section échéances imminentes: de aujourd'hui jusqu'à X jours
-    commandes_imminentes = commande_model.lister_commandes_calendrier(
-        date_debut=aujourd_hui,
-        date_fin=date_cible_max,
+    # Section rappels
+    commandes_rappel = commande_model.lister_commandes_calendrier(
+        date_debut=date_rappel,
+        date_fin=date_rappel,
         couturier_id=couturier_id_filtre,
         tous_les_couturiers=(couturier_id_filtre is None),
         salon_id=salon_id
     )
-
-    def _to_date(value):
-        if value is None:
-            return None
-        if hasattr(value, "date"):
-            try:
-                return value.date()
-            except Exception:
-                pass
-        if isinstance(value, datetime):
-            return value.date()
-        if isinstance(value, str):
-            for fmt in ("%Y-%m-%d", "%d/%m/%Y", "%Y-%m-%d %H:%M:%S", "%d-%m-%Y"):
-                try:
-                    return datetime.strptime(value.strip(), fmt).date()
-                except ValueError:
-                    continue
-        return value
-
-    commandes_a_rappeler = []
-    for c in commandes_imminentes:
-        dl = _to_date(c.get('date_livraison'))
-        if not dl:
-            continue
-        if not commande_model.rappel_deja_envoye(c['id'], dl):
-            c["jours_restants"] = (dl - aujourd_hui).days
-            commandes_a_rappeler.append(c)
-
-    commandes_a_rappeler.sort(key=lambda x: x.get("jours_restants", 9999))
+    commandes_a_rappeler = [
+        c for c in commandes_rappel
+        if not commande_model.rappel_deja_envoye(c['id'], c['date_livraison'])
+    ]
 
     if commandes_a_rappeler:
-        st.warning(
-            f"⚠️ **{len(commandes_a_rappeler)} livraison(s)** à surveiller entre "
-            f"**{aujourd_hui.strftime('%d/%m/%Y')}** et **{date_cible_max.strftime('%d/%m/%Y')}**."
+        st.info(
+            f"**{len(commandes_a_rappeler)} livraison(s)** prévue(s) le **{date_rappel.strftime('%d/%m/%Y')}**. "
+            "Les rappels par email sont envoyés automatiquement chaque jour."
         )
         df_rappel = pd.DataFrame(commandes_a_rappeler)
-        colonnes_candidates = [
-            ('modele', 'Modèle'),
-            ('client_prenom', 'Prénom Client'),
-            ('client_nom', 'Nom Client'),
-            ('couturier_prenom', 'Prénom Couturier'),
-            ('couturier_nom', 'Nom Couturier'),
-            ('jours_restants', 'Jours restants'),
-            ('prix_total', 'Prix (FCFA)'),
-        ]
-        colonnes_existantes = [c for c, _ in colonnes_candidates if c in df_rappel.columns]
-        df_rappel_display = df_rappel[colonnes_existantes].copy()
-        rename_map = {c: label for c, label in colonnes_candidates if c in colonnes_existantes}
-        df_rappel_display.rename(columns=rename_map, inplace=True)
-        if 'Prix (FCFA)' in df_rappel_display.columns:
-            df_rappel_display['Prix (FCFA)'] = df_rappel_display['Prix (FCFA)'].apply(
-                lambda x: f"{_safe_float(x):,.0f}"
-            )
-        st.dataframe(df_rappel_display, hide_index=True, use_container_width=True)
+        df_rappel_display = df_rappel[['modele', 'client_prenom', 'client_nom', 'couturier_prenom', 'couturier_nom', 'prix_total']].copy()
+        df_rappel_display.columns = ['Modèle', 'Prénom Client', 'Nom Client', 'Prénom Couturier', 'Nom Couturier', 'Prix (FCFA)']
+        df_rappel_display['Prix (FCFA)'] = df_rappel_display['Prix (FCFA)'].apply(lambda x: f"{x:,.0f}")
+        st.dataframe(df_rappel_display, hide_index=True, width='stretch')
+    elif commandes_rappel and not commandes_a_rappeler:
+        st.success("✅ Rappels pour les livraisons du " + date_rappel.strftime('%d/%m/%Y') + " déjà envoyés.")
     else:
-        st.success(f"✅ Aucune livraison critique dans les {int(nb_jours_rappel)} prochains jours.")
+        st.info("ℹ️ Aucune livraison prévue dans 2 jours.")
 
     st.markdown("---")
     st.markdown("#### 📦 Par date")
@@ -368,37 +291,13 @@ def _afficher_calendrier(commande_model, couturier_model, couturier_id, salon_id
 
     par_date = defaultdict(list)
     for c in commandes:
-        dl = _to_date(c.get('date_livraison'))
+        dl = c.get('date_livraison')
         if dl:
-            c["jours_restants"] = (dl - aujourd_hui).days
-            par_date[dl].append(c)
+            key = dl if hasattr(dl, 'strftime') else dl
+            par_date[key].append(c)
 
-    commandes_en_retard = 0
-    commandes_du_jour = 0
-    commandes_a_venir = 0
     for date_liv in sorted(par_date.keys()):
-        if date_liv < aujourd_hui:
-            commandes_en_retard += len(par_date[date_liv])
-        elif date_liv == aujourd_hui:
-            commandes_du_jour += len(par_date[date_liv])
-        else:
-            commandes_a_venir += len(par_date[date_liv])
-
-    c1, c2, c3 = st.columns(3)
-    with c1:
-        st.metric("⏳ En retard", commandes_en_retard)
-    with c2:
-        st.metric("🟢 Aujourd'hui", commandes_du_jour)
-    with c3:
-        st.metric("📅 À venir", commandes_a_venir)
-
-    st.markdown("---")
-
-    # Tri global: en retard d'abord, puis aujourd'hui, puis à venir proche
-    dates_triees = sorted(par_date.keys(), key=lambda d: ((d - aujourd_hui).days >= 0, abs((d - aujourd_hui).days), d))
-    for date_liv in dates_triees:
         items = par_date[date_liv]
-        items = sorted(items, key=lambda c: c.get("jours_restants", 9999))
         date_str = date_liv.strftime('%d/%m/%Y') if hasattr(date_liv, 'strftime') else str(date_liv)
         is_aujourd = date_liv == aujourd_hui
         is_passe = date_liv < aujourd_hui
@@ -406,25 +305,16 @@ def _afficher_calendrier(commande_model, couturier_model, couturier_id, salon_id
         if is_aujourd:
             label = f"🟢 **{date_str}** — Aujourd'hui ({len(items)} livraison(s))"
         elif is_passe:
-            label = f"🔴 **{date_str}** — En retard ({len(items)} livraison(s))"
+            label = f"⏳ **{date_str}** — Passée ({len(items)} livraison(s))"
         else:
-            delta = (date_liv - aujourd_hui).days
-            label = f"🟠 **{date_str}** — Dans {delta} jour(s) ({len(items)} livraison(s))"
+            label = f"📅 **{date_str}** — ({len(items)} livraison(s))"
 
         with st.expander(label, expanded=(not is_passe)):
             for c in items:
                 resp = f"{c.get('couturier_prenom', '')} {c.get('couturier_nom', '')}".strip() or "N/A"
                 client = f"{c.get('client_prenom', '')} {c.get('client_nom', '')}".strip()
-                jr = c.get("jours_restants")
-                urgence_txt = (
-                    "🔴 en retard" if isinstance(jr, int) and jr < 0
-                    else "🟢 aujourd'hui" if jr == 0
-                    else f"🟠 dans {jr} jour(s)" if isinstance(jr, int)
-                    else "📅 échéance"
-                )
                 st.markdown(
                     f"- **{c.get('modele', 'N/A')}** — Client: {client} | "
                     f"Responsable: {resp} | "
-                    f"{urgence_txt} | "
-                    f"💰 {_safe_float(c.get('prix_total', 0)):,.0f} FCFA"
+                    f"💰 {c.get('prix_total', 0):,.0f} FCFA"
                 )

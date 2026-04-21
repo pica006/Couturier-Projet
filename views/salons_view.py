@@ -345,5 +345,5 @@ def afficher_page_salons():
                 'Employés', 'Clients', 'Commandes'
             ]
             
-            st.dataframe(df_display, use_container_width=True, hide_index=True)
+            st.dataframe(df_display, width='stretch', hide_index=True)
 

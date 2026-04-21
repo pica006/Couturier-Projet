@@ -22,7 +22,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from controllers.email_controller import EmailController
 from models.salon_model import SalonModel
-from utils.role_utils import obtenir_salon_id, est_admin
+from utils.role_utils import obtenir_salon_id
 
 
 def afficher_page_comptabilite():
@@ -42,8 +42,6 @@ def afficher_page_comptabilite():
     
     # Récupérer l'ID du couturier
     couturier_id = st.session_state.couturier_data['id']
-    is_admin_user = est_admin(st.session_state.couturier_data)
-    salon_id_user = obtenir_salon_id(st.session_state.couturier_data) if is_admin_user else None
     
     # Contrôleur (créé une seule fois)
     try:
@@ -89,8 +87,7 @@ def afficher_page_comptabilite():
         modeles_disponibles = compta_controller.lister_modeles_par_periode(
             couturier_id,
             date_debut_filtre,
-            date_fin_filtre,
-            salon_id=salon_id_user
+            date_fin_filtre
         )
     except Exception:
         modeles_disponibles = []
@@ -110,10 +107,9 @@ def afficher_page_comptabilite():
     try:
         # Récupérer les statistiques
         stats = compta_controller.obtenir_statistiques(
-            couturier_id if not is_admin_user else None,
+            couturier_id, 
             date_debut_filtre, 
-            date_fin_filtre,
-            salon_id=salon_id_user
+            date_fin_filtre
         ) or {}
         
         # ====================================================================
@@ -196,12 +192,11 @@ def afficher_page_comptabilite():
         with col1:
             st.markdown("#### Modèles les plus populaires")
             top_modeles = compta_controller.top_modeles(
-                couturier_id if not is_admin_user else None,
+                couturier_id,
                 statut=None,
                 date_debut=date_debut_filtre,
                 date_fin=date_fin_filtre,
-                limit=10,
-                salon_id=salon_id_user
+                limit=10
             )
             if top_modeles:
                 labels = [m for m, _ in top_modeles]
@@ -230,7 +225,7 @@ def afficher_page_comptabilite():
                     _place_legend(ax1, wedges1, legend_labels1, "Modèles")
                     ax1.set_title("Top modèles par volume")
                     plt.tight_layout()
-                    st.pyplot(fig1, use_container_width=True)
+                    st.pyplot(fig1, width='stretch')
                     plt.close(fig1)
                 else:
                     st.info("Aucune donnée disponible")
@@ -241,11 +236,10 @@ def afficher_page_comptabilite():
         with col2:
             st.markdown("#### Répartition de l'argent reçu par modèle")
             repartition = compta_controller.repartition_argent_par_modele(
-                couturier_id if not is_admin_user else None,
+                couturier_id,
                 date_debut=date_debut_filtre,
                 date_fin=date_fin_filtre,
-                limit=10,
-                salon_id=salon_id_user
+                limit=10
             )
             if repartition:
                 labels_r = [m for m, _ in repartition]
@@ -273,7 +267,7 @@ def afficher_page_comptabilite():
                     _place_legend(ax2, wedges2, legend_labels2, "Modèles")
                     ax2.set_title("Somme des avances par modèle")
                     plt.tight_layout()
-                    st.pyplot(fig2, use_container_width=True)
+                    st.pyplot(fig2, width='stretch')
                     plt.close(fig2)
                 else:
                     st.info("Aucune donnée disponible")
@@ -288,11 +282,10 @@ def afficher_page_comptabilite():
         with col_cat1:
             st.markdown("#### Montants perçus par modèle")
             repartition_cat = compta_controller.repartition_argent_par_modele(
-                couturier_id if not is_admin_user else None,
+                couturier_id,
                 date_debut=date_debut_filtre,
                 date_fin=date_fin_filtre,
-                limit=10,
-                salon_id=salon_id_user
+                limit=10
             )
             if repartition_cat:
                 labels_c = [c for c, _ in repartition_cat]
@@ -314,7 +307,7 @@ def afficher_page_comptabilite():
                     _place_legend(ax3, wedges3, legend_labels3, "Modèles")
                     ax3.set_title("Montants perçus par modèle")
                     plt.tight_layout()
-                    st.pyplot(fig3, use_container_width=True)
+                    st.pyplot(fig3, width='stretch')
                     plt.close(fig3)
                 else:
                     st.info("Aucune donnée disponible pour les modèles (montants perçus)")
@@ -325,11 +318,10 @@ def afficher_page_comptabilite():
         with col_cat2:
             st.markdown("#### Reste à percevoir par modèle")
             reste_cat = compta_controller.reste_par_modele(
-                couturier_id if not is_admin_user else None,
+                couturier_id,
                 date_debut=date_debut_filtre,
                 date_fin=date_fin_filtre,
-                limit=10,
-                salon_id=salon_id_user
+                limit=10
             )
             if reste_cat:
                 labels_rc = [c for c, _, _ in reste_cat]
@@ -352,7 +344,7 @@ def afficher_page_comptabilite():
                     _place_legend(ax4, wedges4, legend_labels4, "Modèles")
                     ax4.set_title("Reste à percevoir par modèle")
                     plt.tight_layout()
-                    st.pyplot(fig4, use_container_width=True)
+                    st.pyplot(fig4, width='stretch')
                     plt.close(fig4)
                 else:
                     st.info("Aucune donnée disponible pour les modèles (reste à percevoir)")
@@ -368,10 +360,7 @@ def afficher_page_comptabilite():
         st.markdown("### 👥 Clients")
         
         # Récupérer la liste des clients
-        clients = compta_controller.obtenir_liste_clients(
-            couturier_id if not is_admin_user else None,
-            salon_id=salon_id_user
-        )
+        clients = compta_controller.obtenir_liste_clients(couturier_id)
         
         if clients:
             # Créer un DataFrame pour affichage
@@ -387,7 +376,7 @@ def afficher_page_comptabilite():
             # Afficher le tableau
             st.dataframe(
                 df_clients,
-                use_container_width=True,
+                width='stretch',
                 hide_index=True
             )
             
@@ -426,10 +415,7 @@ def afficher_page_comptabilite():
         email_controller = EmailController(smtp_config=smtp_config)
         
         # Récupérer les commandes avec reste à payer
-        commandes_relance = compta_controller.obtenir_commandes_a_relancer(
-            couturier_id if not is_admin_user else None,
-            salon_id=salon_id_user
-        )
+        commandes_relance = compta_controller.obtenir_commandes_a_relancer(couturier_id)
         
         if commandes_relance:
             for cmd in commandes_relance:
@@ -451,7 +437,7 @@ def afficher_page_comptabilite():
                     if st.button(
                         "📧 Envoyer un rappel par email",
                         key=f"relance_email_{cmd['id']}",
-                        use_container_width=True
+                        width='stretch'
                     ):
                         client_email = cmd.get('client_email')
                         if not client_email:
