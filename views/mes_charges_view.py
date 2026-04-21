@@ -27,7 +27,6 @@ from PIL import Image as PILImage
 import qrcode
 
 from models.database import ChargesModel, CommandeModel
-from utils.page_header import afficher_header_page
 
 
 # ============================================================================
@@ -236,7 +235,15 @@ def afficher_page_mes_charges():
         titre = "💰 Gestion des Charges"
         sous_titre = "Atelier de Couture - Tableau de bord complet"
     
-    afficher_header_page(titre, sous_titre)
+    st.markdown(f"""
+        <div style='background: linear-gradient(135deg, #B19CD9 0%, #40E0D0 100%); 
+                    padding: 2rem; border-radius: 16px; margin-bottom: 2rem; 
+                    box-shadow: 0 4px 8px rgba(0,0,0,0.1); text-align: center;'>
+            <h1 style='color: white; margin: 0; font-size: 2.5rem; font-weight: 700; 
+                       font-family: Poppins, sans-serif; text-shadow: 0 2px 4px rgba(0,0,0,0.2);'>{titre}</h1>
+            <p style='color: rgba(255,255,255,0.95); margin: 0.5rem 0 0 0; font-size: 1.1rem;'>{sous_titre}</p>
+        </div>
+    """, unsafe_allow_html=True)
     
     # ========================================================================
     # TABS PRINCIPAUX
@@ -1033,7 +1040,7 @@ def afficher_analyses_graphiques(
     df_monthly['Total (FCFA)'] = df_monthly['Total (FCFA)'].apply(lambda x: f"{x:,.0f}")
     df_monthly['Montant moyen'] = df_monthly['Montant moyen'].apply(lambda x: f"{x:,.0f}")
     
-    st.dataframe(df_monthly, use_container_width=True, hide_index=True)
+    st.dataframe(df_monthly, width='stretch', hide_index=True)
 
 
 # ============================================================================

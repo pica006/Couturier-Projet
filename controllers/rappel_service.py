@@ -1,12 +1,44 @@
 """
 Service de rappels automatiques (J-2 avant livraison).
-Envoie email sans intervention manuelle.
+Envoie email + SMS sans intervention manuelle.
 """
+import os
 from datetime import datetime, timedelta
+from collections import defaultdict
 
 from models.database import CommandeModel
 from models.salon_model import SalonModel
 from controllers.email_controller import EmailController
+
+# Fichier pour éviter d'envoyer 2 fois le même jour
+RAPPELS_LAST_RUN_FILE = os.path.join(
+    os.path.dirname(os.path.dirname(__file__)), "data", "rappels_last_run.txt"
+)
+
+
+def _date_aujourd_hui_str() -> str:
+    return datetime.now().strftime("%Y-%m-%d")
+
+
+def _deja_execute_aujourd_hui() -> bool:
+    """Vérifie si les rappels ont déjà été envoyés aujourd'hui."""
+    try:
+        if os.path.exists(RAPPELS_LAST_RUN_FILE):
+            with open(RAPPELS_LAST_RUN_FILE, "r") as f:
+                return f.read().strip() == _date_aujourd_hui_str()
+    except Exception:
+        pass
+    return False
+
+
+def _marquer_execute():
+    """Marque que les rappels ont été envoyés aujourd'hui."""
+    try:
+        os.makedirs(os.path.dirname(RAPPELS_LAST_RUN_FILE), exist_ok=True)
+        with open(RAPPELS_LAST_RUN_FILE, "w") as f:
+            f.write(_date_aujourd_hui_str())
+    except Exception:
+        pass
 
 
 def executer_rappels_automatiques(db_connection) -> tuple:
@@ -15,8 +47,10 @@ def executer_rappels_automatiques(db_connection) -> tuple:
     Appelé automatiquement au chargement du calendrier.
     
     Returns:
-        (nb_envoyes, message)
+        (nb_envoyes, message) ou (0, None) si déjà exécuté / rien à faire
     """
+    if _deja_execute_aujourd_hui():
+        return 0, None
 
     aujourd_hui = datetime.now().date()
     date_rappel = aujourd_hui + timedelta(days=2)
@@ -40,7 +74,8 @@ def executer_rappels_automatiques(db_connection) -> tuple:
     ]
 
     if not commandes_a_rappeler:
-        return 0, "Aucun rappel a envoyer pour aujourd'hui."
+        _marquer_execute()
+        return 0, None
 
     envoyes = 0
     erreurs = []
@@ -74,6 +109,8 @@ def executer_rappels_automatiques(db_connection) -> tuple:
             envoyes += 1
         else:
             erreurs.append(f"#{c['id']}")
+
+    _marquer_execute()
 
     if envoyes > 0:
         msg = f"{envoyes} rappel(s) envoyé(s) automatiquement par email."

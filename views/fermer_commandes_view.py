@@ -3,9 +3,10 @@ Vue pour permettre aux employés de fermer leurs commandes
 """
 import streamlit as st
 import os
-from controllers.commande_controller import CommandeController
+from models.database import CommandeModel
 from controllers.email_controller import EmailController
 from models.salon_model import SalonModel
+from utils.role_utils import obtenir_salon_id
 from utils.role_utils import obtenir_couturier_id, obtenir_salon_id, est_admin
 
 
@@ -40,8 +41,7 @@ def afficher_page_fermer_commandes():
     is_admin_user = est_admin(couturier_data)
     
     db = st.session_state.db_connection
-    commande_controller = CommandeController(db)
-    commande_model = commande_controller.commande_model
+    commande_model = CommandeModel(db)
 
     # Configurer l'email pour le salon courant
     smtp_config = None
@@ -73,7 +73,7 @@ def afficher_page_fermer_commandes():
         # Bouton de rafraîchissement
         col_refresh, _ = st.columns([1, 5])
         with col_refresh:
-            if st.button("🔄 Actualiser", key="refresh_commandes_paiement", use_container_width=True):
+            if st.button("🔄 Actualiser", key="refresh_commandes_paiement", width='stretch'):
                 st.rerun()
         
         st.markdown("---")
@@ -95,14 +95,57 @@ def afficher_page_fermer_commandes():
         
         st.markdown("---")
         
-        # Récupérer les commandes du user avec avance > 0 ET reste > 0 (via controller/model)
+        # Récupérer les commandes du user avec avance > 0 ET reste > 0
         try:
-            commandes_avec_reste = commande_controller.lister_commandes_paiements_a_completer(
-                couturier_id=couturier_id,
-                salon_id=salon_id_user,
-                date_debut=date_debut_paiements,
-                date_fin=date_fin_paiements,
-            )
+            cursor = st.session_state.db_connection.get_connection().cursor()
+            query = """
+                SELECT c.id, c.modele, c.prix_total, c.avance, c.reste, c.statut, 
+                       c.date_creation, c.date_livraison,
+                       cl.nom, cl.prenom
+                FROM commandes c
+                JOIN clients cl ON c.client_id = cl.id
+                JOIN couturiers co ON c.couturier_id = co.id
+                WHERE c.couturier_id = %s 
+                  AND co.salon_id = %s
+                  AND c.statut != 'Fermé'
+                  AND c.avance > 0
+                  AND c.reste > 0
+            """
+            params = [couturier_id, salon_id_user]
+            
+            db_type = st.session_state.db_connection.db_type
+            if date_debut_paiements:
+                if db_type == 'mysql':
+                    query += " AND DATE(c.date_creation) >= %s"
+                else:
+                    query += " AND c.date_creation::date >= %s"
+                params.append(date_debut_paiements)
+            if date_fin_paiements:
+                if db_type == 'mysql':
+                    query += " AND DATE(c.date_creation) <= %s"
+                else:
+                    query += " AND c.date_creation::date <= %s"
+                params.append(date_fin_paiements)
+            
+            query += " ORDER BY c.date_creation DESC"
+            cursor.execute(query, tuple(params))
+            results = cursor.fetchall()
+            cursor.close()
+            
+            commandes_avec_reste = []
+            for row in results:
+                commandes_avec_reste.append({
+                    'id': row[0],
+                    'modele': row[1],
+                    'prix_total': float(row[2]),
+                    'avance': float(row[3]),
+                    'reste': float(row[4]),
+                    'statut': row[5],
+                    'date_creation': row[6],
+                    'date_livraison': row[7],
+                    'client_nom': row[8],
+                    'client_prenom': row[9]
+                })
         except Exception as e:
             st.error(f"❌ Erreur lors de la récupération des commandes : {e}")
             commandes_avec_reste = []
@@ -181,7 +224,7 @@ def afficher_page_fermer_commandes():
                             nouveau_reste = max(0.0, reste_a_verser - nouvelle_avance_ajoutee)
                             
                             st.markdown("**Reste à payer**")
-                            st.metric("Montant restant", f"{nouveau_reste:,.0f} FCFA")
+                            st.markdown(f"### <span style='color: #F39C12; font-size: 1.5em; font-weight: bold;'>{nouveau_reste:,.0f} FCFA</span>", unsafe_allow_html=True)
                             
                             if nouveau_reste == 0 and reste_a_verser > 0:
                                 st.success("✅ Commande entièrement payée")
@@ -215,13 +258,17 @@ def afficher_page_fermer_commandes():
                                     # Mettre à jour le statut si nécessaire
                                     if success:
                                         try:
+                                            connection = st.session_state.db_connection.get_connection()
+                                            cursor = connection.cursor()
                                             # Si le reste est à 0, marquer comme "Terminé" (tout l'argent reçu)
                                             if nouveau_reste <= 0:
-                                                commande_controller.mettre_a_jour_statut_si_soldee(
-                                                    commande_id=commande['id'],
-                                                    nouveau_reste=nouveau_reste,
+                                                cursor.execute(
+                                                    "UPDATE commandes SET statut = 'Terminé' WHERE id = %s",
+                                                    (commande['id'],)
                                                 )
                                                 st.info("💡 Commande marquée comme 'Terminée' (tout l'argent reçu). Vous pouvez maintenant demander la livraison dans l'onglet suivant.")
+                                            connection.commit()
+                                            cursor.close()
                                         except Exception as e:
                                             st.warning(f"⚠️ Les montants ont été mis à jour mais erreur lors de la mise à jour du statut : {e}")
                                 
@@ -289,46 +336,192 @@ def afficher_page_fermer_commandes():
         from models.database import CouturierModel
         couturier_model = CouturierModel(st.session_state.db_connection)
         
-        # Récupérer les commandes selon le rôle (orchestration via controller)
-        try:
-            commandes_terminees = commande_controller.lister_commandes_terminees_pour_livraison(
-                salon_id=salon_id_user,
-                date_debut=date_debut_terminees,
-                date_fin=date_fin_terminees,
-                couturier_id=couturier_id,
-                couturier_id_filter=couturier_id_filter,
-                vue_admin=is_admin_user,
-            )
+        # Récupérer les commandes selon le rôle
+        if is_admin_user:
+            # Admin : voir toutes les commandes terminées du salon (reste = 0, statut = 'Terminé')
+            if salon_id_user:
+                try:
+                    cursor = st.session_state.db_connection.get_connection().cursor()
+                    query = """
+                        SELECT c.id, c.modele, c.prix_total, c.avance, c.reste, c.statut, 
+                               c.date_creation, c.date_livraison,
+                               cl.nom, cl.prenom, cl.email, c.couturier_id,
+                               co.nom as couturier_nom, co.prenom as couturier_prenom
+                        FROM commandes c
+                        JOIN clients cl ON c.client_id = cl.id
+                        LEFT JOIN couturiers co ON c.couturier_id = co.id
+                        WHERE co.salon_id = %s 
+                          AND c.reste <= 0
+                          AND c.statut = 'Terminé'
+                    """
+                    params = [salon_id_user]
+                    
+                    db_type = st.session_state.db_connection.db_type
+                    if date_debut_terminees:
+                        if db_type == 'mysql':
+                            query += " AND DATE(c.date_creation) >= %s"
+                        else:
+                            query += " AND c.date_creation::date >= %s"
+                        params.append(date_debut_terminees)
+                    if date_fin_terminees:
+                        if db_type == 'mysql':
+                            query += " AND DATE(c.date_creation) <= %s"
+                        else:
+                            query += " AND c.date_creation::date <= %s"
+                        params.append(date_fin_terminees)
+                    if couturier_id_filter:
+                        query += " AND c.couturier_id = %s"
+                        params.append(couturier_id_filter)
+                    
+                    query += " ORDER BY c.date_creation DESC"
+                    cursor.execute(query, tuple(params))
+                    results = cursor.fetchall()
+                    cursor.close()
 
-            demandes = commande_model.lister_demandes_validation()
-            if not is_admin_user and commandes_terminees:
-                ids = [cmd["id"] for cmd in commandes_terminees]
-                historique_counts = commande_controller.get_historique_demandes_par_commandes(
-                    couturier_id=couturier_id,
-                    commande_ids=ids,
-                )
+                    commandes_terminees = []
+                    for row in results:
+                        commandes_terminees.append({
+                            'id': row[0],
+                            'modele': row[1],
+                            'prix_total': float(row[2]),
+                            'avance': float(row[3]),
+                            'reste': float(row[4]),
+                            'statut': row[5],
+                            'date_creation': row[6],
+                            'date_livraison': row[7],
+                            'client_nom': row[8],
+                            'client_prenom': row[9],
+                            'client_email': row[10],
+                            'couturier_id': row[11],
+                            'couturier_nom': row[12],
+                            'couturier_prenom': row[13]
+                        })
+
+                    # Vérifier les demandes existantes pour chaque commande
+                    demandes = commande_model.lister_demandes_validation()
+                    for cmd in commandes_terminees:
+                        demande_existante = next(
+                            (
+                                d for d in demandes
+                                if d.get('commande_id') == cmd['id']
+                                and d.get('type_action') == 'fermeture_demande'
+                                and d.get('statut_validation') == 'en_attente'
+                            ),
+                            None
+                        )
+                        cmd['demande_existante'] = demande_existante
+                except Exception as e:
+                    st.error(f"❌ Erreur lors de la récupération des commandes : {e}")
+                    commandes_terminees = []
             else:
-                historique_counts = {}
+                commandes_terminees = []
+        else:
+            # Employé : voir toutes ses commandes totalement payées (reste = 0, statut = 'Terminé')
+            try:
+                cursor = st.session_state.db_connection.get_connection().cursor()
+                query = """
+                    SELECT c.id, c.modele, c.prix_total, c.avance, c.reste, c.statut, 
+                           c.date_creation, c.date_livraison,
+                           cl.nom, cl.prenom
+                    FROM commandes c
+                    JOIN clients cl ON c.client_id = cl.id
+                    JOIN couturiers co ON c.couturier_id = co.id
+                    WHERE c.couturier_id = %s 
+                      AND co.salon_id = %s
+                      AND c.reste <= 0
+                      AND c.statut = 'Terminé'
+                """
+                params = [couturier_id, salon_id_user]
+                
+                db_type = st.session_state.db_connection.db_type
+                if date_debut_terminees:
+                    if db_type == 'mysql':
+                        query += " AND DATE(c.date_creation) >= %s"
+                    else:
+                        query += " AND c.date_creation::date >= %s"
+                    params.append(date_debut_terminees)
+                if date_fin_terminees:
+                    if db_type == 'mysql':
+                        query += " AND DATE(c.date_creation) <= %s"
+                    else:
+                        query += " AND c.date_creation::date <= %s"
+                    params.append(date_fin_terminees)
+                if couturier_id_filter:
+                    query += " AND c.couturier_id = %s"
+                    params.append(couturier_id_filter)
+                
+                query += " ORDER BY c.date_creation DESC"
+                cursor.execute(query, tuple(params))
+                results = cursor.fetchall()
+                cursor.close()
 
-            for cmd in commandes_terminees:
-                demande_existante = next(
-                    (
-                        d for d in demandes
-                        if d.get("commande_id") == cmd["id"]
-                        and d.get("type_action") == "fermeture_demande"
-                        and d.get("statut_validation") == "en_attente"
-                    ),
-                    None,
-                )
-                cmd["demande_existante"] = demande_existante
-                if not is_admin_user:
-                    cmd["demande_stats"] = historique_counts.get(
-                        cmd["id"],
-                        {"total": 0, "en_attente": 0, "validee": 0, "rejetee": 0},
+                commandes_terminees = []
+                for row in results:
+                    commandes_terminees.append({
+                        'id': row[0],
+                        'modele': row[1],
+                        'prix_total': float(row[2]),
+                        'avance': float(row[3]),
+                        'reste': float(row[4]),
+                        'statut': row[5],
+                        'date_creation': row[6],
+                        'date_livraison': row[7],
+                        'client_nom': row[8],
+                        'client_prenom': row[9]
+                    })
+
+                # Vérifier les demandes existantes + historique des demandes pour chaque commande
+                demandes = commande_model.lister_demandes_validation()
+                historique_counts = {}
+                if commandes_terminees:
+                    try:
+                        ids = [cmd['id'] for cmd in commandes_terminees]
+                        placeholders = ", ".join(["%s"] * len(ids))
+                        hist_query = f"""
+                            SELECT commande_id,
+                                   COUNT(*) as total,
+                                   SUM(CASE WHEN statut_validation = 'en_attente' THEN 1 ELSE 0 END) as en_attente,
+                                   SUM(CASE WHEN statut_validation = 'validee' THEN 1 ELSE 0 END) as validee,
+                                   SUM(CASE WHEN statut_validation = 'rejetee' THEN 1 ELSE 0 END) as rejetee
+                            FROM historique_commandes
+                            WHERE couturier_id = %s
+                              AND type_action = 'fermeture_demande'
+                              AND commande_id IN ({placeholders})
+                            GROUP BY commande_id
+                        """
+                        cursor = st.session_state.db_connection.get_connection().cursor()
+                        cursor.execute(hist_query, tuple([couturier_id] + ids))
+                        for row in cursor.fetchall():
+                            historique_counts[row[0]] = {
+                                'total': int(row[1] or 0),
+                                'en_attente': int(row[2] or 0),
+                                'validee': int(row[3] or 0),
+                                'rejetee': int(row[4] or 0),
+                            }
+                        cursor.close()
+                    except Exception as e:
+                        st.warning(f"⚠️ Impossible de charger l'historique des demandes : {e}")
+
+                for cmd in commandes_terminees:
+                    demande_existante = next(
+                        (
+                            d for d in demandes
+                            if d.get('commande_id') == cmd['id']
+                            and d.get('type_action') == 'fermeture_demande'
+                            and d.get('statut_validation') == 'en_attente'
+                        ),
+                        None
                     )
-        except Exception as e:
-            st.error(f"❌ Erreur lors de la récupération des commandes : {e}")
-            commandes_terminees = []
+                    cmd['demande_existante'] = demande_existante
+                    cmd['demande_stats'] = historique_counts.get(cmd['id'], {
+                        'total': 0,
+                        'en_attente': 0,
+                        'validee': 0,
+                        'rejetee': 0,
+                    })
+            except Exception as e:
+                st.error(f"❌ Erreur lors de la récupération des commandes : {e}")
+                commandes_terminees = []
         
         if not commandes_terminees:
             st.info("📭 Aucune commande totalement payée pour le moment.")
@@ -367,12 +560,22 @@ def afficher_page_fermer_commandes():
                     total_demandes = 0
                     derniere_demande_status = None
                     try:
-                        resume_demande = commande_controller.get_resume_demande_fermeture_commande(
-                            commande_id=commande["id"],
-                            couturier_id=couturier_id,
+                        cursor = st.session_state.db_connection.get_connection().cursor()
+                        cursor.execute(
+                            """
+                            SELECT COUNT(*), MAX(statut_validation)
+                            FROM historique_commandes
+                            WHERE commande_id = %s
+                              AND couturier_id = %s
+                              AND type_action = 'fermeture_demande'
+                            """,
+                            (commande['id'], couturier_id),
                         )
-                        total_demandes = int(resume_demande.get("total", 0))
-                        derniere_demande_status = resume_demande.get("dernier_statut")
+                        row = cursor.fetchone()
+                        cursor.close()
+                        if row:
+                            total_demandes = int(row[0] or 0)
+                            derniere_demande_status = row[1]
                     except Exception:
                         total_demandes = 0
                         derniere_demande_status = None
@@ -400,13 +603,14 @@ def afficher_page_fermer_commandes():
                             width='stretch'
                         ):
                             try:
-                                success_validation = commande_controller.valider_commande_livree_payee(
-                                    commande_id=commande["id"]
+                                connection = st.session_state.db_connection.get_connection()
+                                cursor = connection.cursor()
+                                cursor.execute(
+                                    "UPDATE commandes SET statut = 'Livré et payé', date_fermeture = NOW() WHERE id = %s",
+                                    (commande['id'],)
                                 )
-                                if not success_validation:
-                                    st.error("❌ Erreur lors de la validation.")
-                                    continue
-
+                                connection.commit()
+                                cursor.close()
                                 st.success("✅ Commande validée. Elle apparaît désormais dans l'onglet PDF.")
                                 
                                 # Envoi d'un email de livraison terminée au client
@@ -573,15 +777,110 @@ def afficher_page_fermer_commandes():
         # Récupérer les commandes terminées selon le rôle (Terminé ou Livré et payé)
         commandes_terminees = []
         try:
-            commandes_terminees = commande_controller.lister_commandes_livrees_pour_pdf(
-                salon_id=salon_id_user,
-                couturier_id=couturier_id,
-                vue_admin=is_admin_user,
-                date_debut=date_debut,
-                date_fin=date_fin,
-                nom_client_filter=nom_client_filter,
-                couturier_id_filter=couturier_id_filter,
-            )
+            cursor = st.session_state.db_connection.get_connection().cursor()
+            
+            if is_admin_user and salon_id_user:
+                # Admin : voir toutes les commandes validées du salon (Livré et payé uniquement)
+                query = """
+                    SELECT c.id, c.modele, c.prix_total, c.avance, c.reste, c.statut, 
+                           c.date_creation, c.date_livraison,
+                           cl.nom, cl.prenom, cl.telephone, cl.email,
+                           c.couturier_id,
+                           co.nom as couturier_nom, co.prenom as couturier_prenom,
+                           c.pdf_name, c.pdf_path
+                    FROM commandes c
+                    JOIN clients cl ON c.client_id = cl.id
+                    LEFT JOIN couturiers co ON c.couturier_id = co.id
+                    WHERE co.salon_id = %s 
+                      AND c.statut = 'Livré et payé'
+                """
+                params = [salon_id_user]
+            else:
+                # Employé : voir uniquement ses propres commandes validées (Livré et payé uniquement)
+                query = """
+                    SELECT c.id, c.modele, c.prix_total, c.avance, c.reste, c.statut, 
+                           c.date_creation, c.date_livraison,
+                           cl.nom, cl.prenom, cl.telephone, cl.email,
+                           c.pdf_name, c.pdf_path
+                    FROM commandes c
+                    JOIN clients cl ON c.client_id = cl.id
+                    JOIN couturiers co ON c.couturier_id = co.id
+                    WHERE c.couturier_id = %s 
+                      AND co.salon_id = %s
+                      AND c.statut = 'Livré et payé'
+                """
+                params = [couturier_id, salon_id_user]
+            
+            # Ajouter les filtres (adapter selon le SGBD)
+            db_type = st.session_state.db_connection.db_type
+            if date_debut:
+                if db_type == 'mysql':
+                    query += " AND DATE(c.date_creation) >= %s"
+                else:  # PostgreSQL
+                    query += " AND c.date_creation::date >= %s"
+                params.append(date_debut)
+            
+            if date_fin:
+                if db_type == 'mysql':
+                    query += " AND DATE(c.date_creation) <= %s"
+                else:  # PostgreSQL
+                    query += " AND c.date_creation::date <= %s"
+                params.append(date_fin)
+            
+            if nom_client_filter:
+                query += " AND (cl.nom LIKE %s OR cl.prenom LIKE %s)"
+                params.append(f"%{nom_client_filter}%")
+                params.append(f"%{nom_client_filter}%")
+            
+            if is_admin_user and couturier_id_filter:
+                query += " AND c.couturier_id = %s"
+                params.append(couturier_id_filter)
+            
+            query += " ORDER BY c.date_creation DESC"
+            
+            cursor.execute(query, tuple(params))
+            results = cursor.fetchall()
+            cursor.close()
+            
+            commandes_terminees = []
+            for row in results:
+                if is_admin_user and salon_id_user:
+                    commandes_terminees.append({
+                        'id': row[0],
+                        'modele': row[1],
+                        'prix_total': float(row[2]),
+                        'avance': float(row[3]),
+                        'reste': float(row[4]),
+                        'statut': row[5],
+                        'date_creation': row[6],
+                        'date_livraison': row[7],
+                        'client_nom': row[8],
+                        'client_prenom': row[9],
+                        'client_telephone': row[10],
+                        'client_email': row[11],
+                        'couturier_id': row[12],
+                        'couturier_nom': row[13],
+                        'couturier_prenom': row[14],
+                        'pdf_name': row[15] if len(row) > 15 else None,
+                        'pdf_path': row[16] if len(row) > 16 else None
+                    })
+                else:
+                    commandes_terminees.append({
+                        'id': row[0],
+                        'modele': row[1],
+                        'prix_total': float(row[2]),
+                        'avance': float(row[3]),
+                        'reste': float(row[4]),
+                        'statut': row[5],
+                        'date_creation': row[6],
+                        'date_livraison': row[7],
+                        'client_nom': row[8],
+                        'client_prenom': row[9],
+                        'client_telephone': row[10],
+                        'client_email': row[11],
+                        'pdf_name': row[12] if len(row) > 12 else None,
+                        'pdf_path': row[13] if len(row) > 13 else None
+                    })
         except Exception as e:
             st.error(f"❌ Erreur lors de la récupération des commandes terminées : {e}")
             commandes_terminees = []

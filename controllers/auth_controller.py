@@ -23,7 +23,6 @@ Dans views/auth_view.py, ligne : auth_controller.authentifier(code, password)
 from typing import Optional, Dict, Tuple
 from models.database import DatabaseConnection, CouturierModel
 from models.salon_model import SalonModel
-from utils.security import verify_password
 
 
 class AuthController:
@@ -85,17 +84,15 @@ class AuthController:
         """
         
         # ====================================================================
-        # ÉTAPE 1 : VALIDATION DES ENTRÉES (nettoyage des espaces)
+        # ÉTAPE 1 : VALIDATION DES ENTRÉES
         # ====================================================================
-        code_clean = (code_couturier or "").strip()
-        password_clean = (password or "").strip()
-
+        
         # Vérifier que le code couturier n'est pas vide
-        if not code_clean:
+        if not code_couturier or code_couturier.strip() == "":
             return False, None, "Le code couturier ne peut pas être vide"
         
         # Vérifier que le mot de passe n'est pas vide
-        if not password_clean:
+        if not password or password.strip() == "":
             return False, None, "Le mot de passe ne peut pas être vide"
         
         # Vérifier que la connexion à la base de données est active
@@ -106,8 +103,9 @@ class AuthController:
         # ÉTAPE 2 : RECHERCHE DU COUTURIER DANS LA BASE DE DONNÉES
         # ====================================================================
         
-        # Appeler le modèle pour chercher le couturier par son code (code nettoyé)
-        existe, donnees = self.couturier_model.verifier_code(code_clean)
+        # Appeler le modèle pour chercher le couturier par son code
+        # RETOURNE : (existe: bool, donnees: dict ou None)
+        existe, donnees = self.couturier_model.verifier_code(code_couturier)
         
         # Si le code n'existe pas dans la base
         if not existe:
@@ -125,9 +123,11 @@ class AuthController:
             return False, None, "Mot de passe non configuré pour cet utilisateur"
         
         # ====================================================================
-        # VÉRIFICATION DU MOT DE PASSE (BCRYPT + COMPAT LEGACY)
+        # VÉRIFICATION SIMPLE : COMPARAISON DIRECTE DES MOTS DE PASSE
         # ====================================================================
-        if verify_password(password_clean, password_db):
+        
+        # Comparer directement le mot de passe saisi avec celui de la base
+        if password == password_db:
             # ✅ MOT DE PASSE CORRECT !
 
             # 1) Vérifier d'abord si l'utilisateur lui-même est actif

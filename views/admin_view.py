@@ -22,12 +22,9 @@ from reportlab.lib.utils import ImageReader
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 
 from models.database import ChargesModel, CommandeModel, CouturierModel, ClientModel, AppLogoModel
-from controllers.admin_controller import AdminController
 from views.mes_charges_view import _generer_pdf_impots
 from models.salon_model import SalonModel
 from utils.role_utils import est_admin, obtenir_salon_id
-from utils.page_header import afficher_header_page
-from utils.ui import ajouter_espace_vertical
 
 # Barème d'impôts (identique à celui de mes_charges_view.py)
 TRANCHES_IMPOTS = [
@@ -86,7 +83,15 @@ def afficher_page_administration():
     # HEADER DE LA PAGE
     # ========================================================================
     
-    afficher_header_page("👑 Administration", "Vue 360° de l'entreprise - Toutes les activités")
+    st.markdown("""
+        <div style='background: linear-gradient(135deg, #B19CD9 0%, #40E0D0 100%); 
+                    padding: 2rem; border-radius: 16px; margin-bottom: 2rem; 
+                    box-shadow: 0 4px 8px rgba(0,0,0,0.1); text-align: center;'>
+            <h1 style='color: white; margin: 0; font-size: 2.5rem; font-weight: 700; 
+                       font-family: Poppins, sans-serif; text-shadow: 0 2px 4px rgba(0,0,0,0.2);'>👑 Administration</h1>
+            <p style='color: rgba(255,255,255,0.95); margin: 0.5rem 0 0 0; font-size: 1.1rem;'>Vue 360° de l'entreprise - Toutes les activités</p>
+        </div>
+    """, unsafe_allow_html=True)
     
     # Afficher les informations du salon actuel
     if salon_info:
@@ -310,8 +315,18 @@ def afficher_vue_360(couturier_model: CouturierModel, charges_model: ChargesMode
     
     # Nombre total de clients (tous les couturiers du salon)
     try:
-        admin_controller = AdminController(st.session_state.db_connection)
-        nb_clients_total = admin_controller.compter_clients_distincts_salon(salon_id_admin)
+        cursor = client_model.db.get_connection().cursor()
+        # Requête compatible MySQL et PostgreSQL
+        query = """
+            SELECT COUNT(DISTINCT c.id)
+            FROM clients c
+            INNER JOIN couturiers ct ON c.couturier_id = ct.id
+            WHERE ct.salon_id = %s
+        """
+        cursor.execute(query, (salon_id_admin,))
+        result = cursor.fetchone()
+        nb_clients_total = result[0] if result and result[0] is not None else 0
+        cursor.close()
     except Exception as e:
         print(f"Erreur récupération nombre de clients: {e}")
         nb_clients_total = 0
@@ -460,7 +475,7 @@ def afficher_vue_360(couturier_model: CouturierModel, charges_model: ChargesMode
             if not df_charges_cout.empty:
                 st.dataframe(
                     df_charges_cout[['date_charge', 'type', 'categorie', 'description', 'montant']],
-                    use_container_width=True,
+                    width='stretch',
                     hide_index=True
                 )
             else:
@@ -487,7 +502,7 @@ def afficher_vue_360(couturier_model: CouturierModel, charges_model: ChargesMode
                 colonnes_existantes = [col for col in colonnes_afficher if col in df_cmd_cout.columns]
                 st.dataframe(
                     df_cmd_cout[colonnes_existantes],
-                    use_container_width=True,
+                    width='stretch',
                     hide_index=True
                 )
             else:
@@ -524,7 +539,7 @@ def afficher_vue_360(couturier_model: CouturierModel, charges_model: ChargesMode
             st.markdown("**Répartition par modèle**")
             df_display_modeles = df_modeles[['modele', 'categorie', 'sexe', 'nb_commandes', 'CA (FCFA)']].copy()
             df_display_modeles.columns = ['Modèle', 'Catégorie', 'Sexe', 'Nombre', 'CA (FCFA)']
-            st.dataframe(df_display_modeles, hide_index=True, use_container_width=True)
+            st.dataframe(df_display_modeles, hide_index=True, width='stretch')
 
             col_g1, col_g2 = st.columns(2)
             with col_g1:
@@ -637,7 +652,7 @@ def afficher_vue_360(couturier_model: CouturierModel, charges_model: ChargesMode
             st.markdown("##### 📋 Tableau récapitulatif des couturiers")
             st.dataframe(
                 df_couturiers,
-                use_container_width=True,
+                width='stretch',
                 hide_index=True
             )
             
@@ -666,7 +681,7 @@ def afficher_vue_360(couturier_model: CouturierModel, charges_model: ChargesMode
             with col_ch_tab:
                 st.dataframe(
                     df_couturiers[['Code', 'Nom', 'Charges (FCFA)']],
-                    use_container_width=True,
+                    width='stretch',
                     hide_index=True
                 )
 
@@ -707,7 +722,7 @@ def afficher_vue_360(couturier_model: CouturierModel, charges_model: ChargesMode
             with col_ca_tab:
                 st.dataframe(
                     df_couturiers[['Code', 'Nom', 'CA (FCFA)', 'Commandes']],
-                    use_container_width=True,
+                    width='stretch',
                     hide_index=True
                 )
 
@@ -742,7 +757,7 @@ def afficher_vue_360(couturier_model: CouturierModel, charges_model: ChargesMode
             with col_av_tab:
                 st.dataframe(
                     df_couturiers[['Code', 'Nom', 'Avances (FCFA)', 'Encaissé (FCFA)']],
-                    use_container_width=True,
+                    width='stretch',
                     hide_index=True
                 )
 
@@ -766,7 +781,7 @@ def afficher_vue_360(couturier_model: CouturierModel, charges_model: ChargesMode
             with col_cl_tab:
                 st.dataframe(
                     df_couturiers[['Code', 'Nom', 'Clients distincts']],
-                    use_container_width=True,
+                    width='stretch',
                     hide_index=True
                 )
 
@@ -965,7 +980,7 @@ def afficher_toutes_charges(charges_model: ChargesModel, salon_id_admin: str):
 
             st.dataframe(
                 df_emp_display,
-                use_container_width=True,
+                width='stretch',
                 hide_index=True
             )
 
@@ -981,7 +996,7 @@ def afficher_toutes_charges(charges_model: ChargesModel, salon_id_admin: str):
                     data=pdf_emp["content"],
                     file_name=pdf_emp["filename"],
                     mime="application/pdf",
-                    use_container_width=True,
+                    width='stretch',
                 )
     
     st.markdown("---")
@@ -1002,7 +1017,7 @@ def afficher_toutes_charges(charges_model: ChargesModel, salon_id_admin: str):
     # Tableau global (affiché) + export CSV + PDF
     st.dataframe(
         df_display,
-        use_container_width=True,
+        width='stretch',
         hide_index=True
     )
 
@@ -1015,7 +1030,7 @@ def afficher_toutes_charges(charges_model: ChargesModel, salon_id_admin: str):
             data=csv,
             file_name=f"toutes_charges_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
             mime="text/csv",
-            use_container_width=True
+            width='stretch'
         )
 
     with col_exp2:
@@ -1030,7 +1045,7 @@ def afficher_toutes_charges(charges_model: ChargesModel, salon_id_admin: str):
                 data=pdf_global["content"],
                 file_name=pdf_global["filename"],
                 mime="application/pdf",
-                use_container_width=True
+                width='stretch'
             )
 
 
@@ -1446,7 +1461,7 @@ def afficher_calcul_impots_admin(charges_model: ChargesModel, commande_model: Co
         
         st.dataframe(
             df_display,
-            use_container_width=True,
+            width='stretch',
             hide_index=True,
             height=300
         )
@@ -1469,7 +1484,7 @@ def afficher_calcul_impots_admin(charges_model: ChargesModel, commande_model: Co
                 data=pdf_data["content"],
                 file_name=pdf_data["filename"],
                 mime="application/pdf",
-                use_container_width=True
+                width='stretch'
             )
     else:
         st.info("Aucune charge enregistrée pour cette période.")
@@ -1662,7 +1677,7 @@ def afficher_liste_utilisateurs(couturier_model: CouturierModel, admin_data: Dic
     
     st.dataframe(
         df_display,
-        use_container_width=True,
+        width='stretch',
         hide_index=True,
         height=400
     )
@@ -1701,8 +1716,8 @@ def afficher_liste_utilisateurs(couturier_model: CouturierModel, admin_data: Dic
             )
         
         with col_r2:
-            ajouter_espace_vertical()
-            if st.button("💾 Modifier le rôle", type="primary", use_container_width=True, key="btn_modif_role"):
+            st.markdown("<br>", unsafe_allow_html=True)  # Espacement
+            if st.button("💾 Modifier le rôle", type="primary", width='stretch', key="btn_modif_role"):
                 if nouveau_role != role_actuel:
                     if couturier_model.modifier_role(user_id, nouveau_role):
                         st.success("✅ Rôle modifié avec succès !")
@@ -2024,7 +2039,7 @@ def afficher_gestion_logo(admin_data: Dict):
             st.markdown("---")
             
             # Bouton de confirmation
-            if st.button("💾 Enregistrer le nouveau logo", type="primary", use_container_width=True, key="btn_save_logo"):
+            if st.button("💾 Enregistrer le nouveau logo", type="primary", width='stretch', key="btn_save_logo"):
                 try:
                     # Lire le contenu du fichier
                     file_bytes = uploaded_file.read()
@@ -2130,7 +2145,7 @@ def afficher_gestion_commandes_admin(commande_model: CommandeModel, admin_data: 
         # Bouton de rafraîchissement
         col_refresh, _ = st.columns([1, 5])
         with col_refresh:
-            if st.button("🔄 Actualiser", use_container_width=True, key="refresh_demandes"):
+            if st.button("🔄 Actualiser", width='stretch', key="refresh_demandes"):
                 st.rerun()
         
         st.markdown("---")
@@ -2296,7 +2311,7 @@ def afficher_gestion_commandes_admin(commande_model: CommandeModel, admin_data: 
             df_display['Avance'] = df_display['Avance'].apply(lambda x: f"{x:,.0f} FCFA")
             df_display['Reste'] = df_display['Reste'].apply(lambda x: f"{x:,.0f} FCFA")
             
-            st.dataframe(df_display, use_container_width=True, hide_index=True, height=400)
+            st.dataframe(df_display, width='stretch', hide_index=True, height=400)
     
     # ========================================================================
     # ONGLET 3 : COMMANDES FERMÉES
@@ -2393,5 +2408,5 @@ def afficher_gestion_commandes_admin(commande_model: CommandeModel, admin_data: 
             if 'date_fermeture' in df_display.columns:
                 df_display['Date Fermeture'] = pd.to_datetime(df_display['Date Fermeture']).dt.strftime('%d/%m/%Y %H:%M')
             
-            st.dataframe(df_display, use_container_width=True, hide_index=True, height=400)
+            st.dataframe(df_display, width='stretch', hide_index=True, height=400)
 
