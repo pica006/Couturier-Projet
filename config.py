@@ -83,6 +83,8 @@ APP_CONFIG = {
     # Le système cherchera automatiquement logo.png, puis logo.jpg, puis logo.jpeg
     'wallpaper_url': 'assets/background_dark.png',  # Image de fond (fichier local)
     # Si None, aucune image de fond ne sera affichée
+    # Page de connexion : False = dégradé maquette : login_use_wallpaper True pour forcer l'image
+    'login_use_wallpaper': False,
 }
 
 # ============================================================================

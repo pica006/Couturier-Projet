@@ -173,6 +173,11 @@ def _safe_visual_css() -> str:
     [data-testid="stMetric"] {
         background: var(--surface); border: 1px solid var(--border);
         border-radius: var(--r-md); padding: 1.2rem 1.3rem; box-shadow: var(--sh-xs);
+        transition: box-shadow 0.2s ease, transform 0.15s ease;
+    }
+    [data-testid="stMetric"]:hover {
+        box-shadow: var(--sh-sm);
+        transform: translateY(-2px);
     }
     [data-testid="stMetricValue"] {
         font-family: 'Poppins', 'Inter', sans-serif \!important;
@@ -185,13 +190,15 @@ def _safe_visual_css() -> str:
 
     /* FORMULAIRES */
     .stTextInput > div > div, .stNumberInput > div > div,
-    .stSelectbox > div > div, .stTextArea > div > div, .stDateInput > div > div {
+    .stSelectbox > div > div, .stMultiSelect > div > div,
+    .stTextArea > div > div, .stDateInput > div > div {
         background: var(--surface) \!important;
         border: 1.5px solid var(--border) \!important;
         border-radius: var(--r-sm) \!important;
     }
     .stTextInput > div > div:focus-within, .stNumberInput > div > div:focus-within,
-    .stTextArea > div > div:focus-within, .stDateInput > div > div:focus-within {
+    .stTextArea > div > div:focus-within, .stDateInput > div > div:focus-within,
+    .stSelectbox > div > div:focus-within, .stMultiSelect > div > div:focus-within {
         border-color: var(--v) \!important;
         box-shadow: 0 0 0 3px rgba(108,99,255,0.13) \!important;
     }
@@ -448,29 +455,9 @@ if (not VISUAL_SAFE_MODE) and (not _apply_rich_theme):
     )
 
 # Surcharge du fond de la sidebar + harmonisation des boutons
-# Après connexion : dark navy premium (Linear / Stripe). Avant : plain ou image.
+# En VISUAL_SAFE_MODE, _safe_visual_css() définit déjà le thème ; ne pas réinjecter
+# d'anciens styles sidebar (ex. #F3EEF9) qui écrasent le mockup après le chargement.
 def _sidebar_styles_css(sidebar_bg_css, is_authenticated=False):
-    if VISUAL_SAFE_MODE:
-        return f"""
-        <style>
-        [data-testid="stSidebar"] {{
-            {sidebar_bg_css}
-        }}
-        [data-testid="stSidebar"] [data-testid="stSidebarContent"] {{
-            background: transparent !important;
-        }}
-        [data-testid="stSidebar"] .stButton > button {{
-            background: #F3EEF9 !important;
-            color: #2C2C2C !important;
-            border: 1px solid #D8CCE9 !important;
-            border-radius: 10px !important;
-        }}
-        [data-testid="stSidebar"] .stButton > button:hover {{
-            background: #ECE4F8 !important;
-        }}
-        </style>
-        """
-
     if is_authenticated:
         return f"""
         <style>
@@ -560,6 +547,19 @@ def _sidebar_styles_css(sidebar_bg_css, is_authenticated=False):
         [data-testid="stSidebar"] hr {{
             border-color: rgba(108,99,255,0.15) \!important;
             margin: 0.5rem 0 \!important;
+        }}
+        </style>
+        """
+
+    # Page de connexion en mode safe : ne pas surcharger les règles sidebar de _safe_visual_css().
+    if VISUAL_SAFE_MODE:
+        return f"""
+        <style>
+        [data-testid="stSidebar"] {{
+            {sidebar_bg_css}
+        }}
+        [data-testid="stSidebar"] [data-testid="stSidebarContent"] {{
+            background: transparent !important;
         }}
         </style>
         """

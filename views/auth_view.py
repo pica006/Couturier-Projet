@@ -27,7 +27,14 @@ import streamlit as st
 from controllers.auth_controller import AuthController
 from config import DATABASE_CONFIG, APP_CONFIG, BRANDING, VISUAL_SAFE_MODE, IS_RENDER
 from utils.bottom_nav import load_site_content, render_app_footer
-from utils.theme import get_login_css, LOGIN_DISPLAY_TITLE_1, LOGIN_DISPLAY_TITLE_2, LOGIN_DISPLAY_SUBTITLE
+from utils.theme import (
+    get_login_css,
+    LOGIN_DISPLAY_TITLE_1,
+    LOGIN_DISPLAY_TITLE_2,
+    LOGIN_DISPLAY_SUBTITLE,
+    LOGIN_SUPPORT_LINE1,
+    LOGIN_SUPPORT_CONTACT_HTML,
+)
 from services.db_bootstrap_service import connect_and_initialize, validate_required_config
 from utils.ui import (
     appliquer_style_pages_critiques,
@@ -455,27 +462,26 @@ def afficher_page_connexion():
     st.markdown(
         f'<div class="login-theme-card">'
         f'<div class="login-theme-title">{LOGIN_DISPLAY_TITLE_1}{LOGIN_DISPLAY_TITLE_2}</div>'
-        f'<div class="login-theme-subtitle">{LOGIN_DISPLAY_SUBTITLE}</div>'
-        f'<div class="login-theme-label">Authentification</div>',
-        unsafe_allow_html=True
+        f'<div class="login-theme-subtitle">{LOGIN_DISPLAY_SUBTITLE}</div>',
+        unsafe_allow_html=True,
     )
-    
+
     with st.form("auth_form", clear_on_submit=False):
             # Champ de saisie du code couturier
             code_couturier = st.text_input(
-                "Code Couturier *",
+                "Code Couturier",
                 placeholder="Ex: COUT001",
                 help="Votre code d'identification unique",
-                key="code_input"
+                key="code_input",
             )
-            
+
             # Champ de saisie du mot de passe
             password_input = st.text_input(
-                "Mot de passe *",
+                "Mot de passe",
                 type="password",
                 placeholder="Entrez votre mot de passe",
                 help="Votre mot de passe sécurisé",
-                key="password_input"
+                key="password_input",
             )
             
             # Bouton de soumission
@@ -562,12 +568,14 @@ def afficher_page_connexion():
                         "Une erreur inattendue est survenue pendant la connexion. Veuillez reessayer."
                     )
         
-    support_text = content.get("support_text", "")
-    if support_text:
-        st.markdown(
-            f'<div class="login-theme-support">{support_text}</div>',
-            unsafe_allow_html=True,
-        )
+    support_line1 = (content.get("support_text") or "").strip() or LOGIN_SUPPORT_LINE1
+    st.markdown(
+        f'<div class="login-theme-support">'
+        f'<p class="login-theme-support-line1">{support_line1}</p>'
+        f'<p class="login-theme-support-contact">{LOGIN_SUPPORT_CONTACT_HTML}</p>'
+        f"</div>",
+        unsafe_allow_html=True,
+    )
     st.markdown("</div><!-- login-theme-card -->", unsafe_allow_html=True)
 
     st.markdown("</div><!-- login-page-wrapper -->", unsafe_allow_html=True)
@@ -575,9 +583,9 @@ def afficher_page_connexion():
     # Footer : informations de l'entreprise sur la page de connexion aussi
     render_app_footer()
 
-    # Fond d'écran après le formulaire (réduit risque de réponse tronquée en prod)
-    # En production (Render) : pas de data URI pour éviter payload lourd / timeout
-    if not IS_RENDER:
+    # Fond image optionnel (désactivé par défaut : la maquette utilise un dégradé doux).
+    # Pour réactiver : APP_CONFIG['login_use_wallpaper'] = True dans config.py
+    if not IS_RENDER and APP_CONFIG.get("login_use_wallpaper"):
         wallpaper_path = APP_CONFIG.get('wallpaper_url')
         data_uri = _load_wallpaper_data_uri(wallpaper_path) if wallpaper_path else None
         if data_uri:
