@@ -1,0 +1,904 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SpiritStitch — Aperçu Design Premium Glass</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Poppins:wght@500;600;700;800&display=swap" rel="stylesheet">
+<style>
+/* ============================================================
+   VARIABLES GLOBALES — Palette CLAUDE.md
+   ============================================================ */
+:root {
+  --violet:       #6C63FF;
+  --turquoise:    #00C9A7;
+  --gradient:     linear-gradient(135deg, #6C63FF 0%, #00C9A7 100%);
+  --bg-app:       linear-gradient(160deg, #f0eeff 0%, #e4f9f5 50%, #eef5ff 100%);
+  --surface:      #FFFFFF;
+  --text:         #111827;
+  --text-soft:    #6B7280;
+  --border:       #E5E7EB;
+  --shadow-sm:    0 4px 14px rgba(108,99,255,0.12);
+  --shadow-md:    0 10px 32px rgba(108,99,255,0.18);
+  --shadow-lg:    0 24px 60px rgba(108,99,255,0.22);
+  --radius-sm:    10px;
+  --radius-md:    16px;
+  --radius-lg:    24px;
+  --radius-xl:    32px;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Inter', sans-serif; background: #e8e8f0; }
+
+/* ============================================================
+   NAVIGATION ONGLETS DE DÉMO
+   ============================================================ */
+.demo-nav {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 1000;
+  background: rgba(255,255,255,0.9);
+  backdrop-filter: blur(16px);
+  border-bottom: 1px solid rgba(108,99,255,0.12);
+  display: flex; align-items: center; gap: 0.5rem;
+  padding: 0.75rem 2rem;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+}
+.demo-nav span { font-weight: 700; font-size: 0.9rem; color: var(--text-soft); margin-right: 1rem; }
+.demo-btn {
+  padding: 0.5rem 1.2rem; border-radius: 999px; border: none;
+  font-family: 'Inter', sans-serif; font-size: 0.875rem; font-weight: 500;
+  cursor: pointer; background: #f3f0ff; color: var(--text); transition: all 0.2s;
+}
+.demo-btn.active, .demo-btn:hover {
+  background: var(--gradient); color: #fff;
+  box-shadow: var(--shadow-sm);
+}
+
+/* ============================================================
+   CONTENEUR MOCKUP
+   ============================================================ */
+.mockup-wrapper { padding-top: 64px; }
+.screen { display: none; }
+.screen.active { display: block; }
+
+/* ============================================================
+   PAGE CONNEXION
+   ============================================================ */
+.login-screen {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #E0C3FC 0%, #A8EDEA 45%, #8EC5FC 100%);
+  background-size: 300% 300%;
+  animation: bgMove 12s ease infinite;
+  display: flex; align-items: center; justify-content: center;
+  position: relative; overflow: hidden;
+}
+@keyframes bgMove {
+  0%   { background-position: 0% 50%; }
+  50%  { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+.login-screen::before {
+  content: '';
+  position: absolute; inset: 0;
+  background:
+    radial-gradient(circle at 20% 15%, rgba(255,255,255,0.6) 0%, transparent 50%),
+    radial-gradient(circle at 80% 85%, rgba(108,99,255,0.3) 0%, transparent 50%),
+    radial-gradient(circle at 55% 50%, rgba(0,201,167,0.15) 0%, transparent 55%);
+  pointer-events: none;
+}
+
+.login-card {
+  background: rgba(255,255,255,0.92);
+  backdrop-filter: blur(32px) saturate(180%);
+  -webkit-backdrop-filter: blur(32px) saturate(180%);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-lg), 0 0 0 1px rgba(255,255,255,0.65), inset 0 1px 0 rgba(255,255,255,0.95);
+  padding: 3rem 2.75rem;
+  width: 100%; max-width: 440px;
+  animation: cardIn 0.6s cubic-bezier(0.22,1,0.36,1) both;
+  position: relative; z-index: 1;
+}
+@keyframes cardIn {
+  from { opacity:0; transform: translateY(20px) scale(0.97); }
+  to   { opacity:1; transform: translateY(0) scale(1); }
+}
+
+.login-logo {
+  text-align: center; margin-bottom: 0.4rem;
+}
+.login-logo .brand {
+  font-family: 'Poppins', sans-serif;
+  font-size: 2.8rem; font-weight: 800;
+  background: var(--gradient);
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+  letter-spacing: -0.03em;
+}
+.login-logo .subtitle {
+  font-size: 0.88rem; color: var(--text-soft); margin-top: 0.2rem;
+}
+
+.login-divider { height: 1px; background: var(--border); margin: 1.5rem 0; }
+
+.login-label {
+  font-size: 0.825rem; font-weight: 600; color: #374151;
+  margin-bottom: 0.4rem; display: block; letter-spacing: 0.02em;
+}
+.login-input {
+  width: 100%; padding: 0.85rem 1rem;
+  border: 1.5px solid var(--border); border-radius: var(--radius-sm);
+  font-family: 'Inter', sans-serif; font-size: 0.95rem; color: var(--text);
+  background: #fff; outline: none;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  margin-bottom: 1rem;
+}
+.login-input:focus {
+  border-color: var(--violet);
+  box-shadow: 0 0 0 4px rgba(108,99,255,0.15);
+}
+.login-input::placeholder { color: #9CA3AF; }
+
+.login-btn {
+  width: 100%; padding: 1rem;
+  background: var(--gradient);
+  color: #fff; border: none; border-radius: var(--radius-sm);
+  font-family: 'Poppins', sans-serif;
+  font-size: 1rem; font-weight: 700; letter-spacing: 0.02em;
+  cursor: pointer;
+  box-shadow: 0 8px 22px rgba(108,99,255,0.32);
+  transition: transform 0.18s ease, box-shadow 0.2s ease;
+  margin-top: 0.5rem;
+}
+.login-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 14px 32px rgba(108,99,255,0.42);
+}
+
+.login-forgot {
+  text-align: center; margin-top: 1.25rem;
+  font-size: 0.85rem; color: var(--violet); cursor: pointer; font-weight: 500;
+}
+
+.login-footer {
+  text-align: center; margin-top: 1.5rem;
+  font-size: 0.78rem; color: var(--text-soft);
+  padding-top: 1rem; border-top: 1px solid var(--border);
+}
+
+/* ============================================================
+   LAYOUT APP AUTHENTIFIÉE
+   ============================================================ */
+.app-layout {
+  display: flex; min-height: 100vh; background: var(--bg-app);
+}
+
+/* SIDEBAR */
+.sidebar {
+  width: 230px; min-height: 100vh;
+  background: linear-gradient(180deg, #ede9fe 0%, #d1faf3 100%);
+  border-right: 1px solid rgba(108,99,255,0.12);
+  display: flex; flex-direction: column;
+  padding: 1.5rem 1rem;
+  box-shadow: 2px 0 16px rgba(108,99,255,0.06);
+}
+
+.sidebar-brand {
+  padding: 0.75rem 1rem 1rem;
+  margin-bottom: 0.5rem;
+}
+.sidebar-brand .name {
+  font-family: 'Poppins', sans-serif;
+  font-size: 1.3rem; font-weight: 800;
+  background: var(--gradient);
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+  letter-spacing: -0.02em;
+}
+.sidebar-user-badge {
+  background: rgba(108,99,255,0.10);
+  border-radius: var(--radius-sm);
+  padding: 0.5rem 0.75rem;
+  margin-bottom: 0.75rem;
+}
+.sidebar-user-badge .uname {
+  font-size: 0.82rem; font-weight: 600; color: #374151;
+}
+.sidebar-user-badge .urole {
+  font-size: 0.72rem; color: var(--text-soft); margin-top: 0.1rem;
+}
+
+.sidebar-section {
+  font-size: 0.7rem; font-weight: 700;
+  color: var(--text-soft); letter-spacing: 0.08em;
+  text-transform: uppercase; padding: 0 0.75rem;
+  margin: 0.75rem 0 0.4rem;
+}
+
+.nav-btn {
+  display: flex; align-items: center; gap: 0.65rem;
+  padding: 0.6rem 0.85rem; border-radius: var(--radius-sm);
+  font-size: 0.88rem; font-weight: 500; color: #374151;
+  cursor: pointer; transition: all 0.18s ease;
+  margin-bottom: 0.15rem;
+  border: none; background: transparent; width: 100%; text-align: left;
+}
+.nav-btn:hover {
+  background: rgba(108,99,255,0.10);
+  color: var(--violet);
+}
+.nav-btn.active {
+  background: var(--gradient);
+  color: #fff;
+  box-shadow: var(--shadow-sm);
+}
+.nav-btn .icon {
+  width: 28px; height: 28px; border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 0.9rem; flex-shrink: 0;
+  background: rgba(255,255,255,0.5);
+}
+.nav-btn.active .icon { background: rgba(255,255,255,0.25); }
+
+.sidebar-divider { height: 1px; background: rgba(108,99,255,0.12); margin: 0.75rem 0; }
+
+.nav-logout {
+  display: flex; align-items: center; gap: 0.65rem;
+  padding: 0.6rem 0.85rem; border-radius: var(--radius-sm);
+  font-size: 0.88rem; font-weight: 600; color: #EF4444;
+  cursor: pointer; background: transparent; border: none; width: 100%;
+  transition: background 0.18s;
+}
+.nav-logout:hover { background: rgba(239,68,68,0.08); }
+
+/* MAIN CONTENT */
+.main-content { flex: 1; overflow-y: auto; padding: 2rem 2.5rem; }
+
+/* PAGE HEADER BANNER */
+.page-banner {
+  border-radius: var(--radius-lg);
+  background: var(--gradient);
+  padding: 1.75rem 2rem;
+  margin-bottom: 2rem;
+  box-shadow: var(--shadow-md);
+  display: flex; align-items: center; gap: 1rem;
+  position: relative; overflow: hidden;
+}
+.page-banner::before {
+  content: '';
+  position: absolute; top: -40%; right: -10%;
+  width: 200px; height: 200px; border-radius: 50%;
+  background: rgba(255,255,255,0.10);
+}
+.page-banner::after {
+  content: '';
+  position: absolute; bottom: -30%; right: 8%;
+  width: 120px; height: 120px; border-radius: 50%;
+  background: rgba(255,255,255,0.07);
+}
+.page-banner .banner-icon {
+  font-size: 2.2rem; position: relative; z-index: 1;
+}
+.page-banner .banner-text { position: relative; z-index: 1; }
+.page-banner .banner-title {
+  font-family: 'Poppins', sans-serif;
+  font-size: 1.6rem; font-weight: 700; color: #fff;
+  letter-spacing: -0.01em;
+}
+.page-banner .banner-sub { font-size: 0.88rem; color: rgba(255,255,255,0.82); margin-top: 0.15rem; }
+
+/* CARTES MÉTRIQUES */
+.metrics-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 1rem; margin-bottom: 2rem; }
+.metric-card {
+  background: var(--surface);
+  border-radius: var(--radius-md);
+  padding: 1.25rem 1.4rem;
+  border: 1px solid var(--border);
+  box-shadow: 0 2px 8px rgba(108,99,255,0.06);
+  transition: box-shadow 0.2s ease, transform 0.15s ease;
+}
+.metric-card:hover { box-shadow: var(--shadow-sm); transform: translateY(-2px); }
+.metric-label {
+  font-size: 0.72rem; font-weight: 700;
+  color: var(--text-soft); text-transform: uppercase; letter-spacing: 0.07em;
+  margin-bottom: 0.4rem;
+}
+.metric-value {
+  font-family: 'Poppins', sans-serif;
+  font-size: 1.9rem; font-weight: 700; color: var(--violet);
+  letter-spacing: -0.02em;
+}
+.metric-delta {
+  font-size: 0.78rem; font-weight: 600; color: #10B981; margin-top: 0.2rem;
+}
+.metric-card .metric-icon {
+  font-size: 1.4rem; margin-bottom: 0.6rem;
+}
+
+/* FORMULAIRE */
+.form-section {
+  background: var(--surface);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  box-shadow: 0 2px 8px rgba(108,99,255,0.05);
+  margin-bottom: 1.25rem;
+  overflow: hidden;
+}
+.form-section-header {
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--border);
+  font-weight: 600; font-size: 0.92rem; color: var(--text);
+  display: flex; align-items: center; gap: 0.5rem;
+  background: rgba(108,99,255,0.025);
+}
+.form-section-body { padding: 1.25rem; }
+
+.form-row { display: grid; grid-template-columns: repeat(3,1fr); gap: 1rem; margin-bottom: 1rem; }
+.form-row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem; }
+
+.form-group { display: flex; flex-direction: column; gap: 0.35rem; }
+.form-label {
+  font-size: 0.82rem; font-weight: 600; color: #374151; letter-spacing: 0.01em;
+}
+.form-label span.req { color: var(--violet); margin-left: 2px; }
+
+.form-input, .form-select {
+  padding: 0.7rem 0.9rem;
+  border: 1.5px solid var(--border); border-radius: var(--radius-sm);
+  font-family: 'Inter', sans-serif; font-size: 0.9rem; color: var(--text);
+  background: #fff; outline: none;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+.form-input:focus, .form-select:focus {
+  border-color: var(--violet);
+  box-shadow: 0 0 0 3px rgba(108,99,255,0.12);
+}
+.form-input::placeholder { color: #9CA3AF; }
+.form-select { appearance: none; cursor: pointer; }
+
+.price-display {
+  display: flex; align-items: center; gap: 1rem;
+  background: rgba(108,99,255,0.04);
+  border: 1.5px solid rgba(108,99,255,0.15);
+  border-radius: var(--radius-sm); padding: 0.7rem 1rem;
+  font-family: 'Poppins', sans-serif; font-size: 1.2rem; font-weight: 700;
+  color: var(--violet);
+}
+
+/* UPLOAD ZONE */
+.upload-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem; }
+.upload-zone {
+  border: 2px dashed rgba(108,99,255,0.3);
+  border-radius: var(--radius-md);
+  padding: 1.5rem; text-align: center;
+  background: rgba(108,99,255,0.03);
+  transition: border-color 0.2s, background 0.2s;
+  cursor: pointer;
+}
+.upload-zone:hover {
+  border-color: var(--violet);
+  background: rgba(108,99,255,0.06);
+}
+.upload-zone .upload-icon { font-size: 1.8rem; margin-bottom: 0.4rem; opacity: 0.6; }
+.upload-zone .upload-title { font-weight: 600; font-size: 0.88rem; color: var(--text); }
+.upload-zone .upload-hint { font-size: 0.75rem; color: var(--text-soft); margin-top: 0.2rem; }
+
+/* BOUTONS ACTIONS */
+.action-bar {
+  display: flex; gap: 0.75rem; margin-top: 1.5rem; justify-content: flex-end;
+}
+.btn-primary {
+  padding: 0.75rem 1.75rem; border-radius: var(--radius-sm);
+  background: var(--gradient); color: #fff; border: none;
+  font-family: 'Poppins', sans-serif; font-size: 0.95rem; font-weight: 700;
+  cursor: pointer; box-shadow: var(--shadow-sm);
+  transition: transform 0.15s ease, box-shadow 0.2s ease;
+}
+.btn-primary:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); }
+
+.btn-secondary {
+  padding: 0.75rem 1.75rem; border-radius: var(--radius-sm);
+  background: #fff; color: var(--violet);
+  border: 1.5px solid rgba(108,99,255,0.25);
+  font-family: 'Inter', sans-serif; font-size: 0.95rem; font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s;
+}
+.btn-secondary:hover {
+  background: rgba(108,99,255,0.05);
+  border-color: var(--violet);
+}
+
+/* TABS */
+.tabs-bar {
+  display: flex; gap: 0.35rem;
+  background: rgba(108,99,255,0.07);
+  border-radius: var(--radius-sm); padding: 0.35rem;
+  margin-bottom: 1.5rem;
+  border: 1px solid rgba(108,99,255,0.08);
+  width: fit-content;
+}
+.tab-item {
+  padding: 0.55rem 1.2rem; border-radius: 8px;
+  font-size: 0.875rem; font-weight: 500; cursor: pointer;
+  color: var(--text-soft); border: none; background: transparent;
+  transition: all 0.18s ease;
+}
+.tab-item.active {
+  background: var(--gradient); color: #fff;
+  box-shadow: 0 3px 10px rgba(108,99,255,0.22);
+}
+.tab-item:hover:not(.active) {
+  background: rgba(108,99,255,0.08); color: var(--violet);
+}
+
+/* TABLEAU COMMANDES */
+.orders-table {
+  width: 100%; border-collapse: collapse;
+  background: var(--surface); border-radius: var(--radius-md);
+  overflow: hidden; box-shadow: 0 2px 8px rgba(108,99,255,0.06);
+  border: 1px solid var(--border);
+}
+.orders-table th {
+  background: rgba(108,99,255,0.06);
+  padding: 0.8rem 1rem; text-align: left;
+  font-size: 0.75rem; font-weight: 700; color: var(--text-soft);
+  text-transform: uppercase; letter-spacing: 0.06em;
+  border-bottom: 1px solid var(--border);
+}
+.orders-table td {
+  padding: 0.85rem 1rem; font-size: 0.875rem; color: var(--text);
+  border-bottom: 1px solid rgba(229,231,235,0.5);
+}
+.orders-table tr:last-child td { border-bottom: none; }
+.orders-table tr:hover td { background: rgba(108,99,255,0.025); }
+
+.badge {
+  display: inline-flex; align-items: center;
+  padding: 0.25rem 0.65rem; border-radius: 999px;
+  font-size: 0.72rem; font-weight: 600; letter-spacing: 0.02em;
+}
+.badge-green  { background: #DCFCE7; color: #15803D; }
+.badge-orange { background: #FEF3C7; color: #B45309; }
+.badge-blue   { background: #DBEAFE; color: #1D4ED8; }
+.badge-violet { background: #EDE9FE; color: #6C63FF; }
+
+/* DASHBOARD */
+.dashboard-grid { display: grid; grid-template-columns: 2fr 1fr; gap: 1.5rem; }
+.chart-card {
+  background: var(--surface);
+  border-radius: var(--radius-md); border: 1px solid var(--border);
+  padding: 1.4rem; box-shadow: 0 2px 8px rgba(108,99,255,0.06);
+}
+.chart-card-title {
+  font-family: 'Poppins', sans-serif;
+  font-size: 0.95rem; font-weight: 700; color: var(--text);
+  margin-bottom: 1.25rem; display: flex; align-items: center; gap: 0.5rem;
+}
+
+/* Faux graphique en barres */
+.bar-chart { display: flex; align-items: flex-end; gap: 0.5rem; height: 120px; }
+.bar-wrap { display: flex; flex-direction: column; align-items: center; gap: 0.35rem; flex: 1; }
+.bar {
+  width: 100%; border-radius: 6px 6px 0 0;
+  background: var(--gradient);
+  transition: opacity 0.2s;
+}
+.bar:hover { opacity: 0.8; }
+.bar-label { font-size: 0.65rem; color: var(--text-soft); }
+
+/* Liste activité récente */
+.activity-list { display: flex; flex-direction: column; gap: 0.6rem; }
+.activity-item {
+  display: flex; align-items: center; gap: 0.75rem;
+  padding: 0.65rem 0.85rem;
+  border-radius: var(--radius-sm);
+  background: rgba(108,99,255,0.04);
+  border: 1px solid rgba(108,99,255,0.06);
+}
+.activity-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--gradient); flex-shrink: 0;
+}
+.activity-text { font-size: 0.82rem; color: var(--text); flex: 1; }
+.activity-time { font-size: 0.72rem; color: var(--text-soft); }
+
+</style>
+</head>
+<body>
+
+<!-- NAVIGATION DÉMO -->
+<nav class="demo-nav">
+  <span>🎨 Aperçu SpiritStitch</span>
+  <button class="demo-btn active" onclick="showScreen('login')">🔐 Connexion</button>
+  <button class="demo-btn" onclick="showScreen('commande')">➕ Nouvelle Commande</button>
+  <button class="demo-btn" onclick="showScreen('liste')">📜 Mes Commandes</button>
+  <button class="demo-btn" onclick="showScreen('dashboard')">📊 Tableau de Bord</button>
+</nav>
+
+<div class="mockup-wrapper">
+
+<!-- ============================================================ -->
+<!-- ÉCRAN 1 : CONNEXION                                         -->
+<!-- ============================================================ -->
+<div class="screen active" id="screen-login">
+  <div class="login-screen">
+    <div class="login-card">
+      <div class="login-logo">
+        <div class="brand">SpiritStitch</div>
+        <div class="subtitle">— Votre espace couture —</div>
+      </div>
+      <div class="login-divider"></div>
+      <label class="login-label">Code Couturier</label>
+      <input class="login-input" type="text" placeholder="Ex: COUT001">
+      <label class="login-label">Mot de passe</label>
+      <input class="login-input" type="password" placeholder="••••••••••">
+      <button class="login-btn">Se connecter</button>
+      <div class="login-forgot">Mot de passe oublié ?</div>
+      <div class="login-footer">
+        Besoin d'aide ? Contactez l'administrateur de votre atelier.<br>
+        <strong>An's Learning</strong> — Douala, Kotto &nbsp;|&nbsp; +237 698 19 25 07
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- ÉCRAN 2 : NOUVELLE COMMANDE                                 -->
+<!-- ============================================================ -->
+<div class="screen" id="screen-commande">
+  <div class="app-layout">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="sidebar-brand"><div class="name">SpiritStitch</div></div>
+      <div class="sidebar-user-badge">
+        <div class="uname">ISSA ISSA</div>
+        <div class="urole">Code: ISSA &nbsp;|&nbsp; Rôle: admin</div>
+      </div>
+      <div class="sidebar-section">Navigation</div>
+      <button class="nav-btn"><span class="icon">📊</span> Tableau de bord</button>
+      <button class="nav-btn active"><span class="icon">➕</span> Nouvelle commande</button>
+      <button class="nav-btn"><span class="icon">📜</span> Mes commandes</button>
+      <button class="nav-btn"><span class="icon">💰</span> Comptabilité</button>
+      <button class="nav-btn"><span class="icon">📄</span> Mes charges</button>
+      <button class="nav-btn"><span class="icon">🔒</span> Fermer commandes</button>
+      <button class="nav-btn"><span class="icon">📋</span> Modèles & Calendrier</button>
+      <div class="sidebar-divider"></div>
+      <div class="sidebar-section">Administration</div>
+      <button class="nav-btn"><span class="icon">👑</span> Administration</button>
+      <div style="flex:1"></div>
+      <div class="sidebar-divider"></div>
+      <button class="nav-logout">🚪 Déconnexion</button>
+    </aside>
+
+    <!-- Main -->
+    <main class="main-content">
+      <div class="page-banner">
+        <div class="banner-icon">➕</div>
+        <div class="banner-text">
+          <div class="banner-title">Nouvelle Commande</div>
+          <div class="banner-sub">Créer une nouvelle commande pour un client</div>
+        </div>
+      </div>
+
+      <!-- Infos générales -->
+      <div class="form-section">
+        <div class="form-section-header">📋 Informations générales</div>
+        <div class="form-section-body">
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">💵 Prix total (FCFA)<span class="req">*</span></label>
+              <input class="form-input" type="number" placeholder="0,00">
+            </div>
+            <div class="form-group">
+              <label class="form-label">💳 Avance (FCFA)<span class="req">*</span></label>
+              <input class="form-input" type="number" placeholder="0,00">
+            </div>
+            <div class="form-group">
+              <label class="form-label">💰 Reste à payer</label>
+              <div class="price-display">0 FCFA</div>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">👕 Catégorie<span class="req">*</span></label>
+              <select class="form-select">
+                <option>👔 Adulte</option>
+                <option>👶 Enfant</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">🧍 Sexe<span class="req">*</span></label>
+              <select class="form-select">
+                <option>👔 Homme</option>
+                <option>👗 Femme</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">🎨 Modèle<span class="req">*</span></label>
+              <select class="form-select">
+                <option>Costume 3 pièces</option>
+                <option>Boubou grand</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Infos client -->
+      <div class="form-section">
+        <div class="form-section-header">👤 Informations du client</div>
+        <div class="form-section-body">
+          <div class="form-row-2">
+            <div class="form-group">
+              <label class="form-label">Nom<span class="req">*</span></label>
+              <input class="form-input" placeholder="Nom du client">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Téléphone<span class="req">*</span></label>
+              <input class="form-input" placeholder="77 123 45 67">
+            </div>
+          </div>
+          <div class="form-row-2">
+            <div class="form-group">
+              <label class="form-label">Prénom<span class="req">*</span></label>
+              <input class="form-input" placeholder="Prénom du client">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Email</label>
+              <input class="form-input" type="email" placeholder="client@email.com (optionnel)">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Photos -->
+      <div class="form-section">
+        <div class="form-section-header">🖼️ Photos du tissu et du modèle</div>
+        <div class="form-section-body">
+          <div class="upload-grid">
+            <div class="upload-zone">
+              <div class="upload-icon">🧵</div>
+              <div class="upload-title">Photo du tissu <span style="color:var(--violet)">*</span></div>
+              <div class="upload-hint">PNG, JPG, JPEG — max 200 MB</div>
+            </div>
+            <div class="upload-zone">
+              <div class="upload-icon">👗</div>
+              <div class="upload-title">Photo du modèle <span style="color:var(--violet)">*</span></div>
+              <div class="upload-hint">PNG, JPG, JPEG — max 200 MB</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="action-bar">
+        <button class="btn-secondary">🗑️ Annuler</button>
+        <button class="btn-primary">✅ Créer la commande</button>
+      </div>
+    </main>
+  </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- ÉCRAN 3 : LISTE DES COMMANDES                              -->
+<!-- ============================================================ -->
+<div class="screen" id="screen-liste">
+  <div class="app-layout">
+    <aside class="sidebar">
+      <div class="sidebar-brand"><div class="name">SpiritStitch</div></div>
+      <div class="sidebar-user-badge">
+        <div class="uname">ISSA ISSA</div>
+        <div class="urole">Code: ISSA &nbsp;|&nbsp; Rôle: admin</div>
+      </div>
+      <div class="sidebar-section">Navigation</div>
+      <button class="nav-btn"><span class="icon">📊</span> Tableau de bord</button>
+      <button class="nav-btn"><span class="icon">➕</span> Nouvelle commande</button>
+      <button class="nav-btn active"><span class="icon">📜</span> Mes commandes</button>
+      <button class="nav-btn"><span class="icon">💰</span> Comptabilité</button>
+      <button class="nav-btn"><span class="icon">📄</span> Mes charges</button>
+      <button class="nav-btn"><span class="icon">🔒</span> Fermer commandes</button>
+      <button class="nav-btn"><span class="icon">📋</span> Modèles & Calendrier</button>
+      <div class="sidebar-divider"></div>
+      <div class="sidebar-section">Administration</div>
+      <button class="nav-btn"><span class="icon">👑</span> Administration</button>
+      <div style="flex:1"></div>
+      <div class="sidebar-divider"></div>
+      <button class="nav-logout">🚪 Déconnexion</button>
+    </aside>
+    <main class="main-content">
+      <div class="page-banner">
+        <div class="banner-icon">📜</div>
+        <div class="banner-text">
+          <div class="banner-title">Mes Commandes</div>
+          <div class="banner-sub">Suivez et gérez toutes vos commandes</div>
+        </div>
+      </div>
+
+      <div class="tabs-bar">
+        <button class="tab-item active">📋 Toutes</button>
+        <button class="tab-item">⏳ En cours</button>
+        <button class="tab-item">✅ Terminées</button>
+        <button class="tab-item">🔒 Fermées</button>
+      </div>
+
+      <table class="orders-table">
+        <thead>
+          <tr>
+            <th>N° Commande</th>
+            <th>Client</th>
+            <th>Modèle</th>
+            <th>Date livraison</th>
+            <th>Prix total</th>
+            <th>Reste</th>
+            <th>Statut</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>#CMD-2024-089</strong></td>
+            <td>Mamadou Diallo</td>
+            <td>Boubou grand</td>
+            <td>25/04/2026</td>
+            <td>45 000 FCFA</td>
+            <td style="color:#EF4444;font-weight:600">15 000</td>
+            <td><span class="badge badge-orange">⏳ En cours</span></td>
+            <td><button class="btn-primary" style="padding:0.35rem 0.75rem;font-size:0.78rem">Voir</button></td>
+          </tr>
+          <tr>
+            <td><strong>#CMD-2024-088</strong></td>
+            <td>Fatou Ndiaye</td>
+            <td>Robe de soirée</td>
+            <td>20/04/2026</td>
+            <td>75 000 FCFA</td>
+            <td style="color:#10B981;font-weight:600">0</td>
+            <td><span class="badge badge-green">✅ Terminée</span></td>
+            <td><button class="btn-primary" style="padding:0.35rem 0.75rem;font-size:0.78rem">Voir</button></td>
+          </tr>
+          <tr>
+            <td><strong>#CMD-2024-087</strong></td>
+            <td>Ibrahim Koné</td>
+            <td>Costume 3 pièces</td>
+            <td>18/04/2026</td>
+            <td>120 000 FCFA</td>
+            <td style="color:#EF4444;font-weight:600">40 000</td>
+            <td><span class="badge badge-blue">🔄 Retouche</span></td>
+            <td><button class="btn-primary" style="padding:0.35rem 0.75rem;font-size:0.78rem">Voir</button></td>
+          </tr>
+          <tr>
+            <td><strong>#CMD-2024-086</strong></td>
+            <td>Aïcha Touré</td>
+            <td>Tailleur femme</td>
+            <td>15/04/2026</td>
+            <td>55 000 FCFA</td>
+            <td style="color:#10B981;font-weight:600">0</td>
+            <td><span class="badge badge-violet">🔒 Fermée</span></td>
+            <td><button class="btn-primary" style="padding:0.35rem 0.75rem;font-size:0.78rem">Voir</button></td>
+          </tr>
+        </tbody>
+      </table>
+    </main>
+  </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- ÉCRAN 4 : TABLEAU DE BORD                                  -->
+<!-- ============================================================ -->
+<div class="screen" id="screen-dashboard">
+  <div class="app-layout">
+    <aside class="sidebar">
+      <div class="sidebar-brand"><div class="name">SpiritStitch</div></div>
+      <div class="sidebar-user-badge">
+        <div class="uname">ISSA ISSA</div>
+        <div class="urole">Code: ISSA &nbsp;|&nbsp; Rôle: admin</div>
+      </div>
+      <div class="sidebar-section">Navigation</div>
+      <button class="nav-btn active"><span class="icon">📊</span> Tableau de bord</button>
+      <button class="nav-btn"><span class="icon">➕</span> Nouvelle commande</button>
+      <button class="nav-btn"><span class="icon">📜</span> Mes commandes</button>
+      <button class="nav-btn"><span class="icon">💰</span> Comptabilité</button>
+      <button class="nav-btn"><span class="icon">📄</span> Mes charges</button>
+      <button class="nav-btn"><span class="icon">🔒</span> Fermer commandes</button>
+      <button class="nav-btn"><span class="icon">📋</span> Modèles & Calendrier</button>
+      <div class="sidebar-divider"></div>
+      <div class="sidebar-section">Administration</div>
+      <button class="nav-btn"><span class="icon">👑</span> Administration</button>
+      <div style="flex:1"></div>
+      <div class="sidebar-divider"></div>
+      <button class="nav-logout">🚪 Déconnexion</button>
+    </aside>
+    <main class="main-content">
+      <div class="page-banner">
+        <div class="banner-icon">📊</div>
+        <div class="banner-text">
+          <div class="banner-title">Tableau de Bord</div>
+          <div class="banner-sub">Vue d'ensemble de l'atelier — Avril 2026</div>
+        </div>
+      </div>
+
+      <!-- Métriques -->
+      <div class="metrics-grid">
+        <div class="metric-card">
+          <div class="metric-icon">📦</div>
+          <div class="metric-label">Commandes actives</div>
+          <div class="metric-value">24</div>
+          <div class="metric-delta">▲ +3 cette semaine</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-icon">💰</div>
+          <div class="metric-label">CA du mois</div>
+          <div class="metric-value">1,2M</div>
+          <div class="metric-delta">▲ +18% vs mois dernier</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-icon">👥</div>
+          <div class="metric-label">Clients ce mois</div>
+          <div class="metric-value">38</div>
+          <div class="metric-delta">▲ +5 nouveaux</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-icon">⏰</div>
+          <div class="metric-label">Livraisons à venir</div>
+          <div class="metric-value" style="color:#F59E0B">7</div>
+          <div class="metric-delta" style="color:#F59E0B">⚠ Dans les 3 jours</div>
+        </div>
+      </div>
+
+      <!-- Graphique + Activité -->
+      <div class="dashboard-grid">
+        <div class="chart-card">
+          <div class="chart-card-title">📈 Chiffre d'affaires — 6 derniers mois</div>
+          <div class="bar-chart">
+            <div class="bar-wrap"><div class="bar" style="height:60%"></div><div class="bar-label">Nov</div></div>
+            <div class="bar-wrap"><div class="bar" style="height:72%"></div><div class="bar-label">Déc</div></div>
+            <div class="bar-wrap"><div class="bar" style="height:55%"></div><div class="bar-label">Jan</div></div>
+            <div class="bar-wrap"><div class="bar" style="height:80%"></div><div class="bar-label">Fév</div></div>
+            <div class="bar-wrap"><div class="bar" style="height:68%"></div><div class="bar-label">Mar</div></div>
+            <div class="bar-wrap"><div class="bar" style="height:100%"></div><div class="bar-label">Avr</div></div>
+          </div>
+        </div>
+
+        <div class="chart-card">
+          <div class="chart-card-title">🔔 Activité récente</div>
+          <div class="activity-list">
+            <div class="activity-item">
+              <div class="activity-dot"></div>
+              <div class="activity-text">Nouvelle commande #CMD-089 — Mamadou</div>
+              <div class="activity-time">Il y a 12 min</div>
+            </div>
+            <div class="activity-item">
+              <div class="activity-dot"></div>
+              <div class="activity-text">Commande #CMD-088 terminée — Fatou</div>
+              <div class="activity-time">Il y a 1h</div>
+            </div>
+            <div class="activity-item">
+              <div class="activity-dot"></div>
+              <div class="activity-text">Paiement reçu — Ibrahim K. (40 000 F)</div>
+              <div class="activity-time">Il y a 2h</div>
+            </div>
+            <div class="activity-item">
+              <div class="activity-dot"></div>
+              <div class="activity-text">Rappel envoyé — livraison demain</div>
+              <div class="activity-time">Il y a 3h</div>
+            </div>
+            <div class="activity-item">
+              <div class="activity-dot"></div>
+              <div class="activity-text">PDF facture généré — Aïcha T.</div>
+              <div class="activity-time">Hier</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+
+</div><!-- end mockup-wrapper -->
+
+<script>
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.demo-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('screen-' + id).classList.add('active');
+  event.currentTarget.classList.add('active');
+}
+</script>
+</body>
+</html>

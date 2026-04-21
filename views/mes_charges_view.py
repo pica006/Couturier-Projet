@@ -931,7 +931,7 @@ def afficher_analyses_graphiques(
     )
     
     fig_line.update_traces(
-        line_color='#B19CD9',
+        line_color='#6C63FF',
         line_width=3,
         hovertemplate='<b>Date:</b> %{x}<br><b>Montant:</b> %{y:,.0f} FCFA<extra></extra>'
     )

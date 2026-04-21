@@ -177,7 +177,7 @@ def render_bottom_nav(app_values: dict) -> None:
         .bottom-nav {
             margin-top: 2.5rem;
             background: linear-gradient(135deg, #F3F0FB 0%, #E9FBF9 100%);
-            border-top: 2px solid #B19CD9;
+            border-top: 2px solid #6C63FF;
             padding: 1.1rem 0;
         }
 
@@ -203,7 +203,7 @@ def render_bottom_nav(app_values: dict) -> None:
             display: inline-block;
             padding: 0.32rem 0.85rem;
             border-radius: 999px;
-            background: linear-gradient(135deg, #B19CD9 0%, #40E0D0 100%);
+            background: linear-gradient(135deg, #6C63FF 0%, #00C9A7 100%);
             color: #FFFFFF;
             font-weight: 700;
             font-size: 0.86rem;

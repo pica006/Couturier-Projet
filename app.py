@@ -45,7 +45,7 @@ st.set_page_config(
 
 SIDEBAR_BG_PLAIN = "background: #FAFAFA !important;"
 # Sidebar après connexion : dark navy premium (Linear / Stripe)
-SIDEBAR_BG_DARK = "background: #0F172A !important;"
+SIDEBAR_BG_DARK = "background: linear-gradient(180deg, #ede9fe 0%, #d1faf3 100%) \!important;"
 
 
 @st.cache_data(show_spinner=False)
@@ -92,9 +92,9 @@ def _safe_visual_css() -> str:
     }
 
     .stButton > button, button[kind="primary"] {
-        background: #B19CD9 !important;
+        background: #6C63FF !important;
         color: #FFFFFF !important;
-        border: 1px solid #B19CD9 !important;
+        border: 1px solid #6C63FF !important;
         border-radius: 10px !important;
         box-shadow: none !important;
         transition: none !important;
@@ -102,13 +102,13 @@ def _safe_visual_css() -> str:
     }
 
     .stButton > button:hover, button[kind="primary"]:hover {
-        background: #9F87D3 !important;
+        background: #5A52E0 !important;
         color: #FFFFFF !important;
         opacity: 1 !important;
     }
 
     a, a:visited, a:hover {
-        color: #40E0D0 !important;
+        color: #00C9A7 !important;
     }
     </style>
     """
@@ -123,265 +123,192 @@ elif _apply_rich_theme:
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Poppins:wght@400;500;600;700;800&display=swap');
 
-    /* =====================================================================
-       PALETTE PREMIUM GLASS — CLAUDE.md : violet #6C63FF → turquoise #00C9A7
-       ===================================================================== */
+    /* ========================================================
+       PALETTE CLAUDE.md : violet #6C63FF → turquoise #00C9A7
+       ======================================================== */
     :root {
-        --violet:          #6C63FF;
-        --turquoise:       #00C9A7;
-        --violet-soft:     #8B7FFF;
-        --gradient:        linear-gradient(135deg, #6C63FF 0%, #00C9A7 100%);
-        --gradient-inv:    linear-gradient(135deg, #00C9A7 0%, #6C63FF 100%);
-        --bg-app:          linear-gradient(160deg, #f0eeff 0%, #e8f9f6 50%, #eef6ff 100%);
-        --surface:         #FFFFFF;
-        --surface-soft:    #F8F9FC;
-        --text:            #111827;
-        --text-soft:       #6B7280;
-        --border:          #E5E7EB;
-        --shadow-xs:       0 1px 3px rgba(108,99,255,0.06);
-        --shadow-sm:       0 4px 12px rgba(108,99,255,0.10);
-        --shadow-md:       0 8px 28px rgba(108,99,255,0.16);
-        --shadow-lg:       0 20px 50px rgba(108,99,255,0.20);
-        --radius-sm:       10px;
-        --radius-md:       14px;
-        --radius-lg:       20px;
-        --radius-xl:       28px;
+        --v:          #6C63FF;
+        --t:          #00C9A7;
+        --g:          linear-gradient(135deg, #6C63FF 0%, #00C9A7 100%);
+        --bg:         linear-gradient(160deg, #f0eeff 0%, #e4f9f5 50%, #eef5ff 100%);
+        --surface:    #FFFFFF;
+        --text:       #111827;
+        --soft:       #6B7280;
+        --border:     #E5E7EB;
+        --sh-xs:      0 2px 8px rgba(108,99,255,0.08);
+        --sh-sm:      0 6px 18px rgba(108,99,255,0.14);
+        --sh-md:      0 12px 32px rgba(108,99,255,0.20);
+        --r-sm:       10px;
+        --r-md:       16px;
+        --r-lg:       20px;
     }
 
-    /* =====================================================================
-       FOND GLOBAL — dégradé lavande→cyan très subtil (glass sur blanc)
-       ===================================================================== */
+    /* App background */
     .stApp {
-        background: var(--bg-app) !important;
+        background: var(--bg) \!important;
         font-family: 'Inter', 'Segoe UI', sans-serif;
-        min-height: 100vh;
     }
-
     .main .block-container {
-        background: transparent !important;
+        background: transparent \!important;
         padding-top: 1.5rem;
         padding-bottom: 2.5rem;
         max-width: 1200px;
     }
 
-    /* =====================================================================
-       SIDEBAR
-       ===================================================================== */
-    [data-testid="stSidebar"] {
-        border-right: 1px solid rgba(108,99,255,0.10);
-    }
-
-    /* =====================================================================
-       BOUTONS — gradient violet→turquoise (un seul bloc consolidé)
-       ===================================================================== */
+    /* ---- BOUTONS ---- */
     .stButton > button,
     button[data-baseweb="button"],
-    [data-baseweb="button"],
     div[data-testid="stButton"] > button {
-        background: var(--gradient) !important;
-        color: #FFFFFF !important;
-        border: none !important;
-        border-radius: var(--radius-md) !important;
-        padding: 0.7rem 1.4rem !important;
-        font-weight: 600 !important;
-        font-size: 0.95rem !important;
+        background: var(--g) \!important;
+        color: #fff \!important;
+        border: none \!important;
+        border-radius: var(--r-md) \!important;
+        padding: 0.65rem 1.35rem \!important;
+        font-weight: 600 \!important;
+        font-size: 0.9rem \!important;
+        box-shadow: var(--sh-xs) \!important;
+        transition: transform 0.15s ease, box-shadow 0.2s ease \!important;
         letter-spacing: 0.01em;
-        box-shadow: var(--shadow-sm) !important;
-        transition: transform 0.15s ease, box-shadow 0.2s ease !important;
     }
-
     .stButton > button:hover,
     button[data-baseweb="button"]:hover,
-    [data-baseweb="button"]:hover,
     div[data-testid="stButton"] > button:hover {
-        transform: translateY(-2px) !important;
-        box-shadow: var(--shadow-md) !important;
-        opacity: 0.96;
+        transform: translateY(-2px) \!important;
+        box-shadow: var(--sh-sm) \!important;
     }
+    .stButton > button:active { transform: translateY(0) \!important; }
 
-    .stButton > button:active,
-    button[data-baseweb="button"]:active {
-        transform: translateY(0) !important;
-        box-shadow: var(--shadow-xs) !important;
-    }
-
-    /* =====================================================================
-       ONGLETS (TABS)
-       ===================================================================== */
+    /* ---- ONGLETS ---- */
     .stTabs [data-baseweb="tab-list"] {
-        background: rgba(108,99,255,0.06);
-        border-radius: var(--radius-md);
+        background: rgba(108,99,255,0.07);
+        border-radius: var(--r-md);
         padding: 0.35rem;
         gap: 0.3rem;
         margin-bottom: 1.5rem;
-        border: 1px solid rgba(108,99,255,0.08);
+        border: 1px solid rgba(108,99,255,0.10);
     }
-
     .stTabs [data-baseweb="tab"] {
-        background: transparent !important;
-        border-radius: var(--radius-sm) !important;
-        padding: 0.65rem 1.25rem !important;
-        color: var(--text) !important;
-        font-weight: 500 !important;
-        transition: background 0.2s ease, color 0.2s ease !important;
+        background: transparent \!important;
+        border-radius: var(--r-sm) \!important;
+        padding: 0.6rem 1.2rem \!important;
+        color: var(--text) \!important;
+        font-weight: 500 \!important;
+        transition: all 0.18s ease \!important;
     }
-
     .stTabs [data-baseweb="tab"]:hover {
-        background: rgba(108,99,255,0.08) !important;
-        color: var(--violet) !important;
+        background: rgba(108,99,255,0.09) \!important;
+        color: var(--v) \!important;
     }
-
     .stTabs [aria-selected="true"] {
-        background: var(--gradient) !important;
-        color: #FFFFFF !important;
-        box-shadow: var(--shadow-sm) !important;
+        background: var(--g) \!important;
+        color: #fff \!important;
+        box-shadow: var(--sh-xs) \!important;
     }
+    .stTabs [aria-selected="true"]:hover { opacity: 0.95 \!important; }
 
-    .stTabs [aria-selected="true"]:hover {
-        background: var(--gradient) !important;
-        color: #FFFFFF !important;
-        opacity: 0.95;
-    }
-
-    /* =====================================================================
-       MÉTRIQUES — cartes glass légères
-       ===================================================================== */
+    /* ---- METRIQUES ---- */
     [data-testid="stMetric"] {
         background: var(--surface);
         border: 1px solid var(--border);
-        border-radius: var(--radius-md);
+        border-radius: var(--r-md);
         padding: 1.2rem 1.3rem;
-        box-shadow: var(--shadow-xs);
+        box-shadow: var(--sh-xs);
         transition: box-shadow 0.2s ease, transform 0.15s ease;
     }
-
     [data-testid="stMetric"]:hover {
-        box-shadow: var(--shadow-sm);
+        box-shadow: var(--sh-sm);
         transform: translateY(-2px);
     }
-
     [data-testid="stMetricValue"] {
-        font-family: 'Poppins', 'Inter', sans-serif !important;
-        font-size: 2.1rem !important;
-        font-weight: 700 !important;
-        color: var(--violet) !important;
+        font-family: 'Poppins', 'Inter', sans-serif \!important;
+        font-size: 2rem \!important;
+        font-weight: 700 \!important;
+        color: var(--v) \!important;
     }
-
     [data-testid="stMetricLabel"] {
-        font-size: 0.82rem !important;
-        color: var(--text-soft) !important;
-        font-weight: 500 !important;
+        font-size: 0.72rem \!important;
+        color: var(--soft) \!important;
+        font-weight: 700 \!important;
         text-transform: uppercase;
-        letter-spacing: 0.05em;
+        letter-spacing: 0.07em;
     }
 
-    [data-testid="stMetricDelta"] {
-        font-size: 0.875rem !important;
-        font-weight: 600 !important;
-    }
-
-    /* =====================================================================
-       FORMULAIRES — bordures fines, focus violet
-       ===================================================================== */
+    /* ---- FORMULAIRES ---- */
     .stTextInput > div > div,
     .stNumberInput > div > div,
     .stSelectbox > div > div,
     .stMultiSelect > div > div,
     .stTextArea > div > div,
     .stDateInput > div > div {
-        background: var(--surface) !important;
-        border: 1.5px solid var(--border) !important;
-        border-radius: var(--radius-sm) !important;
-        transition: border-color 0.2s ease, box-shadow 0.2s ease !important;
+        background: var(--surface) \!important;
+        border: 1.5px solid var(--border) \!important;
+        border-radius: var(--r-sm) \!important;
+        transition: border-color 0.2s ease, box-shadow 0.2s ease \!important;
     }
-
     .stTextInput > div > div:focus-within,
     .stNumberInput > div > div:focus-within,
     .stTextArea > div > div:focus-within,
     .stDateInput > div > div:focus-within,
     .stSelectbox > div > div:focus-within {
-        border-color: var(--violet) !important;
-        box-shadow: 0 0 0 3px rgba(108,99,255,0.12) !important;
+        border-color: var(--v) \!important;
+        box-shadow: 0 0 0 3px rgba(108,99,255,0.13) \!important;
     }
 
-    /* =====================================================================
-       TABLEAUX
-       ===================================================================== */
+    /* ---- TABLEAUX ---- */
     .stDataFrame {
-        border-radius: var(--radius-md);
+        border-radius: var(--r-md);
         overflow: hidden;
-        box-shadow: var(--shadow-xs);
+        box-shadow: var(--sh-xs);
         border: 1px solid var(--border);
     }
-
     .stDataFrame th {
-        background: rgba(108,99,255,0.06) !important;
-        color: var(--text) !important;
-        font-weight: 600 !important;
-        font-size: 0.85rem !important;
-        letter-spacing: 0.02em;
+        background: rgba(108,99,255,0.06) \!important;
+        color: var(--text) \!important;
+        font-weight: 700 \!important;
+        font-size: 0.78rem \!important;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
     }
 
-    .stDataFrame tr:hover td {
-        background: rgba(108,99,255,0.03) !important;
-    }
-
-    /* =====================================================================
-       EXPANDERS
-       ===================================================================== */
+    /* ---- EXPANDERS ---- */
     [data-testid="stExpander"] {
-        border-radius: var(--radius-md) !important;
-        border: 1px solid var(--border) !important;
-        box-shadow: var(--shadow-xs) !important;
-        background: var(--surface) !important;
+        border-radius: var(--r-md) \!important;
+        border: 1px solid var(--border) \!important;
+        box-shadow: var(--sh-xs) \!important;
+        background: var(--surface) \!important;
         overflow: hidden;
     }
-
     [data-testid="stExpander"] summary {
-        font-weight: 600 !important;
-        color: var(--text) !important;
-        padding: 0.9rem 1rem !important;
+        font-weight: 600 \!important;
+        color: var(--text) \!important;
+        padding: 0.85rem 1rem \!important;
     }
 
-    /* =====================================================================
-       ALERTES
-       ===================================================================== */
+    /* ---- ALERTES ---- */
     .stAlert {
-        border-radius: var(--radius-md) !important;
-        border-left-width: 4px !important;
-        box-shadow: var(--shadow-xs) !important;
+        border-radius: var(--r-md) \!important;
+        border-left-width: 4px \!important;
+        box-shadow: var(--sh-xs) \!important;
     }
 
-    /* =====================================================================
-       TYPOGRAPHIE
-       ===================================================================== */
+    /* ---- TYPOGRAPHIE ---- */
     h1, h2, h3, h4, h5, h6 {
-        font-family: 'Poppins', 'Inter', sans-serif !important;
-        color: var(--text) !important;
+        font-family: 'Poppins', 'Inter', sans-serif \!important;
+        color: var(--text) \!important;
         font-weight: 600;
         letter-spacing: -0.01em;
     }
 
-    /* =====================================================================
-       LIENS & COULEURS INTERACTIVES
-       ===================================================================== */
-    a, a:visited { color: var(--violet) !important; }
-    a:hover     { color: var(--turquoise) !important; }
+    /* ---- LIENS ---- */
+    a, a:visited { color: var(--v) \!important; }
+    a:hover      { color: var(--t) \!important; }
 
-    /* =====================================================================
-       SÉPARATEURS & SCROLLBAR
-       ===================================================================== */
-    hr {
-        border: none;
-        border-top: 1px solid var(--border);
-        margin: 1.5rem 0;
-    }
-
-    ::-webkit-scrollbar        { width: 8px; height: 8px; }
-    ::-webkit-scrollbar-track  { background: transparent; }
-    ::-webkit-scrollbar-thumb  { background: rgba(108,99,255,0.22); border-radius: 6px; }
+    /* ---- SEPARATEURS & SCROLLBAR ---- */
+    hr { border: none; border-top: 1px solid var(--border); margin: 1.5rem 0; }
+    ::-webkit-scrollbar       { width: 7px; height: 7px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: rgba(108,99,255,0.22); border-radius: 6px; }
     ::-webkit-scrollbar-thumb:hover { background: rgba(108,99,255,0.40); }
-
     </style>
 """, unsafe_allow_html=True)
 
@@ -442,138 +369,92 @@ def _sidebar_styles_css(sidebar_bg_css, is_authenticated=False):
     if is_authenticated:
         return f"""
         <style>
-        /* Fond sidebar après connexion : même univers pastel que l'écran de login */
+        /* =========================================================
+           SIDEBAR AUTHENTIFIEE  — Premium Glass Light
+           ========================================================= */
         [data-testid="stSidebar"] {{
             {sidebar_bg_css}
-            padding: 1.5rem 1rem !important;
+            border-right: 1px solid rgba(108,99,255,0.12) \!important;
         }}
         [data-testid="stSidebar"] [data-testid="stSidebarContent"] {{
-            background: transparent !important;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
+            background: transparent \!important;
+            padding: 0.25rem 0 \!important;
         }}
 
-        /* Carte verre (glass) centrée dans la sidebar - modèle SpiritStitch */
-        .sidebar-glass-card {{
-            background: rgba(255, 255, 255, 0.88) !important;
-            backdrop-filter: blur(24px);
-            -webkit-backdrop-filter: blur(24px);
-            border-radius: 24px;
-            box-shadow:
-                0 18px 45px rgba(15, 23, 42, 0.25),
-                0 0 0 1px rgba(255, 255, 255, 0.55);
-            padding: 1.75rem 1.5rem;
-            width: 100%;
-            box-sizing: border-box;
-            display: flex;
-            flex-direction: column;
-            gap: 1.5rem;
+        /* Brand title */
+        [data-testid="stSidebar"] [data-testid="stMarkdownContainer"] div[style*="gradient"] {{
+            font-family: Poppins, Inter, sans-serif \!important;
         }}
 
-        .sidebar-brand-title {{
-            font-size: 1.25rem;
-            font-weight: 800;
-            letter-spacing: -0.02em;
-            background: linear-gradient(135deg, #6C63FF 0%, #00C9A7 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-            margin-bottom: 0.1rem;
+        /* Badges utilisateur (st.success / st.info) */
+        [data-testid="stSidebar"] [data-testid="stNotification"] {{
+            border-radius: 10px \!important;
+            padding: 0.45rem 0.75rem \!important;
+            font-size: 0.82rem \!important;
+            margin-bottom: 0.3rem \!important;
+        }}
+        [data-testid="stSidebar"] .stAlert {{
+            border-radius: 10px \!important;
+            padding: 0.45rem 0.75rem \!important;
+            font-size: 0.82rem \!important;
+            margin-bottom: 0.3rem \!important;
+            border-left-width: 3px \!important;
         }}
 
-        .sidebar-brand-subtitle {{
-            font-size: 0.8rem;
-            color: #6B7280;
+        /* En-têtes de section h3 */
+        [data-testid="stSidebar"] h3 {{
+            font-size: 0.70rem \!important;
+            font-weight: 700 \!important;
+            color: #9CA3AF \!important;
+            text-transform: uppercase \!important;
+            letter-spacing: 0.09em \!important;
+            margin: 0.8rem 0 0.25rem 0 \!important;
+            padding: 0 \!important;
         }}
 
-        .sidebar-user {{
-            margin-top: 0.9rem;
-            font-size: 0.8rem;
-            color: #6B7280;
+        /* Boutons de navigation */
+        [data-testid="stSidebar"] .stButton > button {{
+            background: transparent \!important;
+            color: #374151 \!important;
+            border: none \!important;
+            border-radius: 10px \!important;
+            padding: 0.6rem 0.9rem \!important;
+            font-size: 0.88rem \!important;
+            font-weight: 500 \!important;
+            text-align: left \!important;
+            box-shadow: none \!important;
+            transition: background 0.18s ease, color 0.18s ease \!important;
+            transform: none \!important;
+            margin-bottom: 0.1rem \!important;
+        }}
+        [data-testid="stSidebar"] .stButton > button:hover {{
+            background: rgba(108,99,255,0.10) \!important;
+            color: #6C63FF \!important;
+            box-shadow: none \!important;
+            transform: none \!important;
+        }}
+        [data-testid="stSidebar"] .stButton > button:active {{
+            background: rgba(108,99,255,0.18) \!important;
+            transform: none \!important;
         }}
 
-        .sidebar-user-name {{
-            font-weight: 600;
-            color: #374151;
+        /* Bouton Déconnexion */
+        [data-testid="stSidebar"] [data-testid="stButton"][key="btn_deconnexion"] button,
+        [data-testid="stSidebar"] .stButton:last-of-type > button {{
+            color: #EF4444 \!important;
+            border: 1px solid rgba(239,68,68,0.22) \!important;
+            background: rgba(255,255,255,0.55) \!important;
+            margin-top: 0.5rem \!important;
+        }}
+        [data-testid="stSidebar"] .stButton:last-of-type > button:hover {{
+            background: rgba(239,68,68,0.07) \!important;
+            color: #DC2626 \!important;
         }}
 
-        .sidebar-user-role {{
-            display: block;
-            color: #9CA3AF;
-            margin-top: 0.15rem;
-        }}
-
-        /* Navigation verticale : items comme sur la maquette */
-        .sidebar-nav {{
-            display: flex;
-            flex-direction: column;
-            gap: 0.4rem;
-        }}
-
-        .sidebar-nav button {{
-            background: transparent !important;
-            border-radius: 999px !important;
-            border: none !important;
-            padding: 0.55rem 0.9rem !important;
-            width: 100% !important;
-            display: flex !important;
-            align-items: center;
-            justify-content: flex-start;
-            gap: 0.6rem;
-            color: #374151 !important;
-            font-size: 0.9rem !important;
-            font-weight: 500 !important;
-            box-shadow: none !important;
-        }}
-
-        .sidebar-nav button:hover {{
-            background: rgba(148, 163, 184, 0.13) !important;
-            color: #111827 !important;
-        }}
-
-        .sidebar-nav button::before {{
-            content: '';
-            flex-shrink: 0;
-            width: 26px;
-            height: 26px;
-            border-radius: 999px;
-            background: linear-gradient(135deg, #E0C3FC 0%, #8EC5FC 100%);
-            opacity: 0.95;
-        }}
-
-        .sidebar-nav button:nth-of-type(1)::before {{
-            background: linear-gradient(135deg, #818CF8 0%, #C4B5FD 100%);
-        }}
-        .sidebar-nav button:nth-of-type(2)::before {{
-            background: linear-gradient(135deg, #34D399 0%, #6EE7B7 100%);
-        }}
-        .sidebar-nav button:nth-of-type(3)::before {{
-            background: linear-gradient(135deg, #F97316 0%, #FDBA74 100%);
-        }}
-        .sidebar-nav button:nth-of-type(4)::before {{
-            background: linear-gradient(135deg, #EC4899 0%, #F9A8D4 100%);
-        }}
-        .sidebar-nav button:nth-of-type(5)::before {{
-            background: linear-gradient(135deg, #0EA5E9 0%, #7DD3FC 100%);
-        }}
-        .sidebar-nav button:nth-of-type(6)::before {{
-            background: linear-gradient(135deg, #6B7280 0%, #9CA3AF 100%);
-        }}
-
-        .sidebar-logout button {{
-            margin-top: 0.75rem;
-            width: 100% !important;
-            border-radius: 999px !important;
-            background: #FFFFFF !important;
-            color: #EF4444 !important;
-            border: 1px solid rgba(239, 68, 68, 0.2) !important;
-            font-weight: 600 !important;
-            box-shadow: none !important;
-        }}
-
-        .sidebar-logout button:hover {{
-            background: #FEF2F2 !important;
+        /* Séparateurs */
+        [data-testid="stSidebar"] hr {{
+            border-color: rgba(108,99,255,0.15) \!important;
+            margin: 0.5rem 0 \!important;
         }}
         </style>
         """
@@ -954,7 +835,7 @@ def afficher_sidebar():
             st.markdown(
                 f'<div style="margin-bottom: 1.5rem;">'
                 f'<span style="font-size: 1.35rem; font-weight: 800; letter-spacing: -0.02em; '
-                f'background: linear-gradient(135deg, #E0E0FF 0%, #00C9A7 100%); '
+                f'background: linear-gradient(135deg, #6C63FF 0%, #00C9A7 100%); '
                 f'-webkit-background-clip: text; -webkit-text-fill-color: transparent; '
                 f'background-clip: text;">{LOGIN_DISPLAY_TITLE_1}{LOGIN_DISPLAY_TITLE_2}</span></div>',
                 unsafe_allow_html=True,
@@ -1033,14 +914,14 @@ def afficher_sidebar():
             st.markdown(
                 "<div style='padding: 2rem 1rem; text-align: center;'>"
                 f"<p style='font-size: 1.5rem; font-weight: 700; margin-bottom: 0.2rem;'>"
-                f"<span style='color: #B19CD9;'>{LOGIN_DISPLAY_TITLE_1}</span>"
-                f"<span style='color: #40E0D0;'>{LOGIN_DISPLAY_TITLE_2}</span>"
+                f"<span style='color: #6C63FF;'>{LOGIN_DISPLAY_TITLE_1}</span>"
+                f"<span style='color: #00C9A7;'>{LOGIN_DISPLAY_TITLE_2}</span>"
                 "</p>"
                 f"<p style='color: #6B7280; font-size: 0.9rem; margin-bottom: 1.5rem; line-height: 1.4;'>{LOGIN_DISPLAY_SUBTITLE}</p>"
                 "<p style='color: #9CA3AF; font-size: 0.85rem; line-height: 1.5;'>"
                 "Connectez-vous pour accéder à votre atelier et gérer vos commandes."
                 "</p>"
-                "<p style='color: #B19CD9; font-size: 0.8rem; margin-top: 1.5rem;'>"
+                "<p style='color: #6C63FF; font-size: 0.8rem; margin-top: 1.5rem;'>"
                 "— Votre espace couture —"
                 "</p>"
                 "</div>",

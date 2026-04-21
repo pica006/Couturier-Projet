@@ -118,7 +118,7 @@ hide_st_style = """
     
     /* Boutons avec dégradé violet-bleu (pas de rouge !) */
     .login-scope .stButton > button {
-        background: linear-gradient(135deg, #B19CD9 0%, #40E0D0 100%) !important;
+        background: linear-gradient(135deg, #6C63FF 0%, #00C9A7 100%) !important;
         color: #FFFFFF !important;
         border: none !important;
         border-radius: 12px !important;
@@ -129,7 +129,7 @@ hide_st_style = """
     }
 
     .login-scope .stButton > button:hover {
-        background: linear-gradient(135deg, #B19CD9 0%, #40E0D0 100%) !important;
+        background: linear-gradient(135deg, #6C63FF 0%, #00C9A7 100%) !important;
         color: #FFFFFF !important;
         transform: translateY(-2px);
         box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1) !important;
@@ -139,7 +139,7 @@ hide_st_style = """
     /* Boutons primaires - dégradé inversé */
     .login-scope button[kind="primary"],
     .login-scope button[data-baseweb="button"][kind="primary"] {
-        background: linear-gradient(135deg, #40E0D0 0%, #B19CD9 100%) !important;
+        background: linear-gradient(135deg, #00C9A7 0%, #6C63FF 100%) !important;
         color: #FFFFFF !important;
         border: none !important;
     }
@@ -147,20 +147,20 @@ hide_st_style = """
     .login-scope button[kind="primary"]:hover,
     .login-scope button[kind="primary"]:active,
     .login-scope button[kind="primary"]:focus {
-        background: linear-gradient(135deg, #40E0D0 0%, #B19CD9 100%) !important;
+        background: linear-gradient(135deg, #00C9A7 0%, #6C63FF 100%) !important;
         color: #FFFFFF !important;
     }
     
     /* Empêcher Streamlit de mettre du rouge par défaut */
     .login-scope button[data-baseweb="button"] {
-        background: linear-gradient(135deg, #B19CD9 0%, #40E0D0 100%) !important;
+        background: linear-gradient(135deg, #6C63FF 0%, #00C9A7 100%) !important;
         color: #FFFFFF !important;
     }
     
     .login-scope button[data-baseweb="button"]:hover,
     .login-scope button[data-baseweb="button"]:active,
     .login-scope button[data-baseweb="button"]:focus {
-        background: linear-gradient(135deg, #B19CD9 0%, #40E0D0 100%) !important;
+        background: linear-gradient(135deg, #6C63FF 0%, #00C9A7 100%) !important;
         color: #FFFFFF !important;
     }
 
@@ -168,7 +168,7 @@ hide_st_style = """
        PAGE DE CONNEXION - DESIGN PREMIUM
        ===================================================================== */
     .login-header {
-        background: linear-gradient(135deg, #B19CD9 0%, #40E0D0 100%);
+        background: linear-gradient(135deg, #6C63FF 0%, #00C9A7 100%);
         padding: 2rem;
         border-radius: 16px;
         margin-bottom: 2rem;
