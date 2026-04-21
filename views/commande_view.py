@@ -11,10 +11,19 @@ from config import MODELES, MESURES
 from utils.image_optimizer import optimiser_image, obtenir_taille_fichier_mb
 from models.salon_model import SalonModel
 from utils.role_utils import obtenir_salon_id
+from utils.ui import (
+    ajouter_espace_vertical,
+    appliquer_style_pages_critiques,
+    afficher_erreur_minimale,
+    afficher_info_minimale,
+    afficher_titre_section,
+    etat_chargement,
+)
 
 
 def afficher_page_commande():
     """Affiche la page de création de commande"""
+    appliquer_style_pages_critiques()
     
     # En-tête encadré standardisé
     from utils.page_header import afficher_header_page
@@ -44,7 +53,7 @@ def afficher_page_commande():
     
     # Container pour les informations générales
     with st.container():
-        st.markdown("### 📋 Informations générales")
+        afficher_titre_section("📋 Informations générales")
         
         # Prix et paiement
         col_prix1, col_prix2, col_prix3 = st.columns(3)
@@ -98,7 +107,7 @@ def afficher_page_commande():
                 delta=f"{(avance/prix_total*100):.0f}% payé" if prix_total > 0 else None
             )
         
-        st.markdown("<br>", unsafe_allow_html=True)
+        ajouter_espace_vertical()
         
         # Catégorie, Sexe et Modèle sur une seule ligne
         col_cat, col_sexe, col_mod = st.columns([1, 1, 2])
@@ -153,7 +162,7 @@ def afficher_page_commande():
                 st.session_state.modele_selectionne = modele
                 st.rerun()
     
-    st.markdown("<br>", unsafe_allow_html=True)
+    ajouter_espace_vertical()
     
     # ========================================================================
     # FORMULAIRE PRINCIPAL
@@ -177,7 +186,7 @@ def afficher_page_commande():
             col_img1, col_img2 = st.columns(2)
             
             with col_img1:
-                st.markdown("#### 📸 Photo du tissu *")
+                afficher_titre_section("📸 Photo du tissu *", niveau=4)
                 st.caption("Photo du tissu fourni par le client")
                 fabric_image = st.file_uploader(
                     "Charger l'image du tissu",
@@ -189,7 +198,7 @@ def afficher_page_commande():
                     st.warning("⚠️ Obligatoire")
             
             with col_img2:
-                st.markdown("#### 👗 Photo du modèle *")
+                afficher_titre_section("👗 Photo du modèle *", niveau=4)
                 st.caption("Photo du modèle souhaité par le client")
                 model_image = st.file_uploader(
                     "Charger l'image du modèle",
@@ -236,7 +245,7 @@ def afficher_page_commande():
         col_date, col_options = st.columns([2, 1])
         
         with col_date:
-            st.markdown("#### 📅 Date de livraison")
+            afficher_titre_section("📅 Date de livraison", niveau=4)
             date_livraison = st.date_input(
                 "Date prévue de livraison",
                 value=datetime.now() + timedelta(days=7),
@@ -245,11 +254,11 @@ def afficher_page_commande():
             )
         
         with col_options:
-            st.markdown("#### 📤 Options")
+            afficher_titre_section("📤 Options", niveau=4)
             st.caption("L'envoi automatique par email est activé si l'email est renseigné.")
         
         # Bouton de soumission
-        st.markdown("<br>", unsafe_allow_html=True)
+        ajouter_espace_vertical()
         submit = st.form_submit_button(
             "✅ Enregistrer la commande",
             type="primary"
@@ -304,7 +313,7 @@ def afficher_page_commande():
                     st.error(f"❌ {erreur}")
             else:
                 # Créer la commande
-                with st.spinner("Enregistrement de la commande..."):
+                with etat_chargement("Enregistrement de la commande..."):
                     client_info = {
                         'nom': client_nom,
                         'prenom': client_prenom,
@@ -368,7 +377,9 @@ def afficher_page_commande():
                     taille_optimisee = obtenir_taille_fichier_mb(fabric_image_bytes)
                     if taille_originale > taille_optimisee:
                         reduction = ((taille_originale - taille_optimisee) / taille_originale) * 100
-                        st.info(f"📊 Image optimisée: {taille_originale:.2f} MB → {taille_optimisee:.2f} MB (-{reduction:.1f}%)")
+                        afficher_info_minimale(
+                            f"Image optimisée: {taille_originale:.2f} MB → {taille_optimisee:.2f} MB (-{reduction:.1f}%)"
+                        )
                     
                     commande_info['fabric_image'] = fabric_image_bytes
                     commande_info['fabric_image_name'] = fabric_image.name
@@ -403,7 +414,9 @@ def afficher_page_commande():
                     taille_optimisee = obtenir_taille_fichier_mb(model_image_bytes)
                     if taille_originale > taille_optimisee:
                         reduction = ((taille_originale - taille_optimisee) / taille_originale) * 100
-                        st.info(f"📊 Image optimisée: {taille_originale:.2f} MB → {taille_optimisee:.2f} MB (-{reduction:.1f}%)")
+                        afficher_info_minimale(
+                            f"Image optimisée: {taille_originale:.2f} MB → {taille_optimisee:.2f} MB (-{reduction:.1f}%)"
+                        )
                     
                     commande_info['model_image'] = model_image_bytes
                     commande_info['model_image_name'] = model_image.name
@@ -435,9 +448,13 @@ def afficher_page_commande():
                         try:
                             commande_data = commande_controller.obtenir_details_commande(commande_id)
                             if not commande_data:
-                                statut_fonctions['base_donnees']['succes'] = False
-                                statut_fonctions['base_donnees']['message'] = '❌ Erreur: Impossible de récupérer les données de la commande'
-                                st.error(statut_fonctions['base_donnees']['message'])
+                                # Fallback: la commande est déjà créée, on continue avec les données du formulaire.
+                                statut_fonctions['base_donnees']['succes'] = True
+                                statut_fonctions['base_donnees']['message'] = (
+                                    "⚠️ Commande enregistrée, mais relecture immédiate indisponible "
+                                    "(utilisation des données du formulaire)."
+                                )
+                                st.warning(statut_fonctions['base_donnees']['message'])
                         except Exception as e:
                             statut_fonctions['base_donnees']['succes'] = False
                             statut_fonctions['base_donnees']['message'] = f'❌ Erreur base de données: {str(e)}'
@@ -452,6 +469,11 @@ def afficher_page_commande():
                         # Préparer les données pour le PDF
                         # Récupérer les données du couturier depuis la session
                         couturier_data = st.session_state.couturier_data
+                        try:
+                            from utils.role_utils import obtenir_salon_id
+                            salon_id_courant = obtenir_salon_id(couturier_data)
+                        except Exception:
+                            salon_id_courant = couturier_data.get('salon_id') if couturier_data else None
                         
                         # Utiliser commande_data si disponible (avec les valeurs de la BDD), sinon utiliser les données du formulaire
                         if commande_data:
@@ -488,6 +510,8 @@ def afficher_page_commande():
                                 'couturier_nom': couturier_data.get('nom', ''),
                                 'couturier_prenom': couturier_data.get('prenom', ''),
                                 'couturier_code': couturier_data.get('code_couturier', ''),
+                                'couturier_id': couturier_data.get('id'),
+                                'salon_id': salon_id_courant,
                                 'fabric_image_path': fabric_image_path,
                                 'fabric_image_name': fabric_image.name if fabric_image else 'fabric.jpg',
                                 'model_image_path': model_image_path,
@@ -497,7 +521,7 @@ def afficher_page_commande():
                         
                         # Générer le PDF (TOUJOURS, même si commande_data n'est pas disponible)
                         st.markdown("---")
-                        st.markdown("### 📄 Génération du PDF")
+                        afficher_titre_section("📄 Génération du PDF")
                         
                         # Vérifier que pdf_data est bien défini
                         if not pdf_data:
@@ -506,13 +530,7 @@ def afficher_page_commande():
                             st.error(statut_fonctions['generation_pdf']['message'])
                         else:
                             try:
-                                with st.spinner("📄 Génération du PDF en cours..."):
-                                    # Vérifier que le dossier de stockage existe
-                                    from config import PDF_STORAGE_PATH
-                                    if not os.path.exists(PDF_STORAGE_PATH):
-                                        os.makedirs(PDF_STORAGE_PATH, exist_ok=True)
-                                        st.info(f"📁 Dossier PDF créé: {PDF_STORAGE_PATH}")
-                                    
+                                with etat_chargement("Génération du PDF en cours..."):
                                     # Vérifier que pdf_data contient les données essentielles
                                     champs_requis = ['id', 'client_nom', 'client_prenom', 'modele', 'prix_total', 'avance']
                                     champs_manquants = [champ for champ in champs_requis if champ not in pdf_data or pdf_data[champ] is None]
@@ -528,51 +546,15 @@ def afficher_page_commande():
                                         statut_fonctions['generation_pdf']['pdf_path'] = pdf_path
                                         st.success(statut_fonctions['generation_pdf']['message'])
                                         
-                                        # Lire le PDF en bytes et stocker dans session_state (HORS du formulaire)
-                                        try:
-                                            with open(pdf_path, "rb") as pdf_file:
-                                                pdf_bytes = pdf_file.read()
-                                            st.session_state['pdf_path_upload'] = pdf_path
-                                            st.session_state['pdf_bytes'] = pdf_bytes
-                                            st.session_state['pdf_filename'] = os.path.basename(pdf_path)
-                                            st.session_state['show_download_section'] = True
-                                        except Exception as e:
-                                            st.error(f"❌ Erreur lors de l'ouverture du PDF: {str(e)}")
+                                        # Stocker uniquement le chemin (evite de garder des bytes lourds en session)
+                                        st.session_state['pdf_path_upload'] = pdf_path
+                                        st.session_state['pdf_filename'] = os.path.basename(pdf_path)
+                                        st.session_state['show_download_section'] = True
                                     elif pdf_path is None:
                                         # Le contrôleur a retourné None, vérifier s'il y a une erreur stockée
                                         error_msg = pdf_controller.last_error or "Erreur inconnue lors de la génération du PDF"
                                         error_details = pdf_controller.last_error_details or "Aucun détail disponible"
                                         raise Exception(f"{error_msg}\n\n{error_details}")
-                                        
-                                        # Tentative de téléchargement automatique (optionnel)
-                                        try:
-                                            import base64
-                                            with open(pdf_path, "rb") as _f:
-                                                _pdf_bytes = _f.read()
-                                            _b64 = base64.b64encode(_pdf_bytes).decode()
-                                            _file_name = os.path.basename(pdf_path)
-                                            _href = f"data:application/pdf;base64,{_b64}"
-                                            st.components.v1.html(
-                                                f"""
-                                                <html>
-                                                <body>
-                                                <a id='auto_dl' href='{_href}' download='{_file_name}'></a>
-                                                <script>
-                                                (function(){{
-                                                  var a = document.getElementById('auto_dl');
-                                                  if(a){{ 
-                                                    setTimeout(function(){{ a.click(); }}, 500);
-                                                  }}
-                                                }})();
-                                                </script>
-                                                </body>
-                                                </html>
-                                                """,
-                                                height=0
-                                            )
-                                        except Exception:
-                                            # Le téléchargement automatique est optionnel, on continue même s'il échoue
-                                            pass
                                     else:
                                         # Le PDF n'a pas été généré ou n'existe pas
                                         statut_fonctions['generation_pdf']['succes'] = False
@@ -643,18 +625,18 @@ def afficher_page_commande():
                         # RÉCAPITULATIF DES FONCTIONS
                         # ============================================================
                         st.markdown("---")
-                        st.markdown("### 📊 Statut des opérations")
+                        afficher_titre_section("📊 Statut des opérations")
                         
                         col_stat1, col_stat2 = st.columns(2)
                         
                         with col_stat1:
-                            st.markdown("#### ✅ Succès")
+                            afficher_titre_section("✅ Succès", niveau=4)
                             for fonction, statut in statut_fonctions.items():
                                 if statut['succes']:
                                     st.success(f"**{fonction.replace('_', ' ').title()}:** {statut['message']}")
                         
                         with col_stat2:
-                            st.markdown("#### ❌ Échecs")
+                            afficher_titre_section("❌ Échecs", niveau=4)
                             echecs = [f for f, s in statut_fonctions.items() if not s['succes']]
                             if echecs:
                                 for fonction in echecs:
@@ -664,7 +646,7 @@ def afficher_page_commande():
                         
                         # Afficher récapitulatif
                         st.markdown("---")
-                        st.markdown("### 📋 Récapitulatif")
+                        afficher_titre_section("📋 Récapitulatif")
                         
                         col1, col2 = st.columns(2)
                         
@@ -683,30 +665,40 @@ def afficher_page_commande():
                             **Livraison:** {date_livraison.strftime('%d/%m/%Y')}
                             """)
                     else:
-                        st.error(f"❌ {message}")
+                        afficher_erreur_minimale(message)
     
     # Section de téléchargement du PDF (en dehors du formulaire pour éviter l'erreur st.download_button dans st.form)
-    if st.session_state.get('show_download_section', False) and st.session_state.get('pdf_bytes'):
+    if st.session_state.get('show_download_section', False) and st.session_state.get('pdf_path_upload'):
         st.markdown("---")
-        st.markdown("### 📥 Télécharger le PDF")
+        afficher_titre_section("📥 Télécharger le PDF")
         try:
+            pdf_path_download = st.session_state.get('pdf_path_upload')
+            if not pdf_path_download or not os.path.exists(pdf_path_download):
+                raise FileNotFoundError("Le fichier PDF n'est plus disponible sur le stockage temporaire.")
+            with open(pdf_path_download, "rb") as pdf_file:
+                pdf_bytes = pdf_file.read()
             st.download_button(
                 label="📥 Télécharger le PDF maintenant",
-                data=st.session_state['pdf_bytes'],
+                data=pdf_bytes,
                 file_name=st.session_state.get('pdf_filename', 'commande.pdf'),
                 mime="application/pdf",
-                width='stretch',
+                use_container_width=True,
                 key="download_pdf_outside",
                 type="primary"
             )
         except Exception as e:
-            st.error(f"❌ Erreur lors du téléchargement du PDF: {str(e)}")
+            afficher_erreur_minimale(f"Erreur lors du téléchargement du PDF: {str(e)}")
+            # Le fichier temporaire peut disparaitre après rerun/redémarrage.
+            st.session_state['pdf_path_upload'] = None
+            st.session_state['pdf_filename'] = None
+            st.session_state['show_download_section'] = False
+            st.session_state['show_upload_section'] = False
     
     # Section d'upload du PDF (en dehors du formulaire pour éviter l'erreur st.button dans st.form)
     if st.session_state.get('show_upload_section', False) and st.session_state.get('pdf_path_upload'):
         pdf_path_upload = st.session_state['pdf_path_upload']
         st.markdown("---")
-        st.markdown("### 📁 Sauvegarder le PDF dans un dossier personnalisé (optionnel)")
+        afficher_titre_section("📁 Sauvegarder le PDF dans un dossier personnalisé (optionnel)")
         col_upload1, col_upload2 = st.columns([3, 1])
         
         with col_upload1:
@@ -718,11 +710,18 @@ def afficher_page_commande():
             )
         
         with col_upload2:
-            st.markdown("<br>", unsafe_allow_html=True)
-            if st.button("📤 Copier le PDF", width='stretch', key="btn_upload_pdf_outside"):
+            ajouter_espace_vertical()
+            if st.button("📤 Copier le PDF", use_container_width=True, key="btn_upload_pdf_outside"):
                 try:
+                    if not pdf_path_upload or not os.path.exists(pdf_path_upload):
+                        st.error("❌ Le PDF n'est plus disponible. Regénérez-le avant la copie.")
+                        st.session_state['show_upload_section'] = False
+                        st.session_state['show_download_section'] = False
+                        st.session_state['pdf_path_upload'] = None
+                        st.session_state['pdf_filename'] = None
+                        st.rerun()
                     if dossier_upload and os.path.exists(dossier_upload):
-                        with st.spinner("📤 Copie du PDF..."):
+                        with etat_chargement("Copie du PDF..."):
                             pdf_uploaded = pdf_controller.uploader_pdf_dossier(pdf_path_upload, dossier_upload)
                             if pdf_uploaded:
                                 st.success(f'✅ PDF copié dans: {pdf_uploaded}')

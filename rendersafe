@@ -1,0 +1,120 @@
+RENDERSAFE - Phase 2
+Date: 2026-02-26
+
+Objectif:
+Stabiliser l'application Streamlit pour Render (production-safe), renforcer la securite
+authentification, limiter les causes d'ecran blanc, et reduire les comportements fragiles.
+
+===============================================================================
+1) SECURITE AUTHENTIFICATION (CRITIQUE)
+===============================================================================
+- Ajout d'un module securite:
+  - utils/security.py
+  - hash_password(password)
+  - verify_password(plain, stored)
+    * bcrypt si hash detecte
+    * fallback legacy en comparaison directe
+
+- Authentification corrigee:
+  - controllers/auth_controller.py
+  - remplacement de "password == password_db" par verify_password(...)
+
+- Ecriture des mots de passe en bcrypt:
+  - models/database.py
+    * CouturierModel.creer_utilisateur() -> hash_password(password)
+    * CouturierModel.reinitialiser_mot_de_passe() -> hash_password(nouveau_password)
+  - models/salon_model.py
+    * creation admin salon -> hash_password(password_admin)
+
+===============================================================================
+2) GESTION SESSION STATE (CENTRALISATION)
+===============================================================================
+- Ajout d'un service de session:
+  - services/session_service.py
+    * initialize_session_state()
+    * logout_user()
+  - services/__init__.py
+
+- App principale alignee:
+  - app.py
+    * initialiser_session_state() delegue au service centralise
+    * deconnexion remplacee par logout_user()
+    * journalisation logo BDD via logger.warning (au lieu de print)
+
+===============================================================================
+3) REDUCTION RISQUES DE RERENDER ET MEMOIRE
+===============================================================================
+- Suppression stockage binaire PDF en session:
+  - views/commande_view.py
+    * plus de st.session_state["pdf_bytes"]
+    * conservation du chemin PDF seulement
+    * lecture du fichier au moment du download_button
+
+- Connexion DB login:
+  - views/auth_view.py
+    * suppression de rerun immediat apres connexion DB reussie
+    * reduction des rerenders inutiles au login
+
+===============================================================================
+4) RENDERSAFE - RAPPELS ET I/O NON PERSISTANT
+===============================================================================
+- Service rappels assaini:
+  - controllers/rappel_service.py
+    * suppression du verrouillage par fichier local "data/rappels_last_run.txt"
+    * execution basee sur l'etat des rappels en BDD (rappel_deja_envoye)
+    * message explicite quand aucun rappel
+
+- Execution rappels controlee cote UI:
+  - views/calendrier_view.py
+    * execution auto max 1 fois/jour/par session
+    * bouton manuel "Relancer les rappels"
+    * evite execution lourde a chaque rerender
+
+===============================================================================
+5) COUPLAGE MVC (AMELIORATION IMMEDIATE)
+===============================================================================
+- PDF controller decouple de Streamlit session:
+  - controllers/pdf_controller.py
+    * suppression fallback salon_id via st.session_state
+    * conservation des sources metier (commande_data + couturier_id)
+
+===============================================================================
+6) HARDENING STREAMLIT PROD
+===============================================================================
+- .streamlit/config.toml
+  - [client] showErrorDetails = false
+  - evite exposition details erreurs en production
+
+===============================================================================
+7) ETAT
+===============================================================================
+Applique dans le code:
+- oui: correctifs critiques securite
+- oui: reduction principaux risques render/rerender/session
+- oui: centralisation session minimale operationnelle
+- oui: sortie de dependance Streamlit dans PDF controller
+
+Reste a faire (prochaine brique):
+- decomposition complete du fichier models/database.py (god file)
+- logging structure global (remplacement complet des print)
+- extraction metier des views (MVC strict)
+- externalisation stockage fichiers (S3/objet store) pour SaaS full
+
+===============================================================================
+8) CONTINUATION - BRIQUE DB BOOTSTRAP
+===============================================================================
+- Ajout d'un bootstrap DB centralise:
+  - services/db_bootstrap_service.py
+    * validate_required_config(...)
+    * connect_and_initialize(...)
+    * initialise auth + commandes + charges en un point unique
+
+- Refactor connexion login:
+  - views/auth_view.py
+    * suppression duplication Render/local de la sequence DB
+    * utilisation du service commun
+    * logging exception propre (logger.exception) sans traceback brut a l'ecran
+
+- Nettoyage mineur:
+  - views/calendrier_view.py
+    * suppression dependance inutile a SalonModel

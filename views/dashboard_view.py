@@ -21,6 +21,13 @@ import pandas as pd
 import plotly.express as px
 from models.database import ChargesModel, CommandeModel, CouturierModel
 from utils.role_utils import est_admin, obtenir_salon_id
+from utils.ui import (
+    ajouter_espace_vertical,
+    appliquer_style_pages_critiques,
+    afficher_erreur_minimale,
+    afficher_info_minimale,
+    afficher_titre_section,
+)
 
 
 def afficher_page_dashboard():
@@ -29,13 +36,15 @@ def afficher_page_dashboard():
     Contenu complet + en mode ADMIN : filtre par couturier, répartition par modèle, figures
     """
     
+    appliquer_style_pages_critiques()
+
     # En-tête encadré standardisé
     from utils.page_header import afficher_header_page
     afficher_header_page("📊 Tableau de bord", "Vue d'ensemble de votre activité")
     
     # Vérifier la connexion
     if not st.session_state.db_connection or not st.session_state.authentifie:
-        st.error("❌ Vous devez être connecté pour accéder à cette page")
+        afficher_erreur_minimale("Vous devez être connecté pour accéder à cette page")
         return
     
     couturier_data = st.session_state.couturier_data
@@ -52,7 +61,7 @@ def afficher_page_dashboard():
         # SÉLECTION DE LA PÉRIODE
         # ========================================================================
         
-        st.markdown("### 📅 Sélection de la période d'analyse")
+        afficher_titre_section("📅 Sélection de la période d'analyse")
         
         aujourdhui = datetime.now()
         debut_mois = datetime(aujourdhui.year, aujourdhui.month, 1).date()
@@ -101,8 +110,8 @@ def afficher_page_dashboard():
             )
         
         with col_date3:
-            st.markdown("<br>", unsafe_allow_html=True)  # Espacement vertical
-            if st.button("🔄 Mois en cours", width='stretch', key="btn_reset_dashboard_dates"):
+            ajouter_espace_vertical()
+            if st.button("🔄 Mois en cours", use_container_width=True, key="btn_reset_dashboard_dates"):
                 # Marquer pour supprimer les clés des widgets au prochain rerun
                 st.session_state.reset_dashboard_dates = True
                 st.rerun()
@@ -130,7 +139,7 @@ def afficher_page_dashboard():
         
         # Validation des dates
         if date_debut > date_fin:
-            st.error("❌ La date de début doit être antérieure à la date de fin")
+            afficher_erreur_minimale("La date de début doit être antérieure à la date de fin")
             return
         
         # Convertir les dates en datetime pour les requêtes
@@ -140,14 +149,17 @@ def afficher_page_dashboard():
         # Calculer le nombre de jours
         nb_jours = (date_fin - date_debut).days + 1
         
-        st.info(f"📊 Analyse de la période du **{date_debut.strftime('%d/%m/%Y')}** au **{date_fin.strftime('%d/%m/%Y')}** ({nb_jours} jour{'s' if nb_jours > 1 else ''})")
+        afficher_info_minimale(
+            f"Analyse de la période du **{date_debut.strftime('%d/%m/%Y')}** au **{date_fin.strftime('%d/%m/%Y')}** "
+            f"({nb_jours} jour{'s' if nb_jours > 1 else ''})"
+        )
         st.markdown("---")
         
         # ========================================================================
         # STATISTIQUES DE LA PÉRIODE SÉLECTIONNÉE
         # ========================================================================
         
-        st.markdown("### 📈 Statistiques de la période")
+        afficher_titre_section("📈 Statistiques de la période")
         
         # Stats de la période sélectionnée
         stats_periode = compta_controller.obtenir_statistiques(couturier_id, date_debut_dt, date_fin_dt)
@@ -229,7 +241,7 @@ def afficher_page_dashboard():
         # STATISTIQUES TOTALES (TOUTES PÉRIODES)
         # ========================================================================
         
-        st.markdown("### 🎯 Statistiques totales (toutes périodes)")
+        afficher_titre_section("🎯 Statistiques totales (toutes périodes)")
         
         # Stats globales (sans filtre de date)
         stats_total = compta_controller.obtenir_statistiques(couturier_id)
@@ -274,27 +286,27 @@ def afficher_page_dashboard():
         # ACTIONS RAPIDES
         # ========================================================================
         
-        st.markdown("### ⚡ Actions rapides")
+        afficher_titre_section("⚡ Actions rapides")
         
         col1, col2, col3, col4 = st.columns(4)
         
         with col1:
-            if st.button("➕ Nouvelle commande", width='stretch'):
+            if st.button("➕ Nouvelle commande", use_container_width=True, key="dashboard_btn_nouvelle_commande"):
                 st.session_state.page = 'nouvelle_commande'
                 st.rerun()
         
         with col2:
-            if st.button("📜 Mes commandes", width='stretch'):
+            if st.button("📜 Mes commandes", use_container_width=True, key="dashboard_btn_mes_commandes"):
                 st.session_state.page = 'liste_commandes'
                 st.rerun()
         
         with col3:
-            if st.button("💰 Comptabilité", width='stretch'):
+            if st.button("💰 Comptabilité", use_container_width=True, key="dashboard_btn_comptabilite"):
                 st.session_state.page = 'comptabilite'
                 st.rerun()
         
         with col4:
-            if st.button("📄 Mes charges", width='stretch'):
+            if st.button("📄 Mes charges", use_container_width=True, key="dashboard_btn_mes_charges"):
                 st.session_state.page = 'charges'
                 st.rerun()
         
@@ -304,7 +316,7 @@ def afficher_page_dashboard():
         # DERNIÈRES ACTIVITÉS
         # ========================================================================
         
-        st.markdown("### 🕐 Dernières activités")
+        afficher_titre_section("🕐 Dernières activités")
         
         # Commandes à relancer
         commandes_relance = compta_controller.obtenir_commandes_a_relancer(couturier_id)
@@ -321,14 +333,14 @@ def afficher_page_dashboard():
         if stats_jour['nb_commandes'] > 0:
             st.success(f"🎉 Aujourd'hui : {stats_jour['nb_commandes']} commande(s) pour {stats_jour['ca_total']:,.0f} FCFA")
         else:
-            st.info("💪 Aujourd'hui : Pas encore de commande, continuez vos efforts !")
+            afficher_info_minimale("Aujourd'hui : pas encore de commande, continuez vos efforts !")
         
         # ========================================================================
         # SECTION MODÈLES RÉALISÉS (admin uniquement) - comme page Modèles réalisés
         # ========================================================================
         if est_admin(couturier_data) and salon_id:
             st.markdown("---")
-            st.markdown("### 👗 Modèles réalisés par le salon")
+            afficher_titre_section("👗 Modèles réalisés par le salon")
             
             date_debut_dt = datetime.combine(date_debut, datetime.min.time())
             date_fin_dt = datetime.combine(date_fin, datetime.max.time())
@@ -357,7 +369,7 @@ def afficher_page_dashboard():
                 st.markdown("#### Répartition par modèle")
                 df_display = df_modeles[['modele', 'categorie', 'sexe', 'nb_commandes', 'CA (FCFA)']].copy()
                 df_display.columns = ['Modèle', 'Catégorie', 'Sexe', 'Nombre', 'CA (FCFA)']
-                st.dataframe(df_display, hide_index=True, width='stretch')
+                st.dataframe(df_display, hide_index=True, use_container_width=True)
                 
                 col_g1, col_g2 = st.columns(2)
                 with col_g1:
@@ -380,10 +392,10 @@ def afficher_page_dashboard():
                     )
                     st.plotly_chart(fig_pie, use_container_width=True)
             else:
-                st.info("Aucun modèle réalisé pour cette période.")
+                afficher_info_minimale("Aucun modèle réalisé pour cette période.")
     
     except Exception as e:
-        st.error(f"❌ Erreur lors du chargement du tableau de bord : {e}")
+        afficher_erreur_minimale(f"Erreur lors du chargement du tableau de bord : {e}")
         import traceback
         st.code(traceback.format_exc())
 

@@ -1,0 +1,311 @@
+# RAPPORT TECHNIQUE - STABILISATION STREAMLIT/RENDER
+
+Date: 2026-02-26  
+Projet: Couturier-Projet  
+Objectif: Stabiliser l'application en production (Render) avant refactor complet
+
+## 0) Contexte
+
+L'application est fonctionnelle en local mais présente des risques majeurs d'instabilité en production Render (ecran blanc, arrets precoces, comportements non deterministes, logique metier melangee a l'UI).
+
+---
+
+## 1) Observations detaillees
+
+### 1.1 Causes tres probables d'ecran blanc sur Render
+
+- Incompatibilite potentielle de version Streamlit:
+  - `requirements.txt` force `streamlit==1.29.0`.
+  - Le code utilise massivement des signatures recentes (`width='stretch'` sur de nombreux widgets).
+  - Si l'API n'est pas supportee par la version deployee, cela peut casser le rendu.
+
+- Surcharge front-end agressive dans `app.py`:
+  - Injection CSS/JS importante (`unsafe_allow_html=True`), `MutationObserver`, `setTimeout`, styles forces.
+  - Risque de conflit DOM, comportement navigateur instable, rendu bloque.
+
+- Connexion DB bloquante tres tot dans `views/auth_view.py`:
+  - Auto-connexion + `st.stop()` sur erreurs.
+  - En cas de config Render partielle/transitoire: l'app s'arrete au lieu de degrader proprement.
+
+### 1.2 Connexions DB prematurees
+
+- Connexion automatique des l'arrivee sur la page de connexion.
+- Initialisation de tables declenchee dans le flux utilisateur (auth/page login), ce qui augmente la latence et la fragilite.
+- Risque de timeout/erreur reseau visible utilisateur au premier rendu.
+
+### 1.3 Violations MVC identifiees
+
+- Les `views` executent du SQL direct (ex. `views/fermer_commandes_view.py`, `views/admin_view.py`, `views/super_admin_dashboard.py`).
+- Les `controllers` dependent de Streamlit (`controllers/pdf_controller.py` utilise `st.session_state`).
+- Logique metier, persistance, presentation, et effets de bord entremeles.
+
+### 1.4 Usages dangereux de `st.session_state`
+
+- Multiples cles avec cycle de vie peu controle.
+- Stockage d'objets lourds (ex: bytes PDF) dans la session.
+- De nombreuses mutations + `st.rerun()` qui peuvent provoquer des reruns en cascade.
+- Nettoyage partiel de session a la deconnexion (risque de reliquats d'etat).
+
+### 1.5 Duplications de code
+
+- Header HTML repete dans plusieurs vues alors qu'un utilitaire existe (`utils/page_header.py`).
+- Logiques de gestion salons/utilisateurs dupliquees entre vues super-admin/salons.
+- Fonctions non utilisees dans `app.py` (`connecter_postgresql_local`, `connecter_render_production`, `afficher_header_app`, `deconnecter_utilisateur`).
+
+### 1.6 Comportements non production-safe
+
+- Mots de passe stockes et compares en clair:
+  - `models/database.py` (`creer_utilisateur`, `reinitialiser_mot_de_passe`).
+  - `controllers/auth_controller.py` (`password == password_db`).
+- Ecritures locales (Render filesystem ephemere):
+  - Images/PDF/temp files dans le disque local.
+  - `pdf_path` peut devenir invalide apres restart.
+- Rappels auto bases sur fichier local (`controllers/rappel_service.py` -> `rappels_last_run.txt`) non robuste en multi-instance.
+- `showErrorDetails = true` en production (`.streamlit/config.toml`) expose les details techniques.
+- `time.sleep(2)` dans des vues (blocage inutile du thread web).
+- Multiples `except:`/`except Exception: pass` masquent les causes reelles.
+
+### 1.7 Anomalies techniques importantes
+
+- `models/database.py` contient des `except Error as e` sans symbole `Error` defini localement.
+- Melange MySQL/PostgreSQL dans toute la base alors que Render cible PostgreSQL: complexite et surface d'erreur accrues.
+- Presence de PDF dans `controllers/pdfs/` (artefacts locaux a ne pas coupler avec la prod).
+
+---
+
+## 2) Ce qui est BON (a conserver)
+
+- Structure globale en couches presente (`views`, `controllers`, `models`).
+- Parametrage SQL majoritairement securise (`%s` placeholders).
+- Support multi-tenant (`salon_id`) deja present dans de nombreux flux.
+- Couverture fonctionnelle metier riche (commandes, compta, admin, super-admin, PDF, rappels).
+- Base de configuration centralisee (`config.py`, `render.yaml`) deja operationnelle.
+
+---
+
+## 3) Ce qui est MAUVAIS (a corriger)
+
+- Authentification non securisee (mot de passe en clair).
+- Rupture de separation MVC (SQL dans vues, Streamlit dans controllers).
+- Flux de connexion/provisioning DB trop intrusif dans l'experience utilisateur.
+- Dette technique structurelle (duplication, dead code, erreurs avalees).
+
+---
+
+## 4) Ce qui est RISQUE en production
+
+- Ecran blanc/plantage de rendu (version + JS/CSS agressif).
+- Erreurs intermitentes au login si DB indisponible.
+- Perte de fichiers locaux apres redemarrage Render.
+- Exposition de details techniques a l'utilisateur final.
+- Risque de faille critique de securite (mots de passe en clair).
+
+---
+
+## 5) Ce qui doit etre restructure globalement
+
+- Introduire un vrai dossier `config/` (settings, env parsing, feature flags).
+- Introduire `services/` (pdf, email, storage, reminders) decouple de Streamlit.
+- Views = presentation uniquement.
+- Controllers = orchestration de cas d'usage.
+- Models = acces donnees uniquement.
+- Politique stricte de session state (leger, explicite, nettoyable).
+
+---
+
+## 6) Plan d'intervention ultra concret en tickets (P0/P1/P2)
+
+### P0 - Critique (stabilite + securite immediate)
+
+**P0-01 - Aligner version Streamlit et API UI**
+- Verifier la compatibilite exacte des appels (`width='stretch'`, etc.).
+- Soit monter Streamlit a version compatible, soit remplacer les appels non supportes.
+- Critere de done: l'app demarre sans exception sur Render et toutes les pages se rendent.
+
+**P0-02 - Desactiver les scripts front les plus risqués**
+- Neutraliser temporairement `MutationObserver`/scripts non indispensables.
+- Conserver un theme minimal stable pour reduire les conflits DOM.
+- Critere de done: plus d'ecran blanc intermittent.
+
+**P0-03 - Rendre la connexion DB resiliente**
+- Supprimer les `st.stop()` brutaux dans le flux principal.
+- Afficher une UI degradee + message clair + bouton retry.
+- Critere de done: en cas de panne DB, la page reste lisible et l'app ne meurt pas.
+
+**P0-04 - Corriger la securite auth (hash)**
+- Ajouter hash bcrypt/argon2 a la creation/reset de mot de passe.
+- Auth: verifier hash et migrer progressivement les anciens comptes en clair.
+- Critere de done: aucun mot de passe en clair en base.
+
+**P0-05 - Couper les ecritures locales critiques**
+- Eviter de dependre de chemins locaux persistants pour PDF/images en prod.
+- Utiliser stockage binaire DB (deja partiellement present) ou stockage externe.
+- Critere de done: aucune fonctionnalite critique ne depend du filesystem local Render.
+
+### P1 - Important (qualite architecture et maintenabilite)
+
+**P1-01 - Enforcer MVC**
+- Deplacer tout SQL des vues vers models/controllers.
+- Retirer toute dependance `streamlit` des controllers/services.
+- Critere de done: vue sans SQL direct, controller sans `st.*`.
+
+**P1-02 - Normaliser la gestion d'erreurs**
+- Remplacer `except:` et `pass` silencieux par logs structures et messages controlees.
+- Introduire une couche logger commune.
+- Critere de done: erreurs tracables sans fuite de details sensibles.
+
+**P1-03 - Rationaliser `st.session_state`**
+- Definir un schema d'etat minimal (auth, navigation, filtres).
+- Retirer objets volumineux (bytes) et reduire les reruns inutiles.
+- Critere de done: reruns maitrisés et memoire stable.
+
+**P1-04 - Nettoyer les duplications / dead code**
+- Supprimer fonctions non utilisees.
+- Mutualiser headers/composants repetes.
+- Critere de done: baisse de duplication et surfaces de bug.
+
+### P2 - Evolution (industrialisation SaaS)
+
+**P2-01 - Refactor structure projet**
+- Creer `config/` et `services/` formels.
+- Separer config runtime, metier, infra.
+- Critere de done: architecture lisible et evolutive.
+
+**P2-02 - Observabilite production**
+- Ajouter health endpoint logique, logs centralises, traces d'erreurs.
+- Dashboard de supervision minimal (uptime, erreurs DB, erreurs SMTP).
+- Critere de done: incidents detectables rapidement.
+
+**P2-03 - Pipeline qualite**
+- Tests smoke e2e pages critiques.
+- Tests integration DB (auth, commande, fermeture, PDF, email).
+- Critere de done: gate CI avant deploy.
+
+**P2-04 - Durcissement securite**
+- Politique secrets/env stricte.
+- `showErrorDetails` desactive en prod.
+- Revue des permissions par role.
+- Critere de done: posture securite conforme SaaS.
+
+---
+
+## 7) Strategie d'execution recommandee
+
+1. Executer tous les tickets P0 d'abord (stabilite + securite minimale).  
+2. Enchainer P1 pour retrouver une base propre et maintenable.  
+3. Planifier P2 pour industrialiser le SaaS (monitoring, CI, architecture cible).
+
+---
+
+## 8) Definition of Done globale
+
+- Plus d'ecran blanc sur Render.
+- Login resilient meme en panne DB temporaire.
+- Mots de passe hashés uniquement.
+- Aucune logique SQL dans les vues.
+- Aucune fonctionnalite critique dependante du disque local Render.
+- Erreurs observables et exploitables sans exposer les details techniques aux utilisateurs finaux.
+
+---
+
+## 9) Plan d'attaque VISUEL (design propre dans MVC)
+
+Objectif: garder une UI moderne, mais avec une discipline stricte pour que le design reste dans la couche presentation uniquement.
+
+### 9.1 Regle d'or MVC pour le visuel
+
+- `views/`:
+  - Autorise: `st.*`, layout, widgets, affichage, CSS leger, appels aux controllers.
+  - Interdit: SQL direct, logique metier complexe, acces disque critique, logique SMTP/PDF metier.
+
+- `controllers/`:
+  - Autorise: orchestration de cas d'usage, validations metier, appels models/services.
+  - Interdit: `streamlit`, HTML/CSS, `st.session_state`, rendu UI.
+
+- `models/`:
+  - Autorise: CRUD, requetes SQL, mapping donnees.
+  - Interdit: decisions de presentation (couleurs, labels UI, mise en page).
+
+- `utils/ui/` (a creer):
+  - Autorise: composants visuels reutilisables (header, cards, badges, tableaux stylises), theme helpers.
+  - Interdit: logique metier et acces base.
+
+### 9.2 Cible technique design
+
+- Centraliser le design system:
+  - Couleurs, espacements, bordures, typo, elevations dans un module unique.
+  - Exposer des tokens (`PRIMARY`, `SUCCESS`, `ERROR`, `SPACING_MD`, etc.).
+
+- Limiter l'injection HTML/JS:
+  - Prioriser les composants natifs Streamlit.
+  - Garder `unsafe_allow_html=True` uniquement pour des blocs statiques maitrises.
+  - Supprimer progressivement tout JS de manipulation DOM (MutationObserver et scripts dynamiques).
+
+- Créer des composants UI standards:
+  - `render_page_header(title, subtitle)`
+  - `render_kpi_card(label, value, trend)`
+  - `render_empty_state(message, action_label=None)`
+  - `render_section_container(...)`
+  - Ces composants vivent dans `utils/ui/` et sont appeles par les vues.
+
+### 9.3 Tickets VISUELS en priorite (V0/V1/V2)
+
+### V0 - Stabilite visuelle immediate
+
+**V0-01 - Audit CSS/JS injecte**
+- Lister tous les points `unsafe_allow_html=True` et scripts inline.
+- Classer: indispensable / remplaçable / a supprimer.
+- Done: inventaire complet + priorisation.
+
+**V0-02 - Mode visuel "safe"**
+- Introduire un theme minimal stable global (sans JS DOM custom).
+- Desactiver les scripts risqués responsables d'ecrans blancs.
+- Done: aucune page ne casse sans scripts custom.
+
+**V0-03 - Harmonisation rapide des pages critiques**
+- Uniformiser header, marges, colonnes, boutons sur login/dashboard/commande/liste.
+- Done: rendu coherent sur les pages a fort trafic.
+
+### V1 - Industrialisation du design dans MVC
+
+**V1-01 - Creer `utils/ui/` et composants partages**
+- Migrer les headers/cartes/styles repetes vers fonctions reutilisables.
+- Done: suppression des duplications visibles.
+
+**V1-02 - Introduire un "theme registry"**
+- Fichier unique pour tokens visuels (couleurs, radius, shadows, spacing).
+- Done: aucune couleur magique hardcodee dans les vues critiques.
+
+**V1-03 - Refactor progressif des vues**
+- Remplacer le HTML inline par composants `utils/ui`.
+- Conserver seulement du declaratif Streamlit dans les vues.
+- Done: vues lisibles, plus courtes, centrées presentation.
+
+### V2 - Qualite UX et robustesse long terme
+
+**V2-01 - Accessibilite et lisibilite**
+- Contraste, tailles, etats disabled/loading/error homogenes.
+- Done: parcours principaux utilisables sans ambiguite.
+
+**V2-02 - Etats UI standardises**
+- Squelettes de chargement, erreurs reseau, etats vides, confirmations succes.
+- Done: UX previsible sur toute l'application.
+
+**V2-03 - Regles de contribution UI**
+- Checklist PR: "pas de SQL en view", "pas de streamlit dans controller", "pas de JS DOM non valide".
+- Done: garde-fou actif pour eviter regressions architecturales.
+
+### 9.4 Sequence recommandee (sans casser la prod)
+
+1. Appliquer V0 (safe mode + suppression scripts risqués).  
+2. Creer `utils/ui/` et migrer 2-3 composants transverses (V1-01).  
+3. Refactor page par page (dashboard, commande, admin, super-admin).  
+4. Finaliser V2 (accessibilite + regles PR + durcissement UX).
+
+### 9.5 Definition of Done "Visuel conforme MVC"
+
+- Le design est centralise et reutilisable (`utils/ui/` + tokens).
+- Les vues ne contiennent plus de SQL ni logique metier lourde.
+- Les controllers ne contiennent aucun code Streamlit/UI.
+- Plus de scripts DOM fragiles en production.
+- Le rendu reste stable sur Render apres redemarrages/deploiements.

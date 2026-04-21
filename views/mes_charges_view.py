@@ -27,6 +27,7 @@ from PIL import Image as PILImage
 import qrcode
 
 from models.database import ChargesModel, CommandeModel
+from utils.page_header import afficher_header_page
 
 
 # ============================================================================
@@ -71,10 +72,18 @@ CATEGORIES_CHARGES_COMMANDE = {
 # Dictionnaire global pour l'affichage des libellés
 CATEGORIES_CHARGES = {**CATEGORIES_CHARGES_GENERAL, **CATEGORIES_CHARGES_COMMANDE}
 
-# Tranches d'impôts (Chiffre d'affaire -> Impôt)
+# Tranches d'impôts (Chiffre d'affaire -> Impôt) — première tranche correspondante utilisée
 TRANCHES_IMPOTS = [
-    {"min": 1000000, "max": 5000000, "impot": 35000},
-    {"min": 5000001, "max": 7000000, "impot": 78000},
+    {"min": 0, "max": 500000, "impot": 5000},
+    {"min": 500000, "max": 1000000, "impot": 75000},
+    {"min": 1000000, "max": 1500000, "impot": 10000},
+    {"min": 1500000, "max": 2000000, "impot": 12500},
+    {"min": 2000000, "max": 2500000, "impot": 15000},
+    {"min": 2500000, "max": 5000000, "impot": 37500},
+    {"min": 5000000, "max": 10000000, "impot": 75000},
+    {"min": 10000000, "max": 20000000, "impot": 125000},
+    {"min": 20000000, "max": 30000000, "impot": 250000},
+    {"min": 30000000, "max": 50000000, "impot": 500000},
 ]
 
 
@@ -82,7 +91,11 @@ TRANCHES_IMPOTS = [
 # FONCTIONS UTILITAIRES
 # ============================================================================
 
-def calculer_prochaine_reference(charges_model: ChargesModel, couturier_id: int, salon_id: Optional[str] = None) -> int:
+def calculer_prochaine_reference(
+    charges_model: ChargesModel,
+    couturier_id: Optional[int],
+    salon_id: Optional[str] = None,
+) -> int:
     """
     Calcule la prochaine référence (N+1) en se basant sur toutes les charges existantes.
     Extrait les références depuis les descriptions au format "| Réf: {numero}"
@@ -218,8 +231,13 @@ def afficher_page_mes_charges():
         salon_id_user = ""
     
     # Si admin, filtrer par salon; sinon, par couturier
-    couturier_id = None if is_admin else obtenir_couturier_id(couturier_data)
-    
+    couturier_id_connecte = obtenir_couturier_id(couturier_data)
+    if couturier_id_connecte is None:
+        st.error("❌ Impossible d'identifier votre compte utilisateur. Merci de vous reconnecter.")
+        return
+    # Filtre liste / périmètre : tout le salon pour l'admin, sinon l'employé connecté
+    couturier_id_filtre = None if is_admin else couturier_id_connecte
+
     charges_model = ChargesModel(st.session_state.db_connection)
     commande_model = CommandeModel(st.session_state.db_connection)
     
@@ -235,15 +253,7 @@ def afficher_page_mes_charges():
         titre = "💰 Gestion des Charges"
         sous_titre = "Atelier de Couture - Tableau de bord complet"
     
-    st.markdown(f"""
-        <div style='background: linear-gradient(135deg, #B19CD9 0%, #40E0D0 100%); 
-                    padding: 2rem; border-radius: 16px; margin-bottom: 2rem; 
-                    box-shadow: 0 4px 8px rgba(0,0,0,0.1); text-align: center;'>
-            <h1 style='color: white; margin: 0; font-size: 2.5rem; font-weight: 700; 
-                       font-family: Poppins, sans-serif; text-shadow: 0 2px 4px rgba(0,0,0,0.2);'>{titre}</h1>
-            <p style='color: rgba(255,255,255,0.95); margin: 0.5rem 0 0 0; font-size: 1.1rem;'>{sous_titre}</p>
-        </div>
-    """, unsafe_allow_html=True)
+    afficher_header_page(titre, sous_titre)
     
     # ========================================================================
     # TABS PRINCIPAUX
@@ -273,9 +283,10 @@ def afficher_page_mes_charges():
         afficher_formulaire_ajout_charge(
             charges_model,
             commande_model,
-            couturier_id,
+            couturier_id_filtre,
             salon_id_user,
-            is_admin=is_admin
+            is_admin=is_admin,
+            couturier_id_auteur=couturier_id_connecte,
         )
     
     # ========================================================================
@@ -283,7 +294,7 @@ def afficher_page_mes_charges():
     # ========================================================================
     
     with tab2:
-        afficher_liste_charges(charges_model, couturier_id, is_admin, salon_id_user)
+        afficher_liste_charges(charges_model, couturier_id_filtre, is_admin, salon_id_user)
     
     # ========================================================================
     # TAB 3 : ANALYSES ET GRAPHIQUES
@@ -291,7 +302,9 @@ def afficher_page_mes_charges():
     
     if is_admin:
         with tab3:
-            afficher_analyses_graphiques(charges_model, commande_model, couturier_id, is_admin, salon_id_user)
+            afficher_analyses_graphiques(
+                charges_model, commande_model, couturier_id_filtre, is_admin, salon_id_user
+            )
     
     # ========================================================================
     # TAB 4 : CALCUL D'IMPÔTS
@@ -299,24 +312,38 @@ def afficher_page_mes_charges():
     
     if is_admin:
         with tab4:
-            afficher_calcul_impots(charges_model, commande_model, couturier_id, is_admin, salon_id_user)
+            afficher_calcul_impots(
+                charges_model, commande_model, couturier_id_filtre, is_admin, salon_id_user
+            )
 
 
 # ============================================================================
 # FORMULAIRE D'AJOUT DE CHARGE
 # ============================================================================
 
-def afficher_formulaire_ajout_charge(charges_model: ChargesModel, 
-                                     commande_model: CommandeModel,
-                                     couturier_id: int,
-                                     salon_id_user: Optional[str] = None,
-                                     is_admin: bool = False):
+def afficher_formulaire_ajout_charge(
+    charges_model: ChargesModel,
+    commande_model: CommandeModel,
+    couturier_id_filtre: Optional[int],
+    salon_id_user: Optional[str] = None,
+    is_admin: bool = False,
+    couturier_id_auteur: Optional[int] = None,
+):
     """Formulaire d'ajout d'une nouvelle charge"""
     
     st.markdown("### ➕ Nouvelle charge")
     st.markdown("Enregistrez vos dépenses de manière structurée")
+    if is_admin:
+        st.caption(
+            "Les charges sont enregistrées sous votre compte administrateur et restent visibles "
+            "pour tout le salon."
+        )
     st.markdown("---")
-    
+
+    if not couturier_id_auteur:
+        st.error("❌ Impossible d'enregistrer : compte utilisateur invalide.")
+        return
+
     with st.form("form_ajout_charge", clear_on_submit=True):
         # Type de charge (placé plus haut)
         type_options = ["Commande"] if not is_admin else list(TYPES_CHARGES.keys())
@@ -379,10 +406,10 @@ def afficher_formulaire_ajout_charge(charges_model: ChargesModel,
             with col_cmd:
                 # Récupérer les commandes : pour un non-admin, filtrer uniquement par couturier_id
                 # (comme dans la page "Mes commandes") ; pour un admin, filtrer par salon_id
-                if couturier_id is not None:
+                if couturier_id_filtre is not None:
                     # Non-admin : filtrer uniquement par couturier_id (comme dans "Mes commandes")
                     commandes = commande_model.lister_commandes(
-                        couturier_id=couturier_id,
+                        couturier_id=couturier_id_filtre,
                         tous_les_couturiers=False,
                         salon_id=salon_id_user
                     )
@@ -464,7 +491,7 @@ def afficher_formulaire_ajout_charge(charges_model: ChargesModel,
                         desc_complete = f"{description} | {commentaire}" if description else commentaire
                     
                     charge_id = charges_model.ajouter_charge(
-                        couturier_id=couturier_id,
+                        couturier_id=couturier_id_auteur,
                         type_charge=type_charge,
                         categorie=categorie,
                         montant=montant,
@@ -478,7 +505,11 @@ def afficher_formulaire_ajout_charge(charges_model: ChargesModel,
                         st.balloons()
                         st.rerun()
                     else:
-                        st.error("❌ Erreur lors de l'enregistrement")
+                        detail = getattr(charges_model, "last_error", None) or ""
+                        st.error(
+                            "❌ Erreur lors de l'enregistrement"
+                            + (f" : {detail}" if detail else "")
+                        )
 
 
 # ============================================================================
@@ -716,7 +747,7 @@ def afficher_liste_charges(
         
         st.dataframe(
             df_display,
-            width='stretch',
+            use_container_width=True,
             hide_index=True,
             height=400
         )
@@ -738,7 +769,7 @@ def afficher_liste_charges(
                 data=csv,
                 file_name=f"charges_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
                 mime="text/csv",
-                width='stretch'
+                use_container_width=True
             )
         
         with col_e2:
@@ -752,7 +783,7 @@ def afficher_liste_charges(
                 data=buffer.getvalue(),
                 file_name=f"charges_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                width='stretch'
+                use_container_width=True
             )
 
 
@@ -1040,7 +1071,7 @@ def afficher_analyses_graphiques(
     df_monthly['Total (FCFA)'] = df_monthly['Total (FCFA)'].apply(lambda x: f"{x:,.0f}")
     df_monthly['Montant moyen'] = df_monthly['Montant moyen'].apply(lambda x: f"{x:,.0f}")
     
-    st.dataframe(df_monthly, width='stretch', hide_index=True)
+    st.dataframe(df_monthly, use_container_width=True, hide_index=True)
 
 
 # ============================================================================
@@ -1181,43 +1212,34 @@ def afficher_calcul_impots(
             impot_a_payer = tranche['impot']
             tranche_applicable = tranche
             break
-    
-    # Afficher les tranches
-    st.info("""
-    **Barème des impôts :**
-    - 1 000 000 - 5 000 000 FCFA → 35 000 FCFA
-    -""")
 
+    lignes_bareme = "\n".join(
+        f"- {t['min']:,.0f} – {t['max']:,.0f} FCFA → **{t['impot']:,.0f} FCFA**"
+        for t in TRANCHES_IMPOTS
+    )
+    st.info(f"**Barème des impôts (indicatif)**\n\n{lignes_bareme}")
 
+    st.markdown("---")
+    resultat_avant_impot = float(ca_a_utiliser) - float(total_charges)
+    c_res1, c_res2, c_res3 = st.columns(3)
+    with c_res1:
+        st.metric("CA retenu", f"{float(ca_a_utiliser):,.0f} FCFA")
+    with c_res2:
+        st.metric("Charges sur la période", f"{float(total_charges):,.0f} FCFA")
+    with c_res3:
+        st.metric("Résultat avant impôt", f"{resultat_avant_impot:,.0f} FCFA")
 
-
-TYPES_CHARGES = {
-    "Fixe": "📌 Frais Fixes",
-    "Ponctuelle": "⏱️ Ponctuelles",
-    "Commande": "🧾 Liées commande",
-    "Salaire": "💰 Salaires"
-}
-
-CATEGORIES_CHARGES = {
-    "loyer": "🏠 Loyer", "electricite": "💡 Électricité",
-    "salaire": "👤 Salaire", "materiel": "✂️ Matériel",
-    "tissu": "🧵 Tissu", "transport": "🚗 Transport",
-    "maintenance": "🔧 Maintenance", "communication": "📱 Communication",
-    "autre": "💼 Autre"
-}
-
-TRANCHES_IMPOTS = [
-    {"min": 0, "max": 500000, "impot": 5000},
-    {"min": 500000, "max": 1000000, "impot": 75000},
-    {"min": 1000000, "max": 1500000, "impot": 10000},
-    {"min": 1500000, "max": 2000000, "impot": 12500},
-    {"min": 2000000, "max": 2500000, "impot": 15000},
-    {"min": 2500000, "max": 5000000, "impot": 37500},
-    {"min": 5000000, "max": 10000000, "impot": 75000},
-    {"min": 10000000, "max": 20000000, "impot": 125000},
-    {"min": 20000000, "max": 30000000, "impot": 250000},
-    {"min": 30000000, "max": 50000000, "impot": 500000},
-]
+    if tranche_applicable:
+        st.success(
+            f"Tranche applicable : {tranche_applicable['min']:,.0f} – "
+            f"{tranche_applicable['max']:,.0f} FCFA"
+        )
+    else:
+        st.warning(
+            "Aucune tranche du barème ne correspond exactement au montant saisi. "
+            "Vérifiez le CA ou complétez les tranches dans le code si besoin."
+        )
+    st.metric("Impôt estimé", f"{impot_a_payer:,.0f} FCFA")
 
 
 # ============================================================================
@@ -2207,26 +2229,6 @@ def _generer_pdf_bulletin_salaire(employe_nom: str,
     except Exception as e:
         print(f"Erreur génération bulletin salaire: {e}")
         return None
-    
-    # Sélection du type de charge en dehors du formulaire pour pouvoir changer dynamiquement
-    type_charge = st.selectbox(
-        "Type de charge *", 
-        list(TYPES_CHARGES.keys()), 
-        format_func=lambda x: TYPES_CHARGES[x],
-        key="type_charge_select"
-    )
-    
-    st.markdown("---")
-    
-    # Afficher le formulaire selon le type sélectionné
-    if type_charge == "Salaire":
-        _formulaire_salaire(charges_model, couturier_id, salon_id_user)
-    elif type_charge == "Ponctuelle":
-        _formulaire_ponctuelle(charges_model, couturier_id, salon_id_user)
-    elif type_charge == "Fixe":
-        _formulaire_fixe(charges_model, couturier_id, salon_id_user)
-    elif type_charge == "Commande":
-        _formulaire_commande(charges_model, commande_model, couturier_id, salon_id_user)
 
 
 def _formulaire_salaire(charges_model, couturier_id, salon_id_user: Optional[str] = None):
@@ -2344,7 +2346,7 @@ def _formulaire_salaire(charges_model, couturier_id, salon_id_user: Optional[str
             data=bulletin_data["content"],
             file_name=bulletin_data["filename"],
             mime="application/pdf",
-            width='stretch',
+            use_container_width=True,
         )
 
 
@@ -2784,7 +2786,7 @@ def _liste_charges(charges_model, couturier_id, is_admin=False, salon_id_user: O
         st.write("")  # Espacement vertical
         btn_actualiser = st.button("🔄 Actualiser", 
                                    type="primary", 
-                                   width='stretch',
+                                   use_container_width=True,
                                    key="btn_actualiser_analyse",
                                    help="Recalculer les totaux et statistiques avec les filtres sélectionnés")
     
@@ -3028,7 +3030,7 @@ def _liste_charges(charges_model, couturier_id, is_admin=False, salon_id_user: O
     
     st.dataframe(
         df_recap_display,
-        width='stretch',
+        use_container_width=True,
         height=300
     )
 
@@ -3058,7 +3060,7 @@ def _liste_charges(charges_model, couturier_id, is_admin=False, salon_id_user: O
             data=excel_buffer.getvalue(),
             file_name=f"AnalyseDesCharges_Du_{dd_str}_Et_{df_str}.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            width='stretch',
+            use_container_width=True,
         )
     
     # Export PDF d'analyse
@@ -3070,7 +3072,7 @@ def _liste_charges(charges_model, couturier_id, is_admin=False, salon_id_user: O
                 data=pdf_data["content"],
                 file_name=pdf_data["filename"],
                 mime="application/pdf",
-                width='stretch',
+                use_container_width=True,
             )
 
 def _analyses(charges_model, couturier_id):
@@ -3165,7 +3167,7 @@ def _calcul_impots(charges_model, commande_model, couturier_id, is_admin=False, 
                 data=pdf_data["content"],
                 file_name=pdf_data["filename"],
                 mime="application/pdf",
-                width='stretch'
+                use_container_width=True
             )
 
     # -------------------------------------------------------------------------
@@ -3243,5 +3245,5 @@ def _calcul_impots(charges_model, commande_model, couturier_id, is_admin=False, 
             data=excel_buffer.getvalue(),
             file_name=f"Releve_Impots_{dd_str}_au_{df_str}.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            width='stretch',
+            use_container_width=True,
         )

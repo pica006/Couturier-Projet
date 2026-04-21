@@ -8,6 +8,13 @@ import re
 from datetime import datetime
 from controllers.commande_controller import CommandeController
 from controllers.pdf_controller import PDFController
+from utils.ui import (
+    ajouter_espace_vertical,
+    appliquer_style_pages_critiques,
+    afficher_info_minimale,
+    afficher_titre_section,
+    etat_chargement,
+)
 
 
 def _generer_nom_fichier_pdf(details):
@@ -34,6 +41,7 @@ def _generer_nom_fichier_pdf(details):
 
 def afficher_page_liste_commandes():
     """Affiche la liste des commandes du couturier"""
+    appliquer_style_pages_critiques()
     
     # En-tête encadré standardisé
     from utils.page_header import afficher_header_page
@@ -54,7 +62,7 @@ def afficher_page_liste_commandes():
         
         # Récupérer les commandes (avec cache pour éviter les rechargements)
         if 'commandes_liste' not in st.session_state:
-            with st.spinner("Chargement des commandes..."):
+            with etat_chargement("Chargement des commandes..."):
                 st.session_state.commandes_liste = commande_controller.lister_commandes_couturier(
                     st.session_state.couturier_data['id']
                 )
@@ -63,15 +71,15 @@ def afficher_page_liste_commandes():
     
     if not commandes:
         with st.container():
-            st.info("📭 Aucune commande enregistrée pour le moment")
+            afficher_info_minimale("Aucune commande enregistrée pour le moment")
             st.markdown("---")
-            if st.button("➕ Créer une nouvelle commande", width='stretch', type="primary"):
+            if st.button("➕ Créer une nouvelle commande", use_container_width=True, type="primary"):
                 st.session_state.page = 'nouvelle_commande'
                 st.rerun()
     else:
         # Statistiques avec style amélioré - OPTIMISÉES
         with st.container():
-            st.markdown("### 📊 Statistiques")
+            afficher_titre_section("📊 Statistiques")
             col1, col2, col3, col4, col5 = st.columns(5)
             
             # Calculs de base
@@ -130,7 +138,7 @@ def afficher_page_liste_commandes():
         
         # Filtres avec style amélioré
         with st.container():
-            st.markdown("### 🔍 Filtres et Recherche")
+            afficher_titre_section("🔍 Filtres et Recherche")
             col1, col2, col3 = st.columns([2, 2, 1])
             
             with col1:
@@ -149,14 +157,14 @@ def afficher_page_liste_commandes():
                 )
             
             with col3:
-                st.markdown("<br>", unsafe_allow_html=True)
-                if st.button("🔄 Actualiser", width='stretch', key="btn_actualiser_liste"):
+                ajouter_espace_vertical()
+                if st.button("🔄 Actualiser", use_container_width=True, key="btn_actualiser_liste"):
                     if 'commandes_liste' in st.session_state:
                         del st.session_state.commandes_liste
                     st.rerun()
             
             # Filtre par période (dates)
-            st.markdown("#### 📅 Filtrer par période")
+            afficher_titre_section("📅 Filtrer par période", niveau=4)
             col_date1, col_date2, col_date3 = st.columns([2, 2, 1])
             
             with col_date1:
@@ -178,8 +186,8 @@ def afficher_page_liste_commandes():
                 )
             
             with col_date3:
-                st.markdown("<br>", unsafe_allow_html=True)
-                if st.button("🗑️ Effacer dates", width='stretch', key="btn_effacer_dates"):
+                ajouter_espace_vertical()
+                if st.button("🗑️ Effacer dates", use_container_width=True, key="btn_effacer_dates"):
                     if 'filtre_date_debut_liste' in st.session_state:
                         del st.session_state.filtre_date_debut_liste
                     if 'filtre_date_fin_liste' in st.session_state:
@@ -315,11 +323,11 @@ def afficher_page_liste_commandes():
                 periode_info += f"à partir du {date_debut.strftime('%d/%m/%Y')}"
             elif date_fin:
                 periode_info += f"jusqu'au {date_fin.strftime('%d/%m/%Y')}"
-            st.info(periode_info)
+            afficher_info_minimale(periode_info)
         
         # Affichage des commandes avec style amélioré
         with st.container():
-            st.markdown(f"### 📋 Liste des commandes ({len(commandes_filtrees)})")
+            afficher_titre_section(f"📋 Liste des commandes ({len(commandes_filtrees)})")
             
             if not commandes_filtrees:
                 st.warning("⚠️ Aucune commande ne correspond aux filtres sélectionnés")
@@ -348,7 +356,7 @@ def afficher_page_liste_commandes():
                 # Afficher le tableau avec style
                 st.dataframe(
                     df,
-                    width='stretch',
+                    use_container_width=True,
                     hide_index=True,
                     height=400
                 )
@@ -357,11 +365,11 @@ def afficher_page_liste_commandes():
         
         # Détails d'une commande avec expander pour plus de dynamisme
         with st.container():
-            st.markdown("### 🔎 Détails d'une commande")
+            afficher_titre_section("🔎 Détails d'une commande")
             
             commande_ids = [c['id'] for c in commandes_filtrees]
             if not commande_ids:
-                st.info("ℹ️ Sélectionnez des filtres pour voir les commandes")
+                afficher_info_minimale("Sélectionnez des filtres pour voir les commandes")
             else:
                 # Fonction pour forcer la mise à jour quand la sélection change
                 def on_commande_change():
@@ -445,13 +453,13 @@ def afficher_page_liste_commandes():
                         st.markdown("---")
                         
                         # Actions avec style amélioré
-                        st.markdown("#### ⚡ Actions")
+                        afficher_titre_section("⚡ Actions", niveau=4)
                         # Première ligne de boutons
                         col1, col2 = st.columns(2)
                         
                         with col1:
-                            if st.button("📄 Générer PDF", width='stretch', type="primary", key=f"btn_gen_pdf_{commande_selectionnee}"):
-                                with st.spinner("📄 Génération du PDF en cours..."):
+                            if st.button("📄 Générer PDF", use_container_width=True, type="primary", key=f"btn_gen_pdf_{commande_selectionnee}"):
+                                with etat_chargement("Génération du PDF en cours..."):
                                     pdf_path = pdf_controller.generer_pdf_commande(details)
                                     
                                     if pdf_path and os.path.exists(pdf_path):
@@ -468,17 +476,61 @@ def afficher_page_liste_commandes():
                                             data=pdf_bytes,
                                             file_name=nom_fichier,
                                             mime="application/pdf",
-                                            width='stretch',
+                                            use_container_width=True,
                                             key=f"download_pdf_liste_{commande_selectionnee}",
                                             type="primary"
                                         )
                                         
-                                        st.info(f"💾 Nom du fichier: `{nom_fichier}`")
+                                        afficher_info_minimale(f"Nom du fichier: `{nom_fichier}`")
                                     else:
                                         st.error("❌ Erreur lors de la génération du PDF")
                         
                         with col2:
-                            if st.button("🔄 Actualiser", width='stretch', key=f"btn_actualiser_details_{commande_selectionnee}"):
+                            if st.button("🔄 Actualiser", use_container_width=True, key=f"btn_actualiser_details_{commande_selectionnee}"):
                                 if 'commandes_liste' in st.session_state:
                                     del st.session_state.commandes_liste
                                 st.rerun()
+
+                        st.markdown("---")
+                        st.markdown("#### 🗑️ Supprimer cette commande (employé)")
+                        st.warning(
+                            "Suppression logique stricte : uniquement vos propres commandes. "
+                            "La commande reste visible chez l'admin/superadmin comme supprimée et n'est plus comptabilisée."
+                        )
+                        with st.form(f"form_supprimer_commande_employe_{commande_selectionnee}", clear_on_submit=True):
+                            motif_suppression = st.text_area(
+                                "Motif de suppression *",
+                                placeholder="Ex: erreur de saisie / doublon",
+                                height=80,
+                            )
+                            confirmer_suppression = st.checkbox(
+                                "Je confirme la suppression de cette commande.",
+                                key=f"confirm_delete_emp_{commande_selectionnee}",
+                            )
+                            submit_delete = st.form_submit_button("🗑️ Supprimer la commande")
+
+                            if submit_delete:
+                                if not motif_suppression or len(motif_suppression.strip()) < 3:
+                                    st.error("❌ Veuillez renseigner un motif de suppression (au moins 3 caractères).")
+                                elif not confirmer_suppression:
+                                    st.error("❌ Veuillez confirmer la suppression.")
+                                else:
+                                    try:
+                                        employe_id = st.session_state.couturier_data.get("id")
+                                        ok = commande_controller.supprimer_commande_employe(
+                                            commande_id=commande_selectionnee,
+                                            employe_id=employe_id,
+                                            salon_id_employe=salon_id,
+                                            motif=motif_suppression.strip(),
+                                        )
+                                        if ok:
+                                            st.success("✅ Commande supprimée avec succès.")
+                                            if 'commandes_liste' in st.session_state:
+                                                del st.session_state.commandes_liste
+                                            st.rerun()
+                                        else:
+                                            st.error(
+                                                "❌ Suppression refusée : vous ne pouvez supprimer que vos propres commandes."
+                                            )
+                                    except Exception as e:
+                                        st.error(f"❌ Erreur pendant la suppression : {e}")

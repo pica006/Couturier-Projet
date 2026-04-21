@@ -3,10 +3,10 @@ Vue pour permettre aux employés de fermer leurs commandes
 """
 import streamlit as st
 import os
-from models.database import CommandeModel
+from datetime import date, datetime
+from controllers.commande_controller import CommandeController
 from controllers.email_controller import EmailController
 from models.salon_model import SalonModel
-from utils.role_utils import obtenir_salon_id
 from utils.role_utils import obtenir_couturier_id, obtenir_salon_id, est_admin
 
 
@@ -41,7 +41,8 @@ def afficher_page_fermer_commandes():
     is_admin_user = est_admin(couturier_data)
     
     db = st.session_state.db_connection
-    commande_model = CommandeModel(db)
+    commande_controller = CommandeController(db)
+    commande_model = commande_controller.commande_model
 
     # Configurer l'email pour le salon courant
     smtp_config = None
@@ -62,6 +63,100 @@ def afficher_page_fermer_commandes():
         "✅ Commandes terminées (en attente de livraison)", 
         "📄 Upload PDFs des commandes terminées"
     ])
+
+    def _badge_statut(statut: str) -> str:
+        s = (statut or "").strip().lower()
+        if s == "en cours":
+            return "⏳ En cours"
+        if s == "terminé":
+            return "✅ Terminé"
+        if s == "livré et payé":
+            return "🚚 Livré et payé"
+        if s == "supprimée":
+            return "🗑️ Supprimée"
+        return f"📌 {statut or 'Inconnu'}"
+
+    def _to_date(value):
+        if value is None:
+            return None
+        if isinstance(value, datetime):
+            return value.date()
+        if isinstance(value, date):
+            return value
+        if isinstance(value, str):
+            raw = value.strip()
+            for fmt in ("%Y-%m-%d", "%d/%m/%Y", "%Y-%m-%d %H:%M:%S", "%d-%m-%Y"):
+                try:
+                    return datetime.strptime(raw, fmt).date()
+                except ValueError:
+                    continue
+        return None
+
+    def _meta_urgence(commande):
+        # Priorité globale: rouge (0) > orange (1) > vert (2)
+        date_livraison = _to_date(commande.get("date_livraison"))
+        reste = float(commande.get("reste", 0) or 0)
+        today = date.today()
+        jours = None if date_livraison is None else (date_livraison - today).days
+
+        if jours is not None and jours < 0:
+            return {
+                "niveau": "rouge",
+                "emoji": "🔴",
+                "label": f"En retard de {abs(jours)} jour(s)",
+                "priorite": 0,
+                "jours": jours,
+            }
+        if jours is not None and jours <= 2:
+            return {
+                "niveau": "orange",
+                "emoji": "🟠",
+                "label": "Échéance proche (0-2 jours)",
+                "priorite": 1,
+                "jours": jours,
+            }
+        if reste > 0:
+            return {
+                "niveau": "orange",
+                "emoji": "🟠",
+                "label": "Paiement à finaliser",
+                "priorite": 1,
+                "jours": 9999 if jours is None else jours,
+            }
+        return {
+            "niveau": "vert",
+            "emoji": "🟢",
+            "label": "Situation stable",
+            "priorite": 2,
+            "jours": 9999 if jours is None else jours,
+        }
+
+    def _trier_commandes_urgentes(commandes):
+        def _safe_int(value, default=0):
+            try:
+                return int(value)
+            except Exception:
+                return default
+
+        return sorted(
+            commandes,
+            key=lambda c: (
+                _meta_urgence(c)["priorite"],
+                _meta_urgence(c)["jours"],
+                -float(c.get("reste", 0) or 0),
+                _safe_int(c.get("id", 0) or 0),
+            ),
+        )
+
+    def _bandeau_urgence(commande):
+        meta = _meta_urgence(commande)
+        message = f"{meta['emoji']} **Priorité {meta['niveau'].upper()}** — {meta['label']}"
+        if meta["niveau"] == "rouge":
+            st.error(message)
+        elif meta["niveau"] == "orange":
+            st.warning(message)
+        else:
+            st.success(message)
     
     # ========================================================================
     # ONGLET 1 : MODIFIER LES PAIEMENTS (Commandes avec avance)
@@ -69,11 +164,12 @@ def afficher_page_fermer_commandes():
     with tab1:
         st.markdown("### 💰 Modifier les paiements")
         st.markdown("Liste de vos commandes où une avance a été versée. Vous pouvez modifier directement le prix total, l'avance et le reste à payer.")
+        st.caption("Objectif : solder le reste à payer. Une commande soldée passe automatiquement au statut **Terminé**.")
         
         # Bouton de rafraîchissement
         col_refresh, _ = st.columns([1, 5])
         with col_refresh:
-            if st.button("🔄 Actualiser", key="refresh_commandes_paiement", width='stretch'):
+            if st.button("🔄 Actualiser", key="refresh_commandes_paiement", use_container_width=True):
                 st.rerun()
         
         st.markdown("---")
@@ -95,57 +191,14 @@ def afficher_page_fermer_commandes():
         
         st.markdown("---")
         
-        # Récupérer les commandes du user avec avance > 0 ET reste > 0
+        # Récupérer les commandes du user avec avance > 0 ET reste > 0 (via controller/model)
         try:
-            cursor = st.session_state.db_connection.get_connection().cursor()
-            query = """
-                SELECT c.id, c.modele, c.prix_total, c.avance, c.reste, c.statut, 
-                       c.date_creation, c.date_livraison,
-                       cl.nom, cl.prenom
-                FROM commandes c
-                JOIN clients cl ON c.client_id = cl.id
-                JOIN couturiers co ON c.couturier_id = co.id
-                WHERE c.couturier_id = %s 
-                  AND co.salon_id = %s
-                  AND c.statut != 'Fermé'
-                  AND c.avance > 0
-                  AND c.reste > 0
-            """
-            params = [couturier_id, salon_id_user]
-            
-            db_type = st.session_state.db_connection.db_type
-            if date_debut_paiements:
-                if db_type == 'mysql':
-                    query += " AND DATE(c.date_creation) >= %s"
-                else:
-                    query += " AND c.date_creation::date >= %s"
-                params.append(date_debut_paiements)
-            if date_fin_paiements:
-                if db_type == 'mysql':
-                    query += " AND DATE(c.date_creation) <= %s"
-                else:
-                    query += " AND c.date_creation::date <= %s"
-                params.append(date_fin_paiements)
-            
-            query += " ORDER BY c.date_creation DESC"
-            cursor.execute(query, tuple(params))
-            results = cursor.fetchall()
-            cursor.close()
-            
-            commandes_avec_reste = []
-            for row in results:
-                commandes_avec_reste.append({
-                    'id': row[0],
-                    'modele': row[1],
-                    'prix_total': float(row[2]),
-                    'avance': float(row[3]),
-                    'reste': float(row[4]),
-                    'statut': row[5],
-                    'date_creation': row[6],
-                    'date_livraison': row[7],
-                    'client_nom': row[8],
-                    'client_prenom': row[9]
-                })
+            commandes_avec_reste = commande_controller.lister_commandes_paiements_a_completer(
+                couturier_id=couturier_id,
+                salon_id=salon_id_user,
+                date_debut=date_debut_paiements,
+                date_fin=date_fin_paiements,
+            )
         except Exception as e:
             st.error(f"❌ Erreur lors de la récupération des commandes : {e}")
             commandes_avec_reste = []
@@ -153,6 +206,13 @@ def afficher_page_fermer_commandes():
         if not commandes_avec_reste:
             st.info("📭 Aucune commande avec avance versée et reste à payer pour le moment.")
         else:
+            commandes_avec_reste = _trier_commandes_urgentes(commandes_avec_reste)
+            total_reste = sum(float(c.get("reste", 0) or 0) for c in commandes_avec_reste)
+            st.info(
+                f"💡 **{len(commandes_avec_reste)} commande(s)** à compléter, "
+                f"pour un **reste total de {total_reste:,.0f} FCFA**."
+            )
+            st.caption("Code couleur global: 🔴 urgence forte | 🟠 à traiter rapidement | 🟢 stable")
             st.markdown(f"#### 📋 Liste des commandes ({len(commandes_avec_reste)})")
             
             # Afficher chaque commande avec possibilité de modification
@@ -165,18 +225,19 @@ def afficher_page_fermer_commandes():
                     f"📦 Commande #{commande['id']} - {client_prenom} {client_nom} - {modele}",
                     expanded=False
                 ):
-                    # Affichage des informations de paiement comme dans "mes commandes"
-                    with st.expander("💰 Informations de Paiement", expanded=True):
-                        col_info1, col_info2, col_info3 = st.columns(3)
-                        
-                        with col_info1:
-                            st.metric("Prix total", f"{commande['prix_total']:,.0f} FCFA")
-                        with col_info2:
-                            st.metric("Avance", f"{commande['avance']:,.0f} FCFA")
-                        with col_info3:
-                            pourcentage_reste = ((commande['reste']/commande['prix_total'])*100) if commande['prix_total'] > 0 else 0
-                            st.metric("Reste à payer", f"{commande['reste']:,.0f} FCFA", 
-                                     delta=f"{pourcentage_reste:.1f}%")
+                    _bandeau_urgence(commande)
+                    # NOTE: Streamlit n'autorise pas les expanders imbriqués.
+                    st.markdown("#### 💰 Informations de Paiement")
+                    col_info1, col_info2, col_info3 = st.columns(3)
+                    
+                    with col_info1:
+                        st.metric("Prix total", f"{commande['prix_total']:,.0f} FCFA")
+                    with col_info2:
+                        st.metric("Avance", f"{commande['avance']:,.0f} FCFA")
+                    with col_info3:
+                        pourcentage_reste = ((commande['reste']/commande['prix_total'])*100) if commande['prix_total'] > 0 else 0
+                        st.metric("Reste à payer", f"{commande['reste']:,.0f} FCFA", 
+                                 delta=f"{pourcentage_reste:.1f}%")
                     
                     st.markdown("---")
                     st.markdown("#### ✏️ Modifier les montants")
@@ -224,7 +285,7 @@ def afficher_page_fermer_commandes():
                             nouveau_reste = max(0.0, reste_a_verser - nouvelle_avance_ajoutee)
                             
                             st.markdown("**Reste à payer**")
-                            st.markdown(f"### <span style='color: #F39C12; font-size: 1.5em; font-weight: bold;'>{nouveau_reste:,.0f} FCFA</span>", unsafe_allow_html=True)
+                            st.metric("Montant restant", f"{nouveau_reste:,.0f} FCFA")
                             
                             if nouveau_reste == 0 and reste_a_verser > 0:
                                 st.success("✅ Commande entièrement payée")
@@ -258,17 +319,13 @@ def afficher_page_fermer_commandes():
                                     # Mettre à jour le statut si nécessaire
                                     if success:
                                         try:
-                                            connection = st.session_state.db_connection.get_connection()
-                                            cursor = connection.cursor()
                                             # Si le reste est à 0, marquer comme "Terminé" (tout l'argent reçu)
                                             if nouveau_reste <= 0:
-                                                cursor.execute(
-                                                    "UPDATE commandes SET statut = 'Terminé' WHERE id = %s",
-                                                    (commande['id'],)
+                                                commande_controller.mettre_a_jour_statut_si_soldee(
+                                                    commande_id=commande['id'],
+                                                    nouveau_reste=nouveau_reste,
                                                 )
                                                 st.info("💡 Commande marquée comme 'Terminée' (tout l'argent reçu). Vous pouvez maintenant demander la livraison dans l'onglet suivant.")
-                                            connection.commit()
-                                            cursor.close()
                                         except Exception as e:
                                             st.warning(f"⚠️ Les montants ont été mis à jour mais erreur lors de la mise à jour du statut : {e}")
                                 
@@ -310,7 +367,7 @@ def afficher_page_fermer_commandes():
         if is_admin_user and salon_id_user:
             from models.database import CouturierModel
             couturier_model = CouturierModel(st.session_state.db_connection)
-            couturiers_salon = couturier_model.lister_tous_couturiers(salon_id=salon_id_user)
+            couturiers_salon = couturier_model.lister_tous_couturiers(salon_id=salon_id_user) or []
             
             options_couturiers = ["👥 Tous les couturiers"] + [
                 f"{c['code_couturier']} - {c['prenom']} {c['nom']}"
@@ -336,198 +393,54 @@ def afficher_page_fermer_commandes():
         from models.database import CouturierModel
         couturier_model = CouturierModel(st.session_state.db_connection)
         
-        # Récupérer les commandes selon le rôle
-        if is_admin_user:
-            # Admin : voir toutes les commandes terminées du salon (reste = 0, statut = 'Terminé')
-            if salon_id_user:
-                try:
-                    cursor = st.session_state.db_connection.get_connection().cursor()
-                    query = """
-                        SELECT c.id, c.modele, c.prix_total, c.avance, c.reste, c.statut, 
-                               c.date_creation, c.date_livraison,
-                               cl.nom, cl.prenom, cl.email, c.couturier_id,
-                               co.nom as couturier_nom, co.prenom as couturier_prenom
-                        FROM commandes c
-                        JOIN clients cl ON c.client_id = cl.id
-                        LEFT JOIN couturiers co ON c.couturier_id = co.id
-                        WHERE co.salon_id = %s 
-                          AND c.reste <= 0
-                          AND c.statut = 'Terminé'
-                    """
-                    params = [salon_id_user]
-                    
-                    db_type = st.session_state.db_connection.db_type
-                    if date_debut_terminees:
-                        if db_type == 'mysql':
-                            query += " AND DATE(c.date_creation) >= %s"
-                        else:
-                            query += " AND c.date_creation::date >= %s"
-                        params.append(date_debut_terminees)
-                    if date_fin_terminees:
-                        if db_type == 'mysql':
-                            query += " AND DATE(c.date_creation) <= %s"
-                        else:
-                            query += " AND c.date_creation::date <= %s"
-                        params.append(date_fin_terminees)
-                    if couturier_id_filter:
-                        query += " AND c.couturier_id = %s"
-                        params.append(couturier_id_filter)
-                    
-                    query += " ORDER BY c.date_creation DESC"
-                    cursor.execute(query, tuple(params))
-                    results = cursor.fetchall()
-                    cursor.close()
+        # Récupérer les commandes selon le rôle (orchestration via controller)
+        try:
+            commandes_terminees = commande_controller.lister_commandes_terminees_pour_livraison(
+                salon_id=salon_id_user,
+                date_debut=date_debut_terminees,
+                date_fin=date_fin_terminees,
+                couturier_id=couturier_id,
+                couturier_id_filter=couturier_id_filter,
+                vue_admin=is_admin_user,
+            )
 
-                    commandes_terminees = []
-                    for row in results:
-                        commandes_terminees.append({
-                            'id': row[0],
-                            'modele': row[1],
-                            'prix_total': float(row[2]),
-                            'avance': float(row[3]),
-                            'reste': float(row[4]),
-                            'statut': row[5],
-                            'date_creation': row[6],
-                            'date_livraison': row[7],
-                            'client_nom': row[8],
-                            'client_prenom': row[9],
-                            'client_email': row[10],
-                            'couturier_id': row[11],
-                            'couturier_nom': row[12],
-                            'couturier_prenom': row[13]
-                        })
-
-                    # Vérifier les demandes existantes pour chaque commande
-                    demandes = commande_model.lister_demandes_validation()
-                    for cmd in commandes_terminees:
-                        demande_existante = next(
-                            (
-                                d for d in demandes
-                                if d.get('commande_id') == cmd['id']
-                                and d.get('type_action') == 'fermeture_demande'
-                                and d.get('statut_validation') == 'en_attente'
-                            ),
-                            None
-                        )
-                        cmd['demande_existante'] = demande_existante
-                except Exception as e:
-                    st.error(f"❌ Erreur lors de la récupération des commandes : {e}")
-                    commandes_terminees = []
+            demandes = commande_model.lister_demandes_validation()
+            if not is_admin_user and commandes_terminees:
+                ids = [cmd["id"] for cmd in commandes_terminees]
+                historique_counts = commande_controller.get_historique_demandes_par_commandes(
+                    couturier_id=couturier_id,
+                    commande_ids=ids,
+                )
             else:
-                commandes_terminees = []
-        else:
-            # Employé : voir toutes ses commandes totalement payées (reste = 0, statut = 'Terminé')
-            try:
-                cursor = st.session_state.db_connection.get_connection().cursor()
-                query = """
-                    SELECT c.id, c.modele, c.prix_total, c.avance, c.reste, c.statut, 
-                           c.date_creation, c.date_livraison,
-                           cl.nom, cl.prenom
-                    FROM commandes c
-                    JOIN clients cl ON c.client_id = cl.id
-                    JOIN couturiers co ON c.couturier_id = co.id
-                    WHERE c.couturier_id = %s 
-                      AND co.salon_id = %s
-                      AND c.reste <= 0
-                      AND c.statut = 'Terminé'
-                """
-                params = [couturier_id, salon_id_user]
-                
-                db_type = st.session_state.db_connection.db_type
-                if date_debut_terminees:
-                    if db_type == 'mysql':
-                        query += " AND DATE(c.date_creation) >= %s"
-                    else:
-                        query += " AND c.date_creation::date >= %s"
-                    params.append(date_debut_terminees)
-                if date_fin_terminees:
-                    if db_type == 'mysql':
-                        query += " AND DATE(c.date_creation) <= %s"
-                    else:
-                        query += " AND c.date_creation::date <= %s"
-                    params.append(date_fin_terminees)
-                if couturier_id_filter:
-                    query += " AND c.couturier_id = %s"
-                    params.append(couturier_id_filter)
-                
-                query += " ORDER BY c.date_creation DESC"
-                cursor.execute(query, tuple(params))
-                results = cursor.fetchall()
-                cursor.close()
-
-                commandes_terminees = []
-                for row in results:
-                    commandes_terminees.append({
-                        'id': row[0],
-                        'modele': row[1],
-                        'prix_total': float(row[2]),
-                        'avance': float(row[3]),
-                        'reste': float(row[4]),
-                        'statut': row[5],
-                        'date_creation': row[6],
-                        'date_livraison': row[7],
-                        'client_nom': row[8],
-                        'client_prenom': row[9]
-                    })
-
-                # Vérifier les demandes existantes + historique des demandes pour chaque commande
-                demandes = commande_model.lister_demandes_validation()
                 historique_counts = {}
-                if commandes_terminees:
-                    try:
-                        ids = [cmd['id'] for cmd in commandes_terminees]
-                        placeholders = ", ".join(["%s"] * len(ids))
-                        hist_query = f"""
-                            SELECT commande_id,
-                                   COUNT(*) as total,
-                                   SUM(CASE WHEN statut_validation = 'en_attente' THEN 1 ELSE 0 END) as en_attente,
-                                   SUM(CASE WHEN statut_validation = 'validee' THEN 1 ELSE 0 END) as validee,
-                                   SUM(CASE WHEN statut_validation = 'rejetee' THEN 1 ELSE 0 END) as rejetee
-                            FROM historique_commandes
-                            WHERE couturier_id = %s
-                              AND type_action = 'fermeture_demande'
-                              AND commande_id IN ({placeholders})
-                            GROUP BY commande_id
-                        """
-                        cursor = st.session_state.db_connection.get_connection().cursor()
-                        cursor.execute(hist_query, tuple([couturier_id] + ids))
-                        for row in cursor.fetchall():
-                            historique_counts[row[0]] = {
-                                'total': int(row[1] or 0),
-                                'en_attente': int(row[2] or 0),
-                                'validee': int(row[3] or 0),
-                                'rejetee': int(row[4] or 0),
-                            }
-                        cursor.close()
-                    except Exception as e:
-                        st.warning(f"⚠️ Impossible de charger l'historique des demandes : {e}")
 
-                for cmd in commandes_terminees:
-                    demande_existante = next(
-                        (
-                            d for d in demandes
-                            if d.get('commande_id') == cmd['id']
-                            and d.get('type_action') == 'fermeture_demande'
-                            and d.get('statut_validation') == 'en_attente'
-                        ),
-                        None
+            for cmd in commandes_terminees:
+                demande_existante = next(
+                    (
+                        d for d in demandes
+                        if d.get("commande_id") == cmd["id"]
+                        and d.get("type_action") == "fermeture_demande"
+                        and d.get("statut_validation") == "en_attente"
+                    ),
+                    None,
+                )
+                cmd["demande_existante"] = demande_existante
+                if not is_admin_user:
+                    cmd["demande_stats"] = historique_counts.get(
+                        cmd["id"],
+                        {"total": 0, "en_attente": 0, "validee": 0, "rejetee": 0},
                     )
-                    cmd['demande_existante'] = demande_existante
-                    cmd['demande_stats'] = historique_counts.get(cmd['id'], {
-                        'total': 0,
-                        'en_attente': 0,
-                        'validee': 0,
-                        'rejetee': 0,
-                    })
-            except Exception as e:
-                st.error(f"❌ Erreur lors de la récupération des commandes : {e}")
-                commandes_terminees = []
+        except Exception as e:
+            st.error(f"❌ Erreur lors de la récupération des commandes : {e}")
+            commandes_terminees = []
         
         if not commandes_terminees:
             st.info("📭 Aucune commande totalement payée pour le moment.")
         else:
+            commandes_terminees = _trier_commandes_urgentes(commandes_terminees)
             st.markdown(f"#### 📋 Commandes totalement payées ({len(commandes_terminees)})")
             st.info("💡 Cliquez sur le bouton pour demander la livraison. La commande passera en attente de confirmation par l'administrateur.")
+            st.caption("Tri automatique appliqué: les commandes les plus urgentes sont affichées en haut.")
             st.markdown("---")
             
             for commande in commandes_terminees:
@@ -545,6 +458,7 @@ def afficher_page_fermer_commandes():
                     f"📦 Commande #{commande['id']} - {client_prenom} {client_nom} - {modele}{couturier_info}",
                     expanded=True
                 ):
+                    _bandeau_urgence(commande)
                     col_d1, col_d2, col_d3 = st.columns(3)
                     
                     with col_d1:
@@ -553,6 +467,7 @@ def afficher_page_fermer_commandes():
                         st.metric("💵 Avance", f"{commande['avance']:,.0f} FCFA")
                     with col_d3:
                         st.metric("💸 Reste", f"{commande['reste']:,.0f} FCFA")
+                    st.caption(f"Statut actuel : **{_badge_statut(commande.get('statut', ''))}**")
                     
                     st.markdown("---")
                     
@@ -560,22 +475,12 @@ def afficher_page_fermer_commandes():
                     total_demandes = 0
                     derniere_demande_status = None
                     try:
-                        cursor = st.session_state.db_connection.get_connection().cursor()
-                        cursor.execute(
-                            """
-                            SELECT COUNT(*), MAX(statut_validation)
-                            FROM historique_commandes
-                            WHERE commande_id = %s
-                              AND couturier_id = %s
-                              AND type_action = 'fermeture_demande'
-                            """,
-                            (commande['id'], couturier_id),
+                        resume_demande = commande_controller.get_resume_demande_fermeture_commande(
+                            commande_id=commande["id"],
+                            couturier_id=couturier_id,
                         )
-                        row = cursor.fetchone()
-                        cursor.close()
-                        if row:
-                            total_demandes = int(row[0] or 0)
-                            derniere_demande_status = row[1]
+                        total_demandes = int(resume_demande.get("total", 0))
+                        derniere_demande_status = resume_demande.get("dernier_statut")
                     except Exception:
                         total_demandes = 0
                         derniere_demande_status = None
@@ -600,17 +505,16 @@ def afficher_page_fermer_commandes():
                             "✅ Valider et passer en 'Livré et payé' (PDF dispo)",
                             key=f"admin_valider_livraison_{commande['id']}",
                             type="primary",
-                            width='stretch'
+                            use_container_width=True
                         ):
                             try:
-                                connection = st.session_state.db_connection.get_connection()
-                                cursor = connection.cursor()
-                                cursor.execute(
-                                    "UPDATE commandes SET statut = 'Livré et payé', date_fermeture = NOW() WHERE id = %s",
-                                    (commande['id'],)
+                                success_validation = commande_controller.valider_commande_livree_payee(
+                                    commande_id=commande["id"]
                                 )
-                                connection.commit()
-                                cursor.close()
+                                if not success_validation:
+                                    st.error("❌ Erreur lors de la validation.")
+                                    continue
+
                                 st.success("✅ Commande validée. Elle apparaît désormais dans l'onglet PDF.")
                                 
                                 # Envoi d'un email de livraison terminée au client
@@ -666,13 +570,11 @@ def afficher_page_fermer_commandes():
                             st.caption("📊 Aucune demande de fermeture envoyée pour cette commande.")
 
                         if demande_existante:
-                            # Demande déjà envoyée - afficher en orange
-                            st.markdown("""
-                                <div style='background-color: #FFA500; padding: 1rem; border-radius: 8px; color: white; text-align: center;'>
-                                    <strong>🟠 Demande de livraison en attente de confirmation</strong><br>
-                                    Votre demande a été envoyée et est en attente de validation par l'administrateur.
-                                </div>
-                            """, unsafe_allow_html=True)
+                            # Demande déjà envoyée
+                            st.warning(
+                                "🟠 Demande de livraison en attente de confirmation. "
+                                "Votre demande est en attente de validation par l'administrateur."
+                            )
                             if demande_existante.get('date_creation'):
                                 st.caption(f"📅 Demande envoyée le : {demande_existante.get('date_creation')}")
                         else:
@@ -685,7 +587,7 @@ def afficher_page_fermer_commandes():
                                 if st.button(
                                     "📤 Demande non envoyée (cliquer pour envoyer)",
                                     key=button_key,
-                                    width='stretch',
+                                    use_container_width=True,
                                     type="primary"
                                 ):
                                     # Créer la demande de livraison
@@ -696,24 +598,61 @@ def afficher_page_fermer_commandes():
                                                 couturier_id,
                                                 "Demande de livraison de la commande"
                                             )
-                                            
-                                            if result and result.get("id"):
-                                                if result.get("created", False):
-                                                    st.success(f"🟢 Demande envoyée avec succès (ID: {result['id']}) pour la commande {commande['id']}")
+
+                                            result_id = None
+                                            created = True
+                                            if isinstance(result, dict):
+                                                result_id = result.get("id")
+                                                created = bool(result.get("created", False))
+                                            elif isinstance(result, int):
+                                                result_id = result
+                                                created = True
+
+                                            if result_id:
+                                                if created:
+                                                    st.success(
+                                                        f"🟢 Demande envoyée avec succès (ID: {result_id}) "
+                                                        f"pour la commande {commande['id']}"
+                                                    )
                                                     st.caption("État : envoyée, la ligne va disparaître.")
                                                     st.balloons()
-                                                    st.rerun()
                                                 else:
-                                                    st.warning(f"⚠️ Une demande de fermeture existe déjà pour la commande {commande['id']} (ID demande: {result['id']})")
+                                                    st.warning(
+                                                        f"⚠️ Une demande de fermeture existe déjà pour la commande "
+                                                        f"{commande['id']} (ID demande: {result_id})"
+                                                    )
                                                     st.caption("État : déjà envoyée, la ligne va disparaître.")
-                                                    st.rerun()
-                                            else:
-                                                st.error("❌ Demande non envoyée (aucun ID retourné).")
-                                                st.caption("État : échec")
+                                                st.rerun()
+
+                                            # Fallback robuste : vérifier si une demande en attente existe maintenant
+                                            demandes_apres = commande_model.lister_demandes_validation() or []
+                                            deja_en_attente = next(
+                                                (
+                                                    d for d in demandes_apres
+                                                    if d.get("commande_id") == commande["id"]
+                                                    and d.get("type_action") == "fermeture_demande"
+                                                    and d.get("statut_validation") == "en_attente"
+                                                ),
+                                                None,
+                                            )
+                                            if deja_en_attente:
+                                                st.warning(
+                                                    f"⚠️ Une demande existe déjà (ID: {deja_en_attente.get('id')})."
+                                                )
+                                                st.caption("État : déjà envoyée, la ligne va disparaître.")
+                                                st.rerun()
+
+                                            st.error(
+                                                "❌ Demande non envoyée. Vérifiez que la commande est totalement soldée "
+                                                "et réessayez."
+                                            )
+                                            st.caption("État : échec")
                                         except Exception as e:
                                             st.error(f"❌ Erreur : {e}")
                                 else:
                                     st.info("💡 État actuel : demande non envoyée.")
+                    if commande.get("statut"):
+                        st.caption(f"État commande : **{_badge_statut(commande.get('statut'))}**")
     
     # ========================================================================
     # ONGLET 3 : TÉLÉCHARGER PDFs DES COMMANDES VALIDÉES
@@ -721,6 +660,7 @@ def afficher_page_fermer_commandes():
     with tab3:
         st.markdown("### 📄 Télécharger les PDFs des commandes validées")
         st.markdown("**Fonctionnalité :** Téléchargez les PDFs des commandes qui ont été **validées par l'administrateur** (statut : Livré et payé). Le PDF indique que la commande est **livrée et terminée**.")
+        st.caption("Seules les commandes au statut **Livré et payé** sont affichées ici.")
         st.markdown("---")
         
         # Filtres
@@ -752,7 +692,7 @@ def afficher_page_fermer_commandes():
         if is_admin_user and salon_id_user:
             from models.database import CouturierModel
             couturier_model = CouturierModel(st.session_state.db_connection)
-            couturiers_salon = couturier_model.lister_tous_couturiers(salon_id=salon_id_user)
+            couturiers_salon = couturier_model.lister_tous_couturiers(salon_id=salon_id_user) or []
             
             options_couturiers = ["👥 Tous les couturiers"] + [
                 f"{c['code_couturier']} - {c['prenom']} {c['nom']}"
@@ -777,110 +717,15 @@ def afficher_page_fermer_commandes():
         # Récupérer les commandes terminées selon le rôle (Terminé ou Livré et payé)
         commandes_terminees = []
         try:
-            cursor = st.session_state.db_connection.get_connection().cursor()
-            
-            if is_admin_user and salon_id_user:
-                # Admin : voir toutes les commandes validées du salon (Livré et payé uniquement)
-                query = """
-                    SELECT c.id, c.modele, c.prix_total, c.avance, c.reste, c.statut, 
-                           c.date_creation, c.date_livraison,
-                           cl.nom, cl.prenom, cl.telephone, cl.email,
-                           c.couturier_id,
-                           co.nom as couturier_nom, co.prenom as couturier_prenom,
-                           c.pdf_name, c.pdf_path
-                    FROM commandes c
-                    JOIN clients cl ON c.client_id = cl.id
-                    LEFT JOIN couturiers co ON c.couturier_id = co.id
-                    WHERE co.salon_id = %s 
-                      AND c.statut = 'Livré et payé'
-                """
-                params = [salon_id_user]
-            else:
-                # Employé : voir uniquement ses propres commandes validées (Livré et payé uniquement)
-                query = """
-                    SELECT c.id, c.modele, c.prix_total, c.avance, c.reste, c.statut, 
-                           c.date_creation, c.date_livraison,
-                           cl.nom, cl.prenom, cl.telephone, cl.email,
-                           c.pdf_name, c.pdf_path
-                    FROM commandes c
-                    JOIN clients cl ON c.client_id = cl.id
-                    JOIN couturiers co ON c.couturier_id = co.id
-                    WHERE c.couturier_id = %s 
-                      AND co.salon_id = %s
-                      AND c.statut = 'Livré et payé'
-                """
-                params = [couturier_id, salon_id_user]
-            
-            # Ajouter les filtres (adapter selon le SGBD)
-            db_type = st.session_state.db_connection.db_type
-            if date_debut:
-                if db_type == 'mysql':
-                    query += " AND DATE(c.date_creation) >= %s"
-                else:  # PostgreSQL
-                    query += " AND c.date_creation::date >= %s"
-                params.append(date_debut)
-            
-            if date_fin:
-                if db_type == 'mysql':
-                    query += " AND DATE(c.date_creation) <= %s"
-                else:  # PostgreSQL
-                    query += " AND c.date_creation::date <= %s"
-                params.append(date_fin)
-            
-            if nom_client_filter:
-                query += " AND (cl.nom LIKE %s OR cl.prenom LIKE %s)"
-                params.append(f"%{nom_client_filter}%")
-                params.append(f"%{nom_client_filter}%")
-            
-            if is_admin_user and couturier_id_filter:
-                query += " AND c.couturier_id = %s"
-                params.append(couturier_id_filter)
-            
-            query += " ORDER BY c.date_creation DESC"
-            
-            cursor.execute(query, tuple(params))
-            results = cursor.fetchall()
-            cursor.close()
-            
-            commandes_terminees = []
-            for row in results:
-                if is_admin_user and salon_id_user:
-                    commandes_terminees.append({
-                        'id': row[0],
-                        'modele': row[1],
-                        'prix_total': float(row[2]),
-                        'avance': float(row[3]),
-                        'reste': float(row[4]),
-                        'statut': row[5],
-                        'date_creation': row[6],
-                        'date_livraison': row[7],
-                        'client_nom': row[8],
-                        'client_prenom': row[9],
-                        'client_telephone': row[10],
-                        'client_email': row[11],
-                        'couturier_id': row[12],
-                        'couturier_nom': row[13],
-                        'couturier_prenom': row[14],
-                        'pdf_name': row[15] if len(row) > 15 else None,
-                        'pdf_path': row[16] if len(row) > 16 else None
-                    })
-                else:
-                    commandes_terminees.append({
-                        'id': row[0],
-                        'modele': row[1],
-                        'prix_total': float(row[2]),
-                        'avance': float(row[3]),
-                        'reste': float(row[4]),
-                        'statut': row[5],
-                        'date_creation': row[6],
-                        'date_livraison': row[7],
-                        'client_nom': row[8],
-                        'client_prenom': row[9],
-                        'client_telephone': row[10],
-                        'client_email': row[11],
-                        'pdf_name': row[12] if len(row) > 12 else None,
-                        'pdf_path': row[13] if len(row) > 13 else None
-                    })
+            commandes_terminees = commande_controller.lister_commandes_livrees_pour_pdf(
+                salon_id=salon_id_user,
+                couturier_id=couturier_id,
+                vue_admin=is_admin_user,
+                date_debut=date_debut,
+                date_fin=date_fin,
+                nom_client_filter=nom_client_filter,
+                couturier_id_filter=couturier_id_filter,
+            )
         except Exception as e:
             st.error(f"❌ Erreur lors de la récupération des commandes terminées : {e}")
             commandes_terminees = []
@@ -894,7 +739,11 @@ def afficher_page_fermer_commandes():
             if date_debut or date_fin or nom_client_filter:
                 st.info(f"💡 Filtres appliqués : Date début={date_debut}, Date fin={date_fin}, Nom client='{nom_client_filter}'")
         else:
+            commandes_terminees = _trier_commandes_urgentes(commandes_terminees)
+            total_ca_pdf = sum(float(c.get("prix_total", 0) or 0) for c in commandes_terminees)
             st.success(f"✅ {len(commandes_terminees)} commande(s) validée(s) trouvée(s)")
+            st.info(f"📊 Montant cumulé des commandes listées : **{total_ca_pdf:,.0f} FCFA**")
+            st.caption("Tri automatique appliqué: priorité visuelle rouge/orange/vert.")
             st.markdown(f"#### 📋 Commandes validées (Livré et payé) ({len(commandes_terminees)})")
             
             for commande in commandes_terminees:
@@ -911,6 +760,7 @@ def afficher_page_fermer_commandes():
                     f"📦 Commande #{commande['id']} - {client_prenom} {client_nom} - {modele}{couturier_info}",
                     expanded=True
                 ):
+                    _bandeau_urgence(commande)
                     # Informations principales du client
                     st.markdown("### 👤 Informations Client")
                     col_client1, col_client2 = st.columns(2)
@@ -953,7 +803,7 @@ def afficher_page_fermer_commandes():
                             else:
                                 st.markdown(f"**Date de commande:** {date_creation}")
                     with col_date2:
-                        st.markdown(f"**Statut:** ✅ {commande['statut']}")
+                        st.markdown(f"**Statut:** {_badge_statut(commande.get('statut', ''))}")
                     
                     st.markdown("---")
                     
@@ -970,39 +820,37 @@ def afficher_page_fermer_commandes():
                     
                     # Générer le PDF automatiquement et afficher le bouton de téléchargement
                     try:
-                        # Récupérer les données complètes de la commande
-                        commande_complete = commande_model.obtenir_commande(commande_id)
-                        
-                        if commande_complete:
+                        pdf_path = commande.get("pdf_path")
+                        if pdf_path and os.path.exists(pdf_path):
+                            with open(pdf_path, "rb") as pdf_file:
+                                pdf_bytes = pdf_file.read()
+                        else:
+                            # Fallback : régénération si le fichier n'est pas présent sur disque
+                            commande_complete = commande_model.obtenir_commande(commande_id)
+                            if not commande_complete:
+                                st.error("❌ Impossible de récupérer les données de la commande")
+                                continue
+
                             from controllers.pdf_controller import PDFController
                             pdf_controller = PDFController(st.session_state.db_connection)
-                            
-                            # S'assurer que le statut indique "Livré et payé" dans le PDF
-                            # Le PDF affichera toujours "Livré et payé" pour indiquer que la commande est livrée et terminée
                             commande_complete['statut'] = 'Livré et payé'
-                            
-                            # Générer le PDF
                             pdf_path = pdf_controller.generer_pdf_commande(commande_complete)
-                            
-                            if pdf_path and os.path.exists(pdf_path):
-                                with open(pdf_path, "rb") as pdf_file:
-                                    pdf_bytes = pdf_file.read()
-                                
-                                # Afficher le bouton de téléchargement
-                                st.download_button(
-                                    label="📥 Télécharger le PDF (Commande livrée et terminée)",
-                                    data=pdf_bytes,
-                                    file_name=f"Commande_{commande_id}_Livree_Terminee.pdf",
-                                    mime="application/pdf",
-                                    width='stretch',
-                                    key=f"download_pdf_terminée_{commande_id}",
-                                    type="primary"
-                                )
-                                st.caption("💡 Le PDF indique que la commande est **livrée et terminée**")
-                            else:
+                            if not pdf_path or not os.path.exists(pdf_path):
                                 st.error("❌ Erreur lors de la génération du PDF")
-                        else:
-                            st.error("❌ Impossible de récupérer les données de la commande")
+                                continue
+                            with open(pdf_path, "rb") as pdf_file:
+                                pdf_bytes = pdf_file.read()
+
+                        st.download_button(
+                            label="📥 Télécharger le PDF (Commande livrée et terminée)",
+                            data=pdf_bytes,
+                            file_name=f"Commande_{commande_id}_Livree_Terminee.pdf",
+                            mime="application/pdf",
+                            use_container_width=True,
+                            key=f"download_pdf_terminée_{commande_id}",
+                            type="primary"
+                        )
+                        st.caption("💡 Le PDF indique que la commande est **livrée et terminée**")
                     except Exception as e:
                         st.error(f"❌ Erreur lors de la génération du PDF : {e}")
                         import traceback

@@ -3,10 +3,12 @@ enableStaticServing = false
 # Port et adresse gérés par Render via la ligne de commande
 # headless = true pour éviter les avertissements en production
 enableXsrfProtection = true
-enableCORS = false
+enableCORS = true
 
 [browser]
 gatherUsageStats = false
 
 [client]
-showErrorDetails = true
+# En production : false pour ne pas exposer les details techniques aux clients.
+# Mettre true temporairement en cas de diagnostic d'incident.
+showErrorDetails = false
