@@ -458,6 +458,16 @@ elif _apply_rich_theme:
     </style>
 """, unsafe_allow_html=True)
 
+# Injection du CSS premium modernise (utils/theme.get_app_premium_css)
+# en complement du CSS ci-dessus. Couvre metrics, tabs, inputs, scrollbar, etc.
+if _apply_rich_theme and not VISUAL_SAFE_MODE:
+    try:
+        from utils.theme import get_app_premium_css as _get_app_premium_css
+        st.markdown(_get_app_premium_css(), unsafe_allow_html=True)
+    except Exception:
+        # Ne bloque jamais le demarrage si le theme a un probleme.
+        pass
+
 if (not VISUAL_SAFE_MODE) and (not _apply_rich_theme):
     # Ecran de connexion: style leger pour accelerer le premier rendu.
     st.markdown(
@@ -1196,6 +1206,23 @@ def main():
 
     # Footer global uniquement sur pages authentifiées.
     # La page de connexion gère déjà son propre footer.
+    if st.session_state.authentifie:
+        render_app_footer()
+
+
+if __name__ == "__main__":
+    main()
+)
+
+    if VISUAL_SAFE_MODE:
+        st.markdown("---")
+        st.caption(
+            f"{APP_CONFIG.get('name', 'Gestion Couturier')} - "
+            f"{APP_CONFIG.get('subtitle', 'Systeme de gestion d atelier')}"
+        )
+
+    # Footer global uniquement sur pages authentifiees.
+    # La page de connexion gere deja son propre footer.
     if st.session_state.authentifie:
         render_app_footer()
 
