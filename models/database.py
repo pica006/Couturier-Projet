@@ -586,6 +586,7 @@ class ClientModel:
     
     def __init__(self, db_connection: DatabaseConnection):
         self.db = db_connection
+        self.last_error: Optional[str] = None
     
     def creer_tables(self) -> bool:
         """Crée les tables clients et commandes"""
@@ -693,6 +694,7 @@ class ClientModel:
             ID du client créé ou None
         """
         try:
+            self.last_error = None
             cursor = self.db.get_connection().cursor()
             # Multi-tenant: rattacher explicitement le client au salon du couturier
             cursor.execute("SELECT salon_id FROM couturiers WHERE id = %s", (couturier_id,))
@@ -721,12 +723,14 @@ class ClientModel:
             cursor.close()
             return client_id
         except (MySQLError, PGError, Exception) as e:
+            self.last_error = str(e)
             print(f"Erreur ajout client: {e}")
             return None
     
     def rechercher_client(self, couturier_id: int, telephone: str) -> Optional[Dict]:
         """Recherche un client par téléphone"""
         try:
+            self.last_error = None
             cursor = self.db.get_connection().cursor()
             query = """
                 SELECT id, nom, prenom, telephone, email
@@ -747,6 +751,7 @@ class ClientModel:
                 }
             return None
         except (MySQLError, PGError, Exception) as e:
+            self.last_error = str(e)
             print(f"Erreur recherche client: {e}")
             return None
 

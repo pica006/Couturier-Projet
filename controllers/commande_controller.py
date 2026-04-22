@@ -100,6 +100,9 @@ class CommandeController:
             )
             
             if not client_id:
+                details = getattr(self.client_model, "last_error", None)
+                if details:
+                    return False, None, f"Erreur lors de la création du client : {details}"
                 return False, None, "Erreur lors de la création du client"
             
             # Vérifier que l'image du tissu est présente (OBLIGATOIRE)
