@@ -587,6 +587,28 @@ class ClientModel:
     def __init__(self, db_connection: DatabaseConnection):
         self.db = db_connection
         self.last_error: Optional[str] = None
+
+    def _ensure_clients_salon_id_column(self) -> None:
+        """Garantit la présence de la colonne salon_id sur les bases existantes."""
+        cursor = self.db.get_connection().cursor()
+        try:
+            if self.db.db_type == 'mysql':
+                cursor.execute(
+                    """
+                    ALTER TABLE clients
+                    ADD COLUMN IF NOT EXISTS salon_id VARCHAR(100)
+                    """
+                )
+            else:
+                cursor.execute(
+                    """
+                    ALTER TABLE clients
+                    ADD COLUMN IF NOT EXISTS salon_id VARCHAR(100)
+                    """
+                )
+            self.db.get_connection().commit()
+        finally:
+            cursor.close()
     
     def creer_tables(self) -> bool:
         """Crée les tables clients et commandes"""
@@ -599,13 +621,21 @@ class ClientModel:
                     CREATE TABLE IF NOT EXISTS clients (
                         id INT AUTO_INCREMENT PRIMARY KEY,
                         couturier_id INT,
+                        salon_id VARCHAR(100),
                         nom VARCHAR(100) NOT NULL,
                         prenom VARCHAR(100) NOT NULL,
                         telephone VARCHAR(20) NOT NULL,
                         email VARCHAR(150),
                         date_creation TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                        FOREIGN KEY (couturier_id) REFERENCES couturiers(id)
+                        FOREIGN KEY (couturier_id) REFERENCES couturiers(id),
+                        FOREIGN KEY (salon_id) REFERENCES salons(id)
                     )
+                    """
+                )
+                cursor.execute(
+                    """
+                    ALTER TABLE clients
+                    ADD COLUMN IF NOT EXISTS salon_id VARCHAR(100)
                     """
                 )
                 cursor.execute(
@@ -643,12 +673,19 @@ class ClientModel:
                     CREATE TABLE IF NOT EXISTS clients (
                         id SERIAL PRIMARY KEY,
                         couturier_id INTEGER REFERENCES couturiers(id),
+                        salon_id VARCHAR(100) REFERENCES salons(id),
                         nom VARCHAR(100) NOT NULL,
                         prenom VARCHAR(100) NOT NULL,
                         telephone VARCHAR(20) NOT NULL,
                         email VARCHAR(150),
                         date_creation TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                     )
+                    """
+                )
+                cursor.execute(
+                    """
+                    ALTER TABLE clients
+                    ADD COLUMN IF NOT EXISTS salon_id VARCHAR(100)
                     """
                 )
                 cursor.execute(
@@ -695,6 +732,7 @@ class ClientModel:
         """
         try:
             self.last_error = None
+            self._ensure_clients_salon_id_column()
             cursor = self.db.get_connection().cursor()
             # Multi-tenant: rattacher explicitement le client au salon du couturier
             cursor.execute("SELECT salon_id FROM couturiers WHERE id = %s", (couturier_id,))
