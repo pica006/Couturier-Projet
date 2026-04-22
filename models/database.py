@@ -720,7 +720,7 @@ class ClientModel:
             self.db.get_connection().commit()
             cursor.close()
             return client_id
-        except Error as e:
+        except (MySQLError, PGError, Exception) as e:
             print(f"Erreur ajout client: {e}")
             return None
     
@@ -746,7 +746,7 @@ class ClientModel:
                     'email': result[4]
                 }
             return None
-        except Error as e:
+        except (MySQLError, PGError, Exception) as e:
             print(f"Erreur recherche client: {e}")
             return None
 
