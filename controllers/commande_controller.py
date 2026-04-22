@@ -133,6 +133,9 @@ class CommandeController:
             if commande_id:
                 return True, commande_id, "Commande créée avec succès"
             else:
+                details = getattr(self.commande_model, "last_error", None)
+                if details:
+                    return False, None, f"Erreur lors de la création de la commande : {details}"
                 return False, None, "Erreur lors de la création de la commande"
                 
         except Exception as e:

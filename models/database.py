@@ -644,6 +644,7 @@ class ClientModel:
                         id INT AUTO_INCREMENT PRIMARY KEY,
                         client_id INT,
                         couturier_id INT,
+                        salon_id VARCHAR(100),
                         categorie VARCHAR(20) NOT NULL,
                         sexe VARCHAR(20) NOT NULL,
                         modele VARCHAR(100) NOT NULL,
@@ -662,7 +663,8 @@ class ClientModel:
                         model_image_name VARCHAR(255),
                         date_creation TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                         FOREIGN KEY (client_id) REFERENCES clients(id),
-                        FOREIGN KEY (couturier_id) REFERENCES couturiers(id)
+                        FOREIGN KEY (couturier_id) REFERENCES couturiers(id),
+                        FOREIGN KEY (salon_id) REFERENCES salons(id)
                     )
                     """
                 )
@@ -694,6 +696,7 @@ class ClientModel:
                         id SERIAL PRIMARY KEY,
                         client_id INTEGER REFERENCES clients(id),
                         couturier_id INTEGER REFERENCES couturiers(id),
+                        salon_id VARCHAR(100) REFERENCES salons(id),
                         categorie VARCHAR(20) NOT NULL,
                         sexe VARCHAR(20) NOT NULL,
                         modele VARCHAR(100) NOT NULL,
@@ -819,6 +822,7 @@ class CommandeModel:
     
     def __init__(self, db_connection: DatabaseConnection):
         self.db = db_connection
+        self.last_error: Optional[str] = None
 
     def _ensure_soft_delete_columns(self) -> None:
         """Ajoute les colonnes de suppression logique si elles n'existent pas."""
@@ -925,6 +929,28 @@ class CommandeModel:
             except Exception:
                 pass
 
+    def _ensure_commandes_salon_id_column(self) -> None:
+        """Garantit la présence de la colonne salon_id dans commandes."""
+        cursor = self.db.get_connection().cursor()
+        try:
+            cursor.execute(
+                """
+                ALTER TABLE commandes
+                ADD COLUMN IF NOT EXISTS salon_id VARCHAR(100)
+                """
+            )
+            self.db.get_connection().commit()
+        except Exception:
+            try:
+                self.db.get_connection().rollback()
+            except Exception:
+                pass
+        finally:
+            try:
+                cursor.close()
+            except Exception:
+                pass
+
 
 
     def ajouter_commande(self, client_id: int, couturier_id: int, 
@@ -965,6 +991,8 @@ class CommandeModel:
         """
         try:
             import json
+            self.last_error = None
+            self._ensure_commandes_salon_id_column()
             connection = self.db.get_connection()
             cursor = connection.cursor()
 
@@ -1029,6 +1057,7 @@ class CommandeModel:
             return commande_id
 
         except (MySQLError, PGError, Exception) as e:
+            self.last_error = str(e)
             print(f"❌ Erreur ajout commande: {e}")
             return None
 
