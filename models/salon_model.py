@@ -1035,4 +1035,3 @@ class SalonModel:
             try: self.db.get_connection().rollback()
             except Exception: pass
             return False
-

@@ -733,14 +733,7 @@ def afficher_page_commande():
                     if dossier_upload and os.path.exists(dossier_upload):
                         with etat_chargement("Copie du PDF..."):
                             pdf_uploaded = pdf_controller.uploader_pdf_dossier(pdf_path_upload, dossier_upload)
-                            if pdf_uploaded:
-                                st.success(f'✅ PDF copié dans: {pdf_uploaded}')
-                                st.balloons()
-                            else:
-                                st.error('❌ Erreur: Échec de la copie du PDF')
-                    elif dossier_upload:
-                        st.error(f"❌ Le dossier '{dossier_upload}' n'existe pas. Veuillez créer le dossier ou vérifier le chemin.")
                     else:
-                        st.warning("⚠️ Veuillez entrer un chemin de dossier")
-                except Exception as e:
-                    st.error(f'❌ Erreur copie PDF: {str(e)}')
+                        st.warning("⚠️ Le dossier spécifié n'existe pas.")
+                except Exception as e_up:
+                    st.error(f"Erreur lors de la copie : {e_up}")

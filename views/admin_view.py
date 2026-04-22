@@ -2607,3 +2607,152 @@ def afficher_gestion_commandes_admin(commande_model: CommandeModel, admin_data: 
                 height=280
             )
 
+
+
+def afficher_configuration_salon(salon_model: SalonModel, salon_id_admin: Optional[str]):
+    """
+    Onglet Configuration salon (Point F).
+    Permet à l'admin de configurer :
+      - max_habits_par_jour : limite quotidienne de livraisons
+      - delais_par_modele   : délai de confection (jours) par type de modèle
+      - pdf_theme_color     : couleur principale (hex) des PDF du salon
+    """
+    from config import MODELES
+
+    st.subheader("⚙️ Configuration du salon")
+
+    if not salon_id_admin:
+        st.error("❌ Impossible d'identifier votre salon. Reconnectez-vous.")
+        return
+
+    # Charger la config actuelle (avec fallbacks sûrs)
+    try:
+        cfg = salon_model.obtenir_config_salon(salon_id_admin)
+    except AttributeError:
+        st.warning("⚠️ La méthode obtenir_config_salon n'est pas disponible (migration en attente).")
+        cfg = {'max_habits_par_jour': None, 'delais_par_modele': {}, 'pdf_theme_color': '#9B8AB5'}
+
+    st.info(
+        "Ces paramètres sont appliqués automatiquement lors de la création de commandes "
+        "et de la génération des PDF pour votre salon."
+    )
+    st.markdown("---")
+
+    # ── Section 1 : Limite quotidienne de livraisons ─────────────────────────
+    st.markdown("### 📦 Limite quotidienne de livraisons")
+    st.caption(
+        "Nombre maximum de vêtements livrables par jour. "
+        "Au-delà, la date de livraison suggérée est décalée automatiquement. "
+        "Laissez à 0 pour désactiver la limite."
+    )
+    current_max = cfg.get('max_habits_par_jour') or 0
+    nouveau_max = st.number_input(
+        "Max. habits livrables par jour",
+        min_value=0,
+        max_value=100,
+        value=int(current_max),
+        step=1,
+        key="config_max_habits",
+        help="0 = illimité"
+    )
+
+    st.markdown("---")
+
+    # ── Section 2 : Délais par modèle ────────────────────────────────────────
+    st.markdown("### ⏱️ Délais de confection par modèle (jours)")
+    st.caption(
+        "Nombre de jours de travail nécessaires pour chaque type de modèle. "
+        "Ce délai est utilisé pour calculer la date de livraison suggérée à la création de commande."
+    )
+
+    # Construire la liste de tous les modèles uniques
+    tous_modeles = set()
+    for cat in MODELES.values():
+        for sex_models in cat.values():
+            tous_modeles.update(sex_models)
+    tous_modeles = sorted(tous_modeles)
+
+    delais_actuels = cfg.get('delais_par_modele', {})
+    nouveaux_delais = {}
+
+    cols_per_row = 3
+    modeles_list = list(tous_modeles)
+    for row_start in range(0, len(modeles_list), cols_per_row):
+        row_models = modeles_list[row_start:row_start + cols_per_row]
+        cols = st.columns(cols_per_row)
+        for col, modele in zip(cols, row_models):
+            with col:
+                val_actuel = int(delais_actuels.get(modele, 7))
+                nouveaux_delais[modele] = st.number_input(
+                    modele,
+                    min_value=1,
+                    max_value=90,
+                    value=val_actuel,
+                    step=1,
+                    key=f"config_delai_{modele.replace(' ', '_')}",
+                    help=f"Délai en jours pour : {modele}"
+                )
+
+    st.markdown("---")
+
+    # ── Section 3 : Thème couleur PDF ────────────────────────────────────────
+    st.markdown("### 🎨 Couleur principale des PDF")
+    st.caption(
+        "Code hexadécimal (ex: #1A73E8) appliqué au bandeau de l'en-tête et du pied de page "
+        "de tous les PDF générés pour votre salon. Laissez vide pour le thème mauve par défaut."
+    )
+
+    current_color = cfg.get('pdf_theme_color') or '#9B8AB5'
+    col_input, col_preview = st.columns([2, 1])
+    with col_input:
+        nouvelle_couleur = st.text_input(
+            "Couleur hexadécimale",
+            value=current_color,
+            max_chars=7,
+            placeholder="#9B8AB5",
+            key="config_pdf_color",
+            help="Format : #RRGGBB (6 chiffres hexadécimaux)"
+        )
+    with col_preview:
+        import re as _re
+        couleur_valide = bool(_re.match(r'^#[0-9A-Fa-f]{6}$', nouvelle_couleur.strip()))
+        if couleur_valide:
+            st.markdown(
+                f'<div style="background-color:{nouvelle_couleur.strip()};'
+                f'width:100%;height:50px;border-radius:8px;border:1px solid #ccc;'
+                f'margin-top:28px;"></div>',
+                unsafe_allow_html=True
+            )
+            st.caption("✅ Aperçu de la couleur")
+        else:
+            st.warning("⚠️ Format invalide. Utilisez #RRGGBB")
+
+    st.markdown("---")
+
+    # ── Bouton de sauvegarde ──────────────────────────────────────────────────
+    if st.button("💾 Enregistrer la configuration", type="primary", use_container_width=True, key="btn_save_config_salon"):
+        try:
+            # Valider la couleur
+            couleur_finale = nouvelle_couleur.strip()
+            if not _re.match(r'^#[0-9A-Fa-f]{6}$', couleur_finale):
+                couleur_finale = '#9B8AB5'
+
+            # Préparer max_habits (None si 0)
+            max_val = int(nouveau_max) if int(nouveau_max) > 0 else None
+
+            ok = salon_model.mettre_a_jour_config_salon(
+                salon_id=salon_id_admin,
+                max_habits_par_jour=max_val,
+                delais_par_modele=nouveaux_delais,
+                pdf_theme_color=couleur_finale,
+            )
+            if ok:
+                st.success("✅ Configuration enregistrée avec succès \!")
+                st.balloons()
+                st.rerun()
+            else:
+                st.error("❌ Échec de la sauvegarde. Vérifiez que la migration SQL a bien été appliquée.")
+        except AttributeError:
+            st.error("❌ La méthode mettre_a_jour_config_salon n'est pas disponible (migration en attente).")
+        except Exception as e:
+            st.error(f"❌ Erreur inattendue : {e}")

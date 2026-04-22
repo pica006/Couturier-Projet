@@ -437,6 +437,15 @@ def _pdf_dessiner_decor_commande(
     watermark_logo_bytes: Optional[bytes],
 ):
     W, H = A4
+    # Couleur du bandeau selon le theme du salon (fallback: mauve par defaut)
+    _hex_theme = (salon_row or {}).get('pdf_theme_color', '#9B8AB5')
+    try:
+        import re as _re
+        if not _re.match(r'^#[0-9A-Fa-f]{6}$', str(_hex_theme)):
+            _hex_theme = '#9B8AB5'
+        _couleur_bandeau = colors.HexColor(_hex_theme)
+    except Exception:
+        _couleur_bandeau = _P_MAUVE
     nom = (
         (salon_row or {}).get("nom_salon") or "Salon de couture"
     ).strip()
@@ -450,7 +459,7 @@ def _pdf_dessiner_decor_commande(
     # Filigrane volontairement désactivé pour garantir une lisibilité maximale.
 
     # Bandeau en-tête (mauve clair)
-    canvas_obj.setFillColor(_P_MAUVE)
+    canvas_obj.setFillColor(_couleur_bandeau)
     canvas_obj.rect(0, H - 3.2 * cm, W, 3.2 * cm, stroke=0, fill=1)
     canvas_obj.setFillColor(_P_OR_CHAMPAGNE)
     canvas_obj.rect(0, H - 3.35 * cm, W, 0.15 * cm, stroke=0, fill=1)
@@ -509,7 +518,7 @@ def _pdf_dessiner_decor_commande(
     # Pied de page
     canvas_obj.setFillColor(_P_OR_CHAMPAGNE)
     canvas_obj.rect(0, 0, W, 0.15 * cm, stroke=0, fill=1)
-    canvas_obj.setFillColor(_P_MAUVE)
+    canvas_obj.setFillColor(_couleur_bandeau)
     canvas_obj.rect(0, 0.15 * cm, W, 1.5 * cm, stroke=0, fill=1)
     canvas_obj.setFillColor(colors.white)
     canvas_obj.setFont("Helvetica-Bold", 9)
@@ -703,6 +712,16 @@ class PDFController:
                     print(f"Erreur récupération logo filigrane depuis BDD: {e}")
             
             salon_row = self._charger_salon(salon_id)
+            # Enrichir salon_row avec la couleur de theme PDF du salon (Point F)
+            if salon_row is None:
+                salon_row = {}
+            if self.db_connection and salon_id and not salon_row.get('pdf_theme_color'):
+                try:
+                    from models.salon_model import SalonModel as _SM
+                    _cfg = _SM(self.db_connection).obtenir_config_salon(salon_id)
+                    salon_row['pdf_theme_color'] = _cfg.get('pdf_theme_color', '#9B8AB5')
+                except Exception:
+                    salon_row['pdf_theme_color'] = '#9B8AB5'
             logo_header_bytes = logo_filigrane_data
 
             def formater_date(date_obj, avec_heure=False):
