@@ -16,6 +16,106 @@ def validate_required_config(config: Dict, required_keys: Tuple[str, ...]) -> li
     return missing
 
 
+def _appliquer_migrations_schema(db_connection) -> None:
+    """
+    Applique les migrations de schéma incrémentales.
+    Chaque bloc est indépendant (try/except) pour ne jamais bloquer le démarrage.
+    """
+    try:
+        conn = db_connection.get_connection()
+        cursor = conn.cursor()
+
+        # ── POINT D-1 : salon_id dans historique_commandes ──────────────────
+        try:
+            cursor.execute("""
+                ALTER TABLE historique_commandes
+                ADD COLUMN IF NOT EXISTS salon_id VARCHAR(50) NULL
+                REFERENCES salons(salon_id) ON DELETE SET NULL
+            """)
+            conn.commit()
+        except Exception as e:
+            try: conn.rollback()
+            except Exception: pass
+            print(f"Migration historique salon_id (ignorée): {e}")
+
+        try:
+            cursor.execute("""
+                CREATE INDEX IF NOT EXISTS idx_historique_salon_id
+                ON historique_commandes(salon_id)
+            """)
+            conn.commit()
+        except Exception as e:
+            try: conn.rollback()
+            except Exception: pass
+
+        try:
+            cursor.execute("""
+                UPDATE historique_commandes h
+                SET salon_id = c.salon_id
+                FROM commandes c
+                WHERE h.commande_id = c.id
+                  AND h.salon_id IS NULL
+                  AND c.salon_id IS NOT NULL
+            """)
+            conn.commit()
+        except Exception as e:
+            try: conn.rollback()
+            except Exception: pass
+            print(f"Peuplement historique.salon_id (ignoré): {e}")
+
+        # ── POINT D-2 : peupler charges.salon_id NULL ────────────────────────
+        try:
+            cursor.execute("""
+                UPDATE charges ch
+                SET salon_id = co.salon_id
+                FROM couturiers co
+                WHERE ch.couturier_id = co.id
+                  AND ch.salon_id IS NULL
+                  AND co.salon_id IS NOT NULL
+            """)
+            conn.commit()
+        except Exception as e:
+            try: conn.rollback()
+            except Exception: pass
+            print(f"Peuplement charges.salon_id (ignoré): {e}")
+
+        # ── POINT D-3 : peupler clients.salon_id NULL ────────────────────────
+        try:
+            cursor.execute("""
+                UPDATE clients cl
+                SET salon_id = co.salon_id
+                FROM couturiers co
+                WHERE cl.couturier_id = co.id
+                  AND cl.salon_id IS NULL
+                  AND co.salon_id IS NOT NULL
+            """)
+            conn.commit()
+        except Exception as e:
+            try: conn.rollback()
+            except Exception: pass
+            print(f"Peuplement clients.salon_id (ignoré): {e}")
+
+        # ── POINT F : colonnes de configuration par salon ────────────────────
+        for ddl in [
+            "ALTER TABLE salons ADD COLUMN IF NOT EXISTS max_habits_par_jour INTEGER DEFAULT NULL",
+            "ALTER TABLE salons ADD COLUMN IF NOT EXISTS delais_par_modele TEXT DEFAULT NULL",
+            "ALTER TABLE salons ADD COLUMN IF NOT EXISTS pdf_theme_color VARCHAR(7) DEFAULT NULL",
+        ]:
+            try:
+                cursor.execute(ddl)
+                conn.commit()
+            except Exception as e:
+                try: conn.rollback()
+                except Exception: pass
+                print(f"Migration colonne salons (ignorée): {e}")
+
+        cursor.close()
+    except Exception as e:
+        print(f"Erreur générale migrations schéma (ignorée): {e}")
+        try: db_connection.get_connection().rollback()
+        except Exception: pass
+
+
 def connect_and_initialize(config: Dict) -> Tuple[bool, Optional["DatabaseConnection"], str]:
     """
     Connecte a la base puis initialise les tables metier.
@@ -39,6 +139,8 @@ def connect_and_initialize(config: Dict) -> Tuple[bool, Optional["DatabaseConnec
 
         charges_model = ChargesModel(db_connection)
         charges_model.creer_tables()
+
+        _appliquer_migrations_schema(db_connection)
 
         return True, db_connection, ""
     except Exception as e:

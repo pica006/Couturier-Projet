@@ -942,3 +942,97 @@ class SalonModel:
                 pass
             return False
 
+    def obtenir_config_salon(self, salon_id: str) -> Dict:
+        """
+        Retourne la configuration métier du salon (Point F).
+        Fallbacks sûrs si colonnes absentes ou valeurs invalides.
+        """
+        import re as _re
+        import json as _json
+        defaults = {
+            'max_habits_par_jour': None,
+            'delais_par_modele': {},
+            'pdf_theme_color': '#9B8AB5',
+        }
+        try:
+            sid = str(salon_id).strip() if salon_id else ""
+            if not sid:
+                return defaults.copy()
+            cursor = self.db.get_connection().cursor()
+            cursor.execute(
+                "SELECT max_habits_par_jour, delais_par_modele, pdf_theme_color FROM salons WHERE salon_id = %s",
+                (sid,)
+            )
+            row = cursor.fetchone()
+            cursor.close()
+            if not row:
+                return defaults.copy()
+            result = defaults.copy()
+            # max_habits_par_jour
+            if row[0] is not None:
+                try:
+                    result['max_habits_par_jour'] = int(row[0])
+                except (TypeError, ValueError):
+                    pass
+            # delais_par_modele
+            if row[1]:
+                try:
+                    parsed = _json.loads(str(row[1]))
+                    if isinstance(parsed, dict):
+                        result['delais_par_modele'] = {str(k): int(v) for k, v in parsed.items()}
+                except Exception:
+                    pass
+            # pdf_theme_color (valider format hex)
+            if row[2] and _re.match(r'^#[0-9A-Fa-f]{6}$', str(row[2]).strip()):
+                result['pdf_theme_color'] = str(row[2]).strip()
+        except Exception as e:
+            print(f"obtenir_config_salon ({salon_id}): {e} — fallback defaults")
+            return defaults.copy()
+        return result
+
+    def mettre_a_jour_config_salon(
+        self,
+        salon_id: str,
+        max_habits_par_jour: Optional[int] = None,
+        delais_par_modele: Optional[Dict] = None,
+        pdf_theme_color: Optional[str] = None,
+    ) -> bool:
+        """
+        Met à jour les configurations métier du salon (Point F).
+        Seules les valeurs non-None sont mises à jour.
+        """
+        import json as _json
+        import re as _re
+        try:
+            updates = []
+            params = []
+            if max_habits_par_jour is not None:
+                updates.append("max_habits_par_jour = %s")
+                params.append(int(max_habits_par_jour) if max_habits_par_jour > 0 else None)
+            if delais_par_modele is not None:
+                updates.append("delais_par_modele = %s")
+                params.append(_json.dumps({str(k): int(v) for k, v in delais_par_modele.items()}))
+            if pdf_theme_color is not None:
+                color = str(pdf_theme_color).strip()
+                if not _re.match(r'^#[0-9A-Fa-f]{6}$', color):
+                    color = '#9B8AB5'  # fallback sûr
+                updates.append("pdf_theme_color = %s")
+                params.append(color)
+            if not updates:
+                return False
+            params.append(salon_id)
+            conn = self.db.get_connection()
+            cursor = conn.cursor()
+            cursor.execute(
+                f"UPDATE salons SET {', '.join(updates)} WHERE salon_id = %s",
+                tuple(params)
+            )
+            conn.commit()
+            cursor.close()
+            return True
+        except Exception as e:
+            print(f"mettre_a_jour_config_salon ({salon_id}): {e}")
+            try: self.db.get_connection().rollback()
+            except Exception: pass
+            return False
+

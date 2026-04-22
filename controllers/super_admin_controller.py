@@ -390,7 +390,6 @@ class SuperAdminController:
             where_clause = ""
             params = []
             if salon_id:
-                where_clause = "WHERE salon_id = %s"
                 params.append(salon_id)
             
             # Filtrer les SUPER_ADMIN et ajouter la clause WHERE si nécessaire

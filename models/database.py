@@ -1097,8 +1097,8 @@ class CommandeModel:
                         co.nom as couturier_nom, co.prenom as couturier_prenom, 
                         co.code_couturier as couturier_code
                     FROM commandes c
-                    JOIN clients cl ON c.client_id = cl.id
-                    JOIN couturiers co ON c.couturier_id = co.id
+                    LEFT JOIN clients cl ON c.client_id = cl.id
+                    LEFT JOIN couturiers co ON c.couturier_id = co.id
                     WHERE c.id = %s
                     """,
                 ),
@@ -1118,8 +1118,8 @@ class CommandeModel:
                         co.nom as couturier_nom, co.prenom as couturier_prenom, 
                         co.code_couturier as couturier_code
                     FROM commandes c
-                    JOIN clients cl ON c.client_id = cl.id
-                    JOIN couturiers co ON c.couturier_id = co.id
+                    LEFT JOIN clients cl ON c.client_id = cl.id
+                    LEFT JOIN couturiers co ON c.couturier_id = co.id
                     WHERE c.id = %s
                     """,
                 ),
@@ -1139,8 +1139,8 @@ class CommandeModel:
                         co.nom as couturier_nom, co.prenom as couturier_prenom, 
                         co.code_couturier as couturier_code
                     FROM commandes c
-                    JOIN clients cl ON c.client_id = cl.id
-                    JOIN couturiers co ON c.couturier_id = co.id
+                    LEFT JOIN clients cl ON c.client_id = cl.id
+                    LEFT JOIN couturiers co ON c.couturier_id = co.id
                     WHERE c.id = %s
                     """,
                 ),
@@ -2654,6 +2654,18 @@ class CommandeModel:
                 "UPDATE commandes SET statut = 'Livré et payé', date_fermeture = NOW() WHERE id = %s",
                 (commande_id,),
             )
+            # Mettre à jour le statut de la demande dans historique (si en attente)
+            try:
+                cursor.execute(
+                    """UPDATE historique_commandes
+                         SET statut_validation = 'validee', date_validation = NOW()
+                         WHERE commande_id = %s
+                           AND type_action = 'fermeture_demande'
+                           AND statut_validation = 'en_attente'""",
+                    (commande_id,),
+                )
+            except Exception as _e_hist:
+                print(f"Avertissement historique valider_livree_payee: {_e_hist}")
             connection.commit()
             cursor.close()
             return True

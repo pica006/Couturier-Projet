@@ -246,9 +246,20 @@ def afficher_page_commande():
         
         with col_date:
             afficher_titre_section("📅 Date de livraison", niveau=4)
+            # Calculer le délai suggéré selon le modèle sélectionné (Point F)
+            _delai_jours = 7  # défaut
+            try:
+                _modele_actuel_delai = st.session_state.get('modele_selectionne', '')
+                if salon_id and _modele_actuel_delai:
+                    _cfg = SalonModel(db).obtenir_config_salon(salon_id)
+                    _delai_jours = _cfg.get('delais_par_modele', {}).get(_modele_actuel_delai, 7)
+                    _delai_jours = max(1, int(_delai_jours))
+            except Exception:
+                _delai_jours = 7
+            date_livraison_defaut = datetime.now().date() + timedelta(days=_delai_jours)
             date_livraison = st.date_input(
                 "Date prévue de livraison",
-                value=datetime.now() + timedelta(days=7),
+                value=date_livraison_defaut,
                 min_value=datetime.now().date(),
                 key="date_livraison_form"
             )
@@ -304,7 +315,7 @@ def afficher_page_commande():
                 reste = 0.0
             
             # Vérifier les mesures
-            mesures_invalides = [m for m, v in mesures_dict.items() if v <= 0]
+            mesures_invalides = [m for m, v in mesures_dict.items() if v is None or v <= 0]
             if mesures_invalides:
                 erreurs.append(f"Mesures invalides: {', '.join(mesures_invalides)}")
             

@@ -128,7 +128,7 @@ def afficher_page_administration():
     # TABS PRINCIPAUX
     # ========================================================================
     
-    tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
+    tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = st.tabs([
         "📊 Tableau de bord",
         "🌐 Vue 360°",
         "💰 Toutes les charges",
@@ -136,6 +136,7 @@ def afficher_page_administration():
         "📋 Modèles & Calendrier",
         "🧮 Calcul d'impôts",
         "👥 Gestion des utilisateurs",
+        "⚙️ Configuration salon",
     ])
     
     # ========================================================================
@@ -187,7 +188,14 @@ def afficher_page_administration():
     
     with tab7:
         afficher_gestion_utilisateurs(couturier_model, couturier_data)
-    
+
+    # ========================================================================
+    # TAB 8 : CONFIGURATION SALON (délais, capacité, thème PDF)
+    # ========================================================================
+
+    with tab8:
+        afficher_configuration_salon(salon_model, salon_id_admin)
+
     # (Plus d'onglet spécifique de réinitialisation : tout est géré dans "Gestion des utilisateurs")
 
 
