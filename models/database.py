@@ -927,7 +927,7 @@ class CommandeModel:
                 except Exception:
                     pass
             cursor = self.db.get_connection().cursor()
-            # Utiliser des colonnes explicites au lieu de c.* pour éviter les problèmes d'ordre
+            # Requête principale (schéma complet avec colonnes PDF)
             query = """
                 SELECT 
                     c.id, c.client_id, c.couturier_id,
@@ -947,7 +947,29 @@ class CommandeModel:
                 JOIN couturiers co ON c.couturier_id = co.id
                 WHERE c.id = %s
             """
-            cursor.execute(query, (commande_id,))
+            try:
+                cursor.execute(query, (commande_id,))
+            except Exception:
+                # Fallback rétrocompatible si certaines colonnes (ex: PDF) n'existent pas.
+                query_fallback = """
+                    SELECT 
+                        c.id, c.client_id, c.couturier_id,
+                        c.categorie, c.sexe, c.modele, c.mesures,
+                        c.prix_total, c.avance, c.reste,
+                        c.date_livraison, c.statut,
+                        c.fabric_image_path, c.fabric_image, c.fabric_image_name,
+                        c.model_type, c.model_image_path, c.model_image, c.model_image_name,
+                        c.date_creation, c.salon_id,
+                        cl.nom as client_nom, cl.prenom as client_prenom, 
+                        cl.telephone as client_telephone, cl.email as client_email,
+                        co.nom as couturier_nom, co.prenom as couturier_prenom, 
+                        co.code_couturier as couturier_code
+                    FROM commandes c
+                    JOIN clients cl ON c.client_id = cl.id
+                    JOIN couturiers co ON c.couturier_id = co.id
+                    WHERE c.id = %s
+                """
+                cursor.execute(query_fallback, (commande_id,))
             result = cursor.fetchone()
             cursor.close()
             
@@ -992,17 +1014,28 @@ class CommandeModel:
                     data['couturier_prenom'] = result[29]
                     data['couturier_code'] = result[30]
                 else:
-                    # Ancien format sans PDF (colonnes 20-26)
+                    # Format rétrocompatible sans colonnes PDF
                     data['pdf_data'] = None
                     data['pdf_name'] = None
                     data['pdf_path'] = None
-                    data['client_nom'] = result[20] if num_cols > 20 else None
-                    data['client_prenom'] = result[21] if num_cols > 21 else None
-                    data['client_telephone'] = result[22] if num_cols > 22 else None
-                    data['client_email'] = result[23] if num_cols > 23 else None
-                    data['couturier_nom'] = result[24] if num_cols > 24 else None
-                    data['couturier_prenom'] = result[25] if num_cols > 25 else None
-                    data['couturier_code'] = result[26] if num_cols > 26 else None
+                    if num_cols >= 28:
+                        # Schéma fallback avec jointures client/couturier (sans PDF)
+                        data['client_nom'] = result[21]
+                        data['client_prenom'] = result[22]
+                        data['client_telephone'] = result[23]
+                        data['client_email'] = result[24]
+                        data['couturier_nom'] = result[25]
+                        data['couturier_prenom'] = result[26]
+                        data['couturier_code'] = result[27]
+                    else:
+                        # Très ancien format minimal
+                        data['client_nom'] = result[20] if num_cols > 20 else None
+                        data['client_prenom'] = result[21] if num_cols > 21 else None
+                        data['client_telephone'] = result[22] if num_cols > 22 else None
+                        data['client_email'] = result[23] if num_cols > 23 else None
+                        data['couturier_nom'] = result[24] if num_cols > 24 else None
+                        data['couturier_prenom'] = result[25] if num_cols > 25 else None
+                        data['couturier_code'] = result[26] if num_cols > 26 else None
                 # Normaliser le champ mesures: parser JSON si MySQL retourne une string
                 try:
                     import json as _json
