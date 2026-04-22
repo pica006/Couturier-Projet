@@ -1006,31 +1006,33 @@ class CommandeModel:
                 except Exception:
                     pass
             cursor = self.db.get_connection().cursor()
-            # Requête principale (schéma complet avec colonnes PDF)
-            query = """
-                SELECT 
-                    c.id, c.client_id, c.couturier_id,
-                    c.categorie, c.sexe, c.modele, c.mesures,
-                    c.prix_total, c.avance, c.reste,
-                    c.date_livraison, c.statut,
-                    c.fabric_image_path, c.fabric_image, c.fabric_image_name,
-                    c.model_type, c.model_image_path, c.model_image, c.model_image_name,
-                    c.date_creation, c.salon_id,
-                    c.pdf_data, c.pdf_name, c.pdf_path,
-                    cl.nom as client_nom, cl.prenom as client_prenom, 
-                    cl.telephone as client_telephone, cl.email as client_email,
-                    co.nom as couturier_nom, co.prenom as couturier_prenom, 
-                    co.code_couturier as couturier_code
-                FROM commandes c
-                JOIN clients cl ON c.client_id = cl.id
-                JOIN couturiers co ON c.couturier_id = co.id
-                WHERE c.id = %s
-            """
-            try:
-                cursor.execute(query, (commande_id,))
-            except Exception:
-                # Fallback rétrocompatible si certaines colonnes (ex: PDF) n'existent pas.
-                query_fallback = """
+            query_mode = None
+            queries = [
+                (
+                    "full",
+                    """
+                    SELECT 
+                        c.id, c.client_id, c.couturier_id,
+                        c.categorie, c.sexe, c.modele, c.mesures,
+                        c.prix_total, c.avance, c.reste,
+                        c.date_livraison, c.statut,
+                        c.fabric_image_path, c.fabric_image, c.fabric_image_name,
+                        c.model_type, c.model_image_path, c.model_image, c.model_image_name,
+                        c.date_creation, c.salon_id,
+                        c.pdf_data, c.pdf_name, c.pdf_path,
+                        cl.nom as client_nom, cl.prenom as client_prenom, 
+                        cl.telephone as client_telephone, cl.email as client_email,
+                        co.nom as couturier_nom, co.prenom as couturier_prenom, 
+                        co.code_couturier as couturier_code
+                    FROM commandes c
+                    JOIN clients cl ON c.client_id = cl.id
+                    JOIN couturiers co ON c.couturier_id = co.id
+                    WHERE c.id = %s
+                    """,
+                ),
+                (
+                    "no_pdf",
+                    """
                     SELECT 
                         c.id, c.client_id, c.couturier_id,
                         c.categorie, c.sexe, c.modele, c.mesures,
@@ -1047,9 +1049,45 @@ class CommandeModel:
                     JOIN clients cl ON c.client_id = cl.id
                     JOIN couturiers co ON c.couturier_id = co.id
                     WHERE c.id = %s
-                """
-                cursor.execute(query_fallback, (commande_id,))
-            result = cursor.fetchone()
+                    """,
+                ),
+                (
+                    "legacy",
+                    """
+                    SELECT 
+                        c.id, c.client_id, c.couturier_id,
+                        c.categorie, c.sexe, c.modele, c.mesures,
+                        c.prix_total, c.avance, c.reste,
+                        c.date_livraison, c.statut,
+                        c.fabric_image_path, c.fabric_image, c.fabric_image_name,
+                        c.model_type, c.model_image_path, c.model_image, c.model_image_name,
+                        c.date_creation,
+                        cl.nom as client_nom, cl.prenom as client_prenom, 
+                        cl.telephone as client_telephone, cl.email as client_email,
+                        co.nom as couturier_nom, co.prenom as couturier_prenom, 
+                        co.code_couturier as couturier_code
+                    FROM commandes c
+                    JOIN clients cl ON c.client_id = cl.id
+                    JOIN couturiers co ON c.couturier_id = co.id
+                    WHERE c.id = %s
+                    """,
+                ),
+            ]
+
+            result = None
+            last_query_error = None
+            for mode, query in queries:
+                try:
+                    cursor.execute(query, (commande_id,))
+                    result = cursor.fetchone()
+                    query_mode = mode
+                    break
+                except Exception as e:
+                    last_query_error = e
+                    continue
+
+            if result is None and last_query_error is not None:
+                raise last_query_error
             cursor.close()
             
             if result:
@@ -1076,11 +1114,11 @@ class CommandeModel:
                     'model_image': result[17],
                     'model_image_name': result[18],
                     'date_creation': result[19],
-                    'salon_id': result[20] if num_cols > 20 else None,
+                    'salon_id': result[20] if query_mode in ("full", "no_pdf") and num_cols > 20 else None,
                 }
                 
-                # Ajouter les données PDF et jointures si disponibles
-                if num_cols > 30:
+                # Ajouter les données selon le mode de requête réellement exécuté
+                if query_mode == "full" and num_cols > 30:
                     data['pdf_data'] = result[21]
                     data['pdf_name'] = result[22]
                     data['pdf_path'] = result[23]
@@ -1092,29 +1130,29 @@ class CommandeModel:
                     data['couturier_nom'] = result[28]
                     data['couturier_prenom'] = result[29]
                     data['couturier_code'] = result[30]
-                else:
-                    # Format rétrocompatible sans colonnes PDF
+                elif query_mode == "no_pdf":
                     data['pdf_data'] = None
                     data['pdf_name'] = None
                     data['pdf_path'] = None
-                    if num_cols >= 28:
-                        # Schéma fallback avec jointures client/couturier (sans PDF)
-                        data['client_nom'] = result[21]
-                        data['client_prenom'] = result[22]
-                        data['client_telephone'] = result[23]
-                        data['client_email'] = result[24]
-                        data['couturier_nom'] = result[25]
-                        data['couturier_prenom'] = result[26]
-                        data['couturier_code'] = result[27]
-                    else:
-                        # Très ancien format minimal
-                        data['client_nom'] = result[20] if num_cols > 20 else None
-                        data['client_prenom'] = result[21] if num_cols > 21 else None
-                        data['client_telephone'] = result[22] if num_cols > 22 else None
-                        data['client_email'] = result[23] if num_cols > 23 else None
-                        data['couturier_nom'] = result[24] if num_cols > 24 else None
-                        data['couturier_prenom'] = result[25] if num_cols > 25 else None
-                        data['couturier_code'] = result[26] if num_cols > 26 else None
+                    data['client_nom'] = result[21] if num_cols > 21 else None
+                    data['client_prenom'] = result[22] if num_cols > 22 else None
+                    data['client_telephone'] = result[23] if num_cols > 23 else None
+                    data['client_email'] = result[24] if num_cols > 24 else None
+                    data['couturier_nom'] = result[25] if num_cols > 25 else None
+                    data['couturier_prenom'] = result[26] if num_cols > 26 else None
+                    data['couturier_code'] = result[27] if num_cols > 27 else None
+                else:
+                    # legacy: sans salon_id ni PDF
+                    data['pdf_data'] = None
+                    data['pdf_name'] = None
+                    data['pdf_path'] = None
+                    data['client_nom'] = result[20] if num_cols > 20 else None
+                    data['client_prenom'] = result[21] if num_cols > 21 else None
+                    data['client_telephone'] = result[22] if num_cols > 22 else None
+                    data['client_email'] = result[23] if num_cols > 23 else None
+                    data['couturier_nom'] = result[24] if num_cols > 24 else None
+                    data['couturier_prenom'] = result[25] if num_cols > 25 else None
+                    data['couturier_code'] = result[26] if num_cols > 26 else None
                 # Normaliser le champ mesures: parser JSON si MySQL retourne une string
                 try:
                     import json as _json
