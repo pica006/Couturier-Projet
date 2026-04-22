@@ -694,20 +694,28 @@ class ClientModel:
         """
         try:
             cursor = self.db.get_connection().cursor()
+            # Multi-tenant: rattacher explicitement le client au salon du couturier
+            cursor.execute("SELECT salon_id FROM couturiers WHERE id = %s", (couturier_id,))
+            row_salon = cursor.fetchone()
+            salon_id = row_salon[0] if row_salon and row_salon[0] is not None else None
+            if not salon_id:
+                cursor.close()
+                self.last_error = f"Impossible de déterminer le salon_id pour le couturier {couturier_id}."
+                return None
             if self.db.db_type == 'mysql':
                 query = (
-                    "INSERT INTO clients (couturier_id, nom, prenom, telephone, email) "
-                    "VALUES (%s, %s, %s, %s, %s)"
+                    "INSERT INTO clients (couturier_id, salon_id, nom, prenom, telephone, email) "
+                    "VALUES (%s, %s, %s, %s, %s, %s)"
                 )
-                cursor.execute(query, (couturier_id, nom, prenom, telephone, email))
+                cursor.execute(query, (couturier_id, salon_id, nom, prenom, telephone, email))
                 client_id = cursor.lastrowid
             else:
                 query = """
-                    INSERT INTO clients (couturier_id, nom, prenom, telephone, email)
-                    VALUES (%s, %s, %s, %s, %s)
+                    INSERT INTO clients (couturier_id, salon_id, nom, prenom, telephone, email)
+                    VALUES (%s, %s, %s, %s, %s, %s)
                     RETURNING id
                 """
-                cursor.execute(query, (couturier_id, nom, prenom, telephone, email))
+                cursor.execute(query, (couturier_id, salon_id, nom, prenom, telephone, email))
                 client_id = cursor.fetchone()[0]
             self.db.get_connection().commit()
             cursor.close()
@@ -838,6 +846,14 @@ class CommandeModel:
             connection = self.db.get_connection()
             cursor = connection.cursor()
 
+            # Multi-tenant: rattacher explicitement la commande au salon du couturier
+            cursor.execute("SELECT salon_id FROM couturiers WHERE id = %s", (couturier_id,))
+            row_salon = cursor.fetchone()
+            salon_id = row_salon[0] if row_salon and row_salon[0] is not None else None
+            if not salon_id:
+                cursor.close()
+                return None
+
             # Utiliser le reste passé en paramètre, sinon le calculer
             if reste is None:
                 reste = prix_total - avance
@@ -851,14 +867,14 @@ class CommandeModel:
             if self.db.db_type == 'mysql':
                 query = (
                     "INSERT INTO commandes "
-                    "(client_id, couturier_id, categorie, sexe, modele, mesures, "
+                    "(client_id, couturier_id, salon_id, categorie, sexe, modele, mesures, "
                     " prix_total, avance, reste, date_livraison, fabric_image_path, fabric_image, fabric_image_name, "
                     " model_type, model_image_path, model_image, model_image_name, statut) "
-                    "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
+                    "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
                 )
 
                 cursor.execute(query, (
-                    client_id, couturier_id, categorie, sexe, modele,
+                    client_id, couturier_id, salon_id, categorie, sexe, modele,
                     json.dumps(mesures), prix_total, avance, reste, 
                     date_livraison, fabric_image_path, fabric_image, fabric_image_name,
                     model_type, model_image_path, model_image, model_image_name, statut
@@ -870,15 +886,15 @@ class CommandeModel:
                 # Version PostgreSQL (si jamais tu l'utilises aussi)
                 query = """
                     INSERT INTO commandes 
-                    (client_id, couturier_id, categorie, sexe, modele, mesures,
+                    (client_id, couturier_id, salon_id, categorie, sexe, modele, mesures,
                      prix_total, avance, reste, date_livraison, fabric_image_path, fabric_image, fabric_image_name,
                      model_type, model_image_path, model_image, model_image_name, statut)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                     RETURNING id
                 """
 
                 cursor.execute(query, (
-                    client_id, couturier_id, categorie, sexe, modele,
+                    client_id, couturier_id, salon_id, categorie, sexe, modele,
                     json.dumps(mesures), prix_total, avance, reste,
                     date_livraison, fabric_image_path, fabric_image, fabric_image_name,
                     model_type, model_image_path, model_image, model_image_name, statut
