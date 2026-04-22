@@ -2016,7 +2016,3 @@ class CommandeModel:
         except Exception as e:
             print(f"Erreur liste commandes livrées pour PDF: {e}")
             return []
-
-
-{e}")
-            return []
