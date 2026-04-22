@@ -413,7 +413,7 @@ def afficher_page_fermer_commandes():
                 vue_admin=is_admin_user,
             )
 
-            demandes = commande_model.lister_demandes_validation()
+            demandes = commande_model.lister_demandes_validation(salon_id=salon_id_user)
             if not is_admin_user and commandes_terminees:
                 ids = [cmd["id"] for cmd in commandes_terminees]
                 historique_counts = commande_controller.get_historique_demandes_par_commandes(
@@ -736,7 +736,7 @@ def afficher_page_fermer_commandes():
                                                 st.rerun()
 
                                             # Fallback robuste : vérifier si une demande en attente existe maintenant
-                                            demandes_apres = commande_model.lister_demandes_validation() or []
+                                            demandes_apres = commande_model.lister_demandes_validation(salon_id=salon_id_user) or []
                                             deja_en_attente = next(
                                                 (
                                                     d for d in demandes_apres

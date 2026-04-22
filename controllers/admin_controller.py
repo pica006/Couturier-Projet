@@ -36,6 +36,9 @@ class AdminController:
     def __init__(self, db_connection: DatabaseConnection):
         self.db = db_connection
         self.client_model = ClientModel(db_connection)
+        self.charges_model = ChargesModel(db_connection)
+        self.commande_model = CommandeModel(db_connection)
+        self.couturier_model = CouturierModel(db_connection)
 
     def compter_clients_distincts_salon(self, salon_id: str) -> int:
         return self.client_model.compter_clients_distincts_salon(salon_id)
@@ -388,6 +391,11 @@ class AdminController:
             return {
                 "ok": False,
                 "flash_error": "❌ Erreur lors de la réinitialisation du mot de passe",
+                "rerun": True,
+            }
+        except Exception as e:
+            return {"ok": False, "flash_error": f"❌ {e}", "rerun": True}
+isation du mot de passe",
                 "rerun": True,
             }
         except Exception as e:

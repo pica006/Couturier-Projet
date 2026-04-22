@@ -37,11 +37,11 @@ def afficher_dashboard_super_admin():
         st.error("❌ Erreur : Connexion à la base de données non établie")
         return
     
-    # Initialiser les contrôleurs
+    # Initialiser le contrôleur (expose les modèles via super_admin_ctrl.XXX_model)
     super_admin_ctrl = SuperAdminController(st.session_state.db_connection)
-    salon_model = SalonModel(st.session_state.db_connection)
-    couturier_model = CouturierModel(st.session_state.db_connection)
-    commande_model = CommandeModel(st.session_state.db_connection)
+    salon_model = super_admin_ctrl.salon_model
+    couturier_model = super_admin_ctrl.couturier_model
+    commande_model = super_admin_ctrl.commande_model
     
     # ========================================================================
     # ONGLETS PRINCIPAUX
@@ -2069,3 +2069,4 @@ def afficher_rapports(super_admin_ctrl, salon_model):
                 else:
                     st.warning("⚠️ Aucun salon à exporter")
 
+orter")

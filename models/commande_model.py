@@ -504,7 +504,7 @@ class CommandeModel:
                            cl.nom, cl.prenom, c.couturier_id,
                            co.nom as couturier_nom, co.prenom as couturier_prenom, co.salon_id
                     FROM commandes c
-                    JOIN clients cl ON c.client_id = cl.id
+                    LEFT JOIN clients cl ON c.client_id = cl.id
                     LEFT JOIN couturiers co ON c.couturier_id = co.id
                     WHERE COALESCE(c.est_supprime, FALSE) = FALSE
                     ORDER BY c.date_creation DESC
@@ -517,7 +517,7 @@ class CommandeModel:
                            cl.nom, cl.prenom, c.couturier_id,
                            co.nom as couturier_nom, co.prenom as couturier_prenom, co.salon_id
                     FROM commandes c
-                    JOIN clients cl ON c.client_id = cl.id
+                    LEFT JOIN clients cl ON c.client_id = cl.id
                     LEFT JOIN couturiers co ON c.couturier_id = co.id
                     WHERE co.salon_id = %s
                       AND COALESCE(c.est_supprime, FALSE) = FALSE
@@ -533,7 +533,7 @@ class CommandeModel:
                                cl.nom, cl.prenom, c.couturier_id,
                                co.nom as couturier_nom, co.prenom as couturier_prenom, co.salon_id
                         FROM commandes c
-                        JOIN clients cl ON c.client_id = cl.id
+                        LEFT JOIN clients cl ON c.client_id = cl.id
                         LEFT JOIN couturiers co ON c.couturier_id = co.id
                         WHERE co.salon_id = %s AND c.couturier_id = %s
                           AND COALESCE(c.est_supprime, FALSE) = FALSE
@@ -547,7 +547,7 @@ class CommandeModel:
                                cl.nom, cl.prenom, c.couturier_id,
                                co.nom as couturier_nom, co.prenom as couturier_prenom, co.salon_id
                         FROM commandes c
-                        JOIN clients cl ON c.client_id = cl.id
+                        LEFT JOIN clients cl ON c.client_id = cl.id
                         LEFT JOIN couturiers co ON c.couturier_id = co.id
                         WHERE co.salon_id = %s
                           AND COALESCE(c.est_supprime, FALSE) = FALSE
@@ -560,7 +560,7 @@ class CommandeModel:
                         SELECT c.id, c.modele, c.prix_total, c.statut, c.date_creation,
                                cl.nom, cl.prenom
                         FROM commandes c
-                        JOIN clients cl ON c.client_id = cl.id
+                        LEFT JOIN clients cl ON c.client_id = cl.id
                         WHERE c.couturier_id = %s
                           AND COALESCE(c.est_supprime, FALSE) = FALSE
                         ORDER BY c.date_creation DESC
@@ -572,7 +572,7 @@ class CommandeModel:
                         SELECT c.id, c.modele, c.prix_total, c.statut, c.date_creation,
                                cl.nom, cl.prenom
                         FROM commandes c
-                        JOIN clients cl ON c.client_id = cl.id
+                        LEFT JOIN clients cl ON c.client_id = cl.id
                         WHERE 1=0
                         ORDER BY c.date_creation DESC
                     """
@@ -2018,3 +2018,5 @@ class CommandeModel:
             return []
 
 
+{e}")
+            return []

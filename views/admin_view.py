@@ -50,6 +50,12 @@ def _resoudre_salon_id_admin(admin_data: Dict) -> Optional[str]:
                 return salon.get("salon_id")
     except Exception:
         pass
+    # Si SUPER_ADMIN, ne pas retourner None silencieusement — vérifier session
+    if couturier_data and couturier_data.get('role', '').upper() == 'SUPER_ADMIN':
+        salon_override = st.session_state.get('active_salon_filter')
+        if salon_override:
+            return str(salon_override)
+        return '__SUPER_ADMIN__'  # sentinel : la vue doit gérer ce cas
     return None
 
 
@@ -78,13 +84,13 @@ def afficher_page_administration():
         st.info("💡 Contactez un administrateur pour obtenir les droits d'accès.")
         return
     
-    # Initialisation des modèles
-    charges_model = ChargesModel(st.session_state.db_connection)
-    commande_model = CommandeModel(st.session_state.db_connection)
-    couturier_model = CouturierModel(st.session_state.db_connection)
-    client_model = ClientModel(st.session_state.db_connection)
-    salon_model = SalonModel(st.session_state.db_connection)
+    # Initialisation du contrôleur (expose les modèles via admin_controller.XXX_model)
     admin_controller = AdminController(st.session_state.db_connection)
+    charges_model = admin_controller.charges_model
+    commande_model = admin_controller.commande_model
+    couturier_model = admin_controller.couturier_model
+    client_model = admin_controller.client_model
+    salon_model = SalonModel(st.session_state.db_connection)
     salon_id_admin = _resoudre_salon_id_admin(couturier_data)
     
     # Récupérer les informations du salon

@@ -29,6 +29,10 @@ import qrcode
 from models.database import ChargesModel
 from models.commande_model import CommandeModel
 from utils.page_header import afficher_header_page
+from controllers.charges_pdf_controller import (
+    generer_pdf_impots as _ctrl_generer_pdf_impots,
+    generer_pdf_analyse_charges as _ctrl_generer_pdf_analyse_charges,
+)
 
 
 # ============================================================================
@@ -3064,8 +3068,19 @@ def _liste_charges(charges_model, couturier_id, is_admin=False, salon_id_user: O
             use_container_width=True,
         )
     
-    # Export PDF d'analyse
-    pdf_data = _generer_pdf_analyse_charges(d_debut, d_fin, df_details, df_recap_export)
+    # Export PDF d'analyse (délégué au contrôleur)
+    _salon_id_pdf = None
+    try:
+        from utils.role_utils import obtenir_salon_id as _obtenir_salon_id
+        if st.session_state.get('couturier_data'):
+            _salon_id_pdf = _obtenir_salon_id(st.session_state.couturier_data)
+    except Exception:
+        pass
+    pdf_data = _ctrl_generer_pdf_analyse_charges(
+        d_debut, d_fin, df_details, df_recap_export,
+        salon_id=_salon_id_pdf,
+        db_connection=st.session_state.get('db_connection'),
+    )
     with col_pdf:
         if pdf_data:
             st.download_button(
@@ -3159,7 +3174,19 @@ def _calcul_impots(charges_model, commande_model, couturier_id, is_admin=False, 
         )
         df_charges = df_charges[mask]
 
-    pdf_data = _generer_pdf_impots(dd, df, ca_manuel, total_charges, impot, benefice, df_charges)
+    # Générer le PDF via le contrôleur (pas de st.session_state dans le contrôleur)
+    _salon_id_impots = None
+    try:
+        from utils.role_utils import obtenir_salon_id as _obtenir_salon_id_imp
+        if st.session_state.get('couturier_data'):
+            _salon_id_impots = _obtenir_salon_id_imp(st.session_state.couturier_data)
+    except Exception:
+        pass
+    pdf_data = _ctrl_generer_pdf_impots(
+        dd, df, ca_manuel, total_charges, impot, benefice, df_charges,
+        salon_id=_salon_id_impots,
+        db_connection=st.session_state.get('db_connection'),
+    )
     col_pdf, col_excel = st.columns(2)
     with col_pdf:
         if pdf_data:

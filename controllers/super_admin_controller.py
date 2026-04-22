@@ -9,9 +9,14 @@ from datetime import datetime, timedelta
 
 class SuperAdminController:
     """Contrôleur pour les fonctionnalités du SUPER_ADMIN"""
-    
+
     def __init__(self, db_connection: DatabaseConnection):
         self.db = db_connection
+        self.salon_model = SalonModel(db_connection)
+        from models.database import CouturierModel as _CouturierModel
+        from models.commande_model import CommandeModel as _CommandeModel
+        self.couturier_model = _CouturierModel(db_connection)
+        self.commande_model = _CommandeModel(db_connection)
 
     def diagnostiquer_salons(self) -> Dict:
         """
@@ -545,3 +550,10 @@ class SuperAdminController:
         
         return rapport
 
+lons': self.obtenir_statistiques_par_salon(),
+            'utilisateurs': self.obtenir_tous_utilisateurs(salon_id),
+            'commandes': self.obtenir_toutes_commandes(salon_id, limit=1000),
+            'evolution_mensuelle': self.obtenir_evolution_mensuelle(salon_id)
+        }
+        
+        return rapport
