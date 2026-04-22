@@ -20,7 +20,7 @@ from datetime import datetime
 import pandas as pd
 import plotly.express as px
 from models.database import ChargesModel, CommandeModel, CouturierModel
-from utils.role_utils import est_admin, obtenir_salon_id
+from utils.role_utils import est_admin, obtenir_salon_id_resolu
 from utils.ui import (
     ajouter_espace_vertical,
     appliquer_style_pages_critiques,
@@ -49,7 +49,8 @@ def afficher_page_dashboard():
     
     couturier_data = st.session_state.couturier_data
     couturier_id = couturier_data['id']
-    salon_id = obtenir_salon_id(couturier_data)
+    is_admin_user = est_admin(couturier_data)
+    salon_id = obtenir_salon_id_resolu(couturier_data, st.session_state.db_connection)
     
     try:
         from controllers.comptabilite_controller import ComptabiliteController
@@ -118,7 +119,7 @@ def afficher_page_dashboard():
         
         # Filtrer par couturier (admin uniquement)
         couturier_id_filtre_modeles = couturier_id
-        if est_admin(couturier_data) and salon_id:
+        if is_admin_user and salon_id:
             couturier_model = CouturierModel(st.session_state.db_connection)
             tous_couturiers = couturier_model.lister_tous_couturiers(salon_id=salon_id)
             options = ["👥 Tous les couturiers"] + [
@@ -162,8 +163,18 @@ def afficher_page_dashboard():
         afficher_titre_section("📈 Statistiques de la période")
         
         # Stats de la période sélectionnée
-        stats_periode = compta_controller.obtenir_statistiques(couturier_id, date_debut_dt, date_fin_dt)
-        charges_periode = charges_model.total_charges(couturier_id, date_debut_dt, date_fin_dt)
+        stats_periode = compta_controller.obtenir_statistiques(
+            couturier_id if not is_admin_user else None,
+            date_debut_dt,
+            date_fin_dt,
+            salon_id=salon_id if is_admin_user else None,
+        )
+        charges_periode = charges_model.total_charges(
+            couturier_id if not is_admin_user else None,
+            date_debut_dt,
+            date_fin_dt,
+            salon_id=salon_id if is_admin_user else None,
+        )
         resultat_periode = stats_periode['ca_total'] - charges_periode
         
         # Cartes principales
@@ -244,8 +255,14 @@ def afficher_page_dashboard():
         afficher_titre_section("🎯 Statistiques totales (toutes périodes)")
         
         # Stats globales (sans filtre de date)
-        stats_total = compta_controller.obtenir_statistiques(couturier_id)
-        charges_total = charges_model.total_charges(couturier_id)
+        stats_total = compta_controller.obtenir_statistiques(
+            couturier_id if not is_admin_user else None,
+            salon_id=salon_id if is_admin_user else None,
+        )
+        charges_total = charges_model.total_charges(
+            couturier_id if not is_admin_user else None,
+            salon_id=salon_id if is_admin_user else None,
+        )
         
         col1, col2, col3, col4 = st.columns(4)
         
@@ -319,7 +336,10 @@ def afficher_page_dashboard():
         afficher_titre_section("🕐 Dernières activités")
         
         # Commandes à relancer
-        commandes_relance = compta_controller.obtenir_commandes_a_relancer(couturier_id)
+        commandes_relance = compta_controller.obtenir_commandes_a_relancer(
+            couturier_id if not is_admin_user else None,
+            salon_id=salon_id if is_admin_user else None,
+        )
         if commandes_relance:
             st.warning(f"🔔 {len(commandes_relance)} commande(s) à relancer pour paiement")
         else:
@@ -328,7 +348,12 @@ def afficher_page_dashboard():
         # Performance du jour
         debut_jour = datetime.combine(aujourdhui.date(), datetime.min.time())
         fin_jour = datetime.combine(aujourdhui.date(), datetime.max.time())
-        stats_jour = compta_controller.obtenir_statistiques(couturier_id, debut_jour, fin_jour)
+        stats_jour = compta_controller.obtenir_statistiques(
+            couturier_id if not is_admin_user else None,
+            debut_jour,
+            fin_jour,
+            salon_id=salon_id if is_admin_user else None,
+        )
         
         if stats_jour['nb_commandes'] > 0:
             st.success(f"🎉 Aujourd'hui : {stats_jour['nb_commandes']} commande(s) pour {stats_jour['ca_total']:,.0f} FCFA")
@@ -338,7 +363,7 @@ def afficher_page_dashboard():
         # ========================================================================
         # SECTION MODÈLES RÉALISÉS (admin uniquement) - comme page Modèles réalisés
         # ========================================================================
-        if est_admin(couturier_data) and salon_id:
+        if is_admin_user and salon_id:
             st.markdown("---")
             afficher_titre_section("👗 Modèles réalisés par le salon")
             

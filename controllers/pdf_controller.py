@@ -447,45 +447,7 @@ def _pdf_dessiner_decor_commande(
     responsable = ((salon_row or {}).get("responsable") or "").strip()
     telephone = ((salon_row or {}).get("telephone") or "").strip()
     email = ((salon_row or {}).get("email") or "").strip()
-    code_salon = str(
-        (salon_row or {}).get("code_admin")
-        or (salon_row or {}).get("salon_id")
-        or ""
-    )
-
-    # Filigrane texte très pâle
-    canvas_obj.saveState()
-    canvas_obj.setFillColor(_P_MAUVE_TRES_CLAIR)
-    canvas_obj.setFont("Helvetica-Bold", 56)
-    canvas_obj.translate(W / 2, H / 2)
-    canvas_obj.rotate(28)
-    canvas_obj.drawCentredString(0, 0, nom[:18] if len(nom) > 18 else nom)
-    canvas_obj.restoreState()
-
-    # Filigrane logo (optionnel), plus léger que l’ancien rendu
-    if watermark_logo_bytes:
-        try:
-            logo_img = PILImage.open(io.BytesIO(watermark_logo_bytes))
-            logo_img.thumbnail((280, 280), PILImage.Resampling.LANCZOS)
-            canvas_obj.saveState()
-            if hasattr(canvas_obj, "setFillAlpha"):
-                canvas_obj.setFillAlpha(0.08)
-            iw, ih = logo_img.size
-            img_width = iw * 0.9
-            img_height = ih * 0.9
-            x = (W - img_width) / 2
-            y = (H - img_height) / 2
-            canvas_obj.drawImage(
-                ImageReader(logo_img),
-                x,
-                y,
-                width=img_width,
-                height=img_height,
-                preserveAspectRatio=True,
-            )
-            canvas_obj.restoreState()
-        except Exception as e:
-            print(f"Filigrane logo PDF commande: {e}")
+    # Filigrane volontairement désactivé pour garantir une lisibilité maximale.
 
     # Bandeau en-tête (mauve clair)
     canvas_obj.setFillColor(_P_MAUVE)
@@ -528,12 +490,6 @@ def _pdf_dessiner_decor_commande(
     canvas_obj.setFont("Helvetica-Oblique", 10)
     canvas_obj.drawString(3.6 * cm, H - 1.82 * cm, slogan)
     canvas_obj.setFillColor(colors.white)
-    canvas_obj.setFont("Helvetica", 8.5)
-    canvas_obj.drawString(
-        3.6 * cm, H - 2.32 * cm, f"Code salon : {code_salon or '—'}"
-    )
-
-    canvas_obj.setFillColor(colors.white)
     canvas_obj.setFont("Helvetica-Bold", 9)
     canvas_obj.drawRightString(W - 1.2 * cm, H - 1.08 * cm, adresse[:55])
     canvas_obj.setFont("Helvetica", 8.5)
@@ -574,7 +530,7 @@ def _pdf_dessiner_decor_commande(
     canvas_obj.drawCentredString(
         W / 2,
         0.4 * cm,
-        f"Document officiel — Commande N° {numero_commande}  {page_txt}",
+        f"Document officiel de commande  {page_txt}",
     )
 
 
@@ -895,7 +851,7 @@ class PDFController:
                 [
                     [
                         Paragraph(
-                            f"<b>N° {numero_cmd}</b>",
+                            f"<b>Créée le : {date_creation_str}</b>",
                             ParagraphStyle(
                                 "RubanN",
                                 fontName="Helvetica-Bold",
@@ -949,7 +905,6 @@ class PDFController:
             story.append(
                 _pdf_table_infos_commande(
                     [
-                        ("N° Commande :", numero_cmd),
                         ("Date :", date_creation_str),
                         ("Statut :", str(commande_data.get("statut", "Non défini"))),
                         ("Date de livraison :", date_livraison_str),
