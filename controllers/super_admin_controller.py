@@ -549,11 +549,3 @@ class SuperAdminController:
         }
         
         return rapport
-
-lons': self.obtenir_statistiques_par_salon(),
-            'utilisateurs': self.obtenir_tous_utilisateurs(salon_id),
-            'commandes': self.obtenir_toutes_commandes(salon_id, limit=1000),
-            'evolution_mensuelle': self.obtenir_evolution_mensuelle(salon_id)
-        }
-        
-        return rapport

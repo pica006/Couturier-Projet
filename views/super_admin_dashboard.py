@@ -2068,5 +2068,3 @@ def afficher_rapports(super_admin_ctrl, salon_model):
                         st.dataframe(df_salons.head(10), use_container_width=True, hide_index=True)
                 else:
                     st.warning("⚠️ Aucun salon à exporter")
-
-orter")
