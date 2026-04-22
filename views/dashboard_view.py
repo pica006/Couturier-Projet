@@ -19,7 +19,8 @@ import streamlit as st
 from datetime import datetime
 import pandas as pd
 import plotly.express as px
-from models.database import ChargesModel, CommandeModel, CouturierModel
+from models.database import ChargesModel, CouturierModel
+from models.commande_model import CommandeModel
 from utils.role_utils import est_admin, obtenir_salon_id_resolu
 from utils.ui import (
     ajouter_espace_vertical,
@@ -48,7 +49,10 @@ def afficher_page_dashboard():
         return
     
     couturier_data = st.session_state.couturier_data
-    couturier_id = couturier_data['id']
+    couturier_id = couturier_data.get('id') if couturier_data else None
+    if not couturier_id:
+        afficher_erreur_minimale("Impossible de récupérer votre identifiant couturier.")
+        return
     is_admin_user = est_admin(couturier_data)
     salon_id = obtenir_salon_id_resolu(couturier_data, st.session_state.db_connection)
     

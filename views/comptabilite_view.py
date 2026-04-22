@@ -41,10 +41,14 @@ def afficher_page_comptabilite():
         return
     
     # Récupérer l'ID du couturier
-    couturier_id = st.session_state.couturier_data['id']
-    is_admin_user = est_admin(st.session_state.couturier_data)
+    couturier_data_session = st.session_state.get('couturier_data') or {}
+    couturier_id = couturier_data_session.get('id')
+    if not couturier_id:
+        st.error("❌ Impossible de récupérer votre identifiant couturier.")
+        return
+    is_admin_user = est_admin(couturier_data_session)
     salon_id_user = (
-        obtenir_salon_id_resolu(st.session_state.couturier_data, st.session_state.db_connection)
+        obtenir_salon_id_resolu(couturier_data_session, st.session_state.db_connection)
         if is_admin_user
         else None
     )

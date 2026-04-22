@@ -4,7 +4,7 @@ Envoie email sans intervention manuelle.
 """
 from datetime import datetime, timedelta
 
-from models.database import CommandeModel
+from models.commande_model import CommandeModel
 from models.salon_model import SalonModel
 from controllers.email_controller import EmailController
 

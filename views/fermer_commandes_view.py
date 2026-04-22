@@ -589,42 +589,18 @@ def afficher_page_fermer_commandes():
 
                                             email_controller_envoi = EmailController(smtp_config=smtp_config_email)
                                         else:
-                                            # Dernier fallback: lire la config SMTP du salon directement via la commande
-                                            conn = db.get_connection()
-                                            cursor = conn.cursor()
                                             try:
-                                                cursor.execute(
-                                                    """
-                                                    SELECT
-                                                        s.smtp_host,
-                                                        s.smtp_port,
-                                                        s.smtp_user,
-                                                        s.smtp_password,
-                                                        s.smtp_from,
-                                                        s.smtp_use_tls,
-                                                        s.smtp_use_ssl,
-                                                        s.email
-                                                    FROM commandes c
-                                                    JOIN salons s ON s.salon_id = c.salon_id
-                                                    WHERE c.id = %s
-                                                    """,
-                                                    (commande["id"],)
+                                                smtp_fallback = commande_model.obtenir_email_client_par_commande(
+                                                    commande["id"],
+                                                    salon_id_user,
                                                 )
-                                                row = cursor.fetchone()
-                                                if row:
-                                                    smtp_config_email = {
-                                                        "enabled": True,
-                                                        "host": row[0],
-                                                        "port": row[1],
-                                                        "user": row[2] or row[7],
-                                                        "password": row[3],
-                                                        "from_email": row[4] or row[2] or row[7],
-                                                        "use_tls": row[5],
-                                                        "use_ssl": row[6],
-                                                    }
-                                                    email_controller_envoi = EmailController(smtp_config=smtp_config_email)
-                                            finally:
-                                                cursor.close()
+                                                if smtp_fallback:
+                                                    smtp_config_email = smtp_fallback
+                                                    email_controller_envoi = EmailController(
+                                                        smtp_config=smtp_config_email
+                                                    )
+                                            except Exception:
+                                                pass
                                     except Exception:
                                         email_controller_envoi = email_controller
 

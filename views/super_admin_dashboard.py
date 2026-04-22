@@ -8,7 +8,8 @@
 """
 import streamlit as st
 from models.salon_model import SalonModel
-from models.database import CouturierModel, CommandeModel, AppLogoModel
+from models.database import CouturierModel, AppLogoModel
+from models.commande_model import CommandeModel
 from controllers.super_admin_controller import SuperAdminController
 from utils.permissions import est_super_admin
 import pandas as pd

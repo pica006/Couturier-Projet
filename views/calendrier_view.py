@@ -12,7 +12,8 @@ import io
 from datetime import datetime, timedelta
 from collections import defaultdict
 
-from models.database import CommandeModel, CouturierModel
+from models.database import CouturierModel
+from models.commande_model import CommandeModel
 from utils.role_utils import est_admin, obtenir_salon_id, obtenir_couturier_id
 from utils.page_header import afficher_header_page
 

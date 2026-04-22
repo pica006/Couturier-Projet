@@ -2,7 +2,8 @@
 Contrôleur de gestion des commandes (Controller dans MVC)
 """
 from typing import Optional, Dict, List, Tuple
-from models.database import DatabaseConnection, ClientModel, CommandeModel
+from models.database import DatabaseConnection, ClientModel
+from models.commande_model import CommandeModel
 from datetime import datetime
 import os
 from config import PDF_STORAGE_PATH, IS_RENDER

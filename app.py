@@ -1182,8 +1182,8 @@ def main():
         }:
             _render_authenticated_page(st.session_state.page)
         elif st.session_state.page == 'administration':
-            # Vérifier que l'utilisateur est admin
-            if est_admin(st.session_state.couturier_data):
+            # Vérifier que l'utilisateur est admin ou super-admin
+            if est_admin(st.session_state.couturier_data) or est_super_admin():
                 _render_authenticated_page('administration')
             else:
                 st.error("❌ Accès refusé. Cette page est réservée aux administrateurs.")

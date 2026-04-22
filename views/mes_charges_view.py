@@ -26,7 +26,8 @@ from reportlab.lib.utils import ImageReader
 from PIL import Image as PILImage
 import qrcode
 
-from models.database import ChargesModel, CommandeModel
+from models.database import ChargesModel
+from models.commande_model import CommandeModel
 from utils.page_header import afficher_header_page
 
 

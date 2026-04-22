@@ -247,7 +247,7 @@ MODELES = {
             'Robe de cérémonie',     # Pour événements spéciaux
             'Robe casual',           # Robe de tous les jours
             'Ensemble jupe',         # Ensemble avec jupe
-            'Robe traditionnelle',   # Tenue culturelle
+            'Robe traditionnelle enfant',   # Tenue culturelle (enfant)
             'Boubou enfant'          # Boubou taille enfant
         ]
     }
@@ -447,7 +447,7 @@ MESURES = {
     # (déjà définis plus haut dans la section homme)
     
     # ========== MODÈLES ENFANT FILLE (suite) ==========
-    'Robe traditionnelle': [
+    'Robe traditionnelle enfant': [
         'Tour de cou',
         'Tour de poitrine',
         'Tour de taille',

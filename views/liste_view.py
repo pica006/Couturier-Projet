@@ -110,6 +110,13 @@ def afficher_page_liste_commandes():
         # Récupérer les informations de l'utilisateur connecté
         from utils.role_utils import obtenir_salon_id
         couturier_data = st.session_state.couturier_data
+        if not couturier_data:
+            st.error("❌ Vous devez être connecté pour accéder à cette page.")
+            return
+        cid_liste = couturier_data.get('id')
+        if not cid_liste:
+            st.error("❌ Impossible de récupérer votre identifiant couturier.")
+            return
         salon_id = obtenir_salon_id(couturier_data)
         code_couturier = couturier_data.get('code_couturier') if couturier_data else None
         
@@ -117,7 +124,7 @@ def afficher_page_liste_commandes():
         if 'commandes_liste' not in st.session_state:
             with etat_chargement("Chargement des commandes..."):
                 st.session_state.commandes_liste = commande_controller.lister_commandes_couturier(
-                    st.session_state.couturier_data['id']
+                    cid_liste
                 )
         
         commandes = st.session_state.commandes_liste

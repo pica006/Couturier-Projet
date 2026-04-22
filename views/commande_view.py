@@ -432,8 +432,12 @@ def afficher_page_commande():
                     commande_info['model_image'] = model_image_bytes
                     commande_info['model_image_name'] = model_image.name
                     
+                    cid_cmd = (st.session_state.get('couturier_data') or {}).get('id')
+                    if not cid_cmd:
+                        st.error("❌ Impossible de récupérer votre identifiant couturier.")
+                        return
                     succes, commande_id, message = commande_controller.creer_commande(
-                        st.session_state.couturier_data['id'],
+                        cid_cmd,
                         client_info,
                         commande_info
                     )
