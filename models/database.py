@@ -803,6 +803,85 @@ class CommandeModel:
             except Exception:
                 pass
 
+    def _ensure_historique_demandes_schema(self) -> None:
+        """Garantit la présence de la table/colonnes utilisées pour les demandes de fermeture."""
+        connection = self.db.get_connection()
+        cursor = connection.cursor()
+        try:
+            if self.db.db_type == 'mysql':
+                cursor.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS historique_commandes (
+                        id INT AUTO_INCREMENT PRIMARY KEY,
+                        commande_id INT NOT NULL,
+                        couturier_id INT NOT NULL,
+                        type_action VARCHAR(50) NOT NULL,
+                        montant_paye DECIMAL(10,2) DEFAULT 0.00,
+                        reste_apres_paiement DECIMAL(10,2) DEFAULT 0.00,
+                        statut_avant VARCHAR(50),
+                        statut_apres VARCHAR(50),
+                        commentaire TEXT,
+                        statut_validation VARCHAR(50) DEFAULT 'en_attente',
+                        admin_validation_id INT NULL,
+                        date_validation TIMESTAMP NULL,
+                        commentaire_admin TEXT,
+                        date_creation TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        INDEX idx_historique_commande_id (commande_id),
+                        INDEX idx_historique_couturier_id (couturier_id),
+                        INDEX idx_historique_statut_validation (statut_validation),
+                        INDEX idx_historique_type_action (type_action),
+                        CONSTRAINT fk_hist_commande FOREIGN KEY (commande_id) REFERENCES commandes(id) ON DELETE CASCADE ON UPDATE CASCADE,
+                        CONSTRAINT fk_hist_couturier FOREIGN KEY (couturier_id) REFERENCES couturiers(id) ON DELETE CASCADE ON UPDATE CASCADE,
+                        CONSTRAINT fk_hist_admin FOREIGN KEY (admin_validation_id) REFERENCES couturiers(id) ON DELETE SET NULL ON UPDATE CASCADE
+                    )
+                    """
+                )
+            else:
+                cursor.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS historique_commandes (
+                        id SERIAL PRIMARY KEY,
+                        commande_id INTEGER NOT NULL,
+                        couturier_id INTEGER NOT NULL,
+                        type_action VARCHAR(50) NOT NULL,
+                        montant_paye DECIMAL(10,2) DEFAULT 0.00,
+                        reste_apres_paiement DECIMAL(10,2) DEFAULT 0.00,
+                        statut_avant VARCHAR(50),
+                        statut_apres VARCHAR(50),
+                        commentaire TEXT,
+                        statut_validation VARCHAR(50) DEFAULT 'en_attente',
+                        admin_validation_id INTEGER NULL,
+                        date_validation TIMESTAMP NULL,
+                        commentaire_admin TEXT,
+                        date_creation TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        FOREIGN KEY (commande_id) REFERENCES commandes(id) ON DELETE CASCADE ON UPDATE CASCADE,
+                        FOREIGN KEY (couturier_id) REFERENCES couturiers(id) ON DELETE CASCADE ON UPDATE CASCADE,
+                        FOREIGN KEY (admin_validation_id) REFERENCES couturiers(id) ON DELETE SET NULL ON UPDATE CASCADE
+                    )
+                    """
+                )
+                cursor.execute("CREATE INDEX IF NOT EXISTS idx_historique_commande_id ON historique_commandes(commande_id)")
+                cursor.execute("CREATE INDEX IF NOT EXISTS idx_historique_couturier_id ON historique_commandes(couturier_id)")
+                cursor.execute("CREATE INDEX IF NOT EXISTS idx_historique_statut_validation ON historique_commandes(statut_validation)")
+                cursor.execute("CREATE INDEX IF NOT EXISTS idx_historique_type_action ON historique_commandes(type_action)")
+
+            cursor.execute("ALTER TABLE historique_commandes ADD COLUMN IF NOT EXISTS statut_validation VARCHAR(50) DEFAULT 'en_attente'")
+            cursor.execute("ALTER TABLE historique_commandes ADD COLUMN IF NOT EXISTS admin_validation_id INTEGER NULL")
+            cursor.execute("ALTER TABLE historique_commandes ADD COLUMN IF NOT EXISTS date_validation TIMESTAMP NULL")
+            cursor.execute("ALTER TABLE historique_commandes ADD COLUMN IF NOT EXISTS commentaire_admin TEXT")
+            connection.commit()
+        except Exception as e:
+            try:
+                connection.rollback()
+            except Exception:
+                pass
+            print(f"Erreur migration historique_commandes: {e}")
+        finally:
+            try:
+                cursor.close()
+            except Exception:
+                pass
+
 
 
     def ajouter_commande(self, client_id: int, couturier_id: int, 
@@ -1335,6 +1414,7 @@ class CommandeModel:
             dict: {"id": <id>, "created": <bool>} ou None si erreur
         """
         try:
+            self._ensure_historique_demandes_schema()
             connection = self.db.get_connection()
             cursor = connection.cursor()
             
@@ -1428,6 +1508,7 @@ class CommandeModel:
             True si succès, False sinon
         """
         try:
+            self._ensure_historique_demandes_schema()
             connection = self.db.get_connection()
             cursor = connection.cursor()
             
@@ -2136,6 +2217,7 @@ class CommandeModel:
         Optionnellement filtrées par salon (via le couturier) et par période.
         """
         try:
+            self._ensure_historique_demandes_schema()
             cursor = self.db.get_connection().cursor()
 
             where_clauses = ["h.statut_validation = 'en_attente'"]
@@ -2162,12 +2244,12 @@ class CommandeModel:
                        c.modele, c.prix_total, c.avance, c.reste,
                        cl.nom as client_nom, cl.prenom as client_prenom,
                        co.nom as couturier_nom, co.prenom as couturier_prenom,
-                       co.salon_id, s.nom as salon_nom
+                       COALESCE(co.salon_id, c.salon_id) as salon_id, s.nom as salon_nom
                 FROM historique_commandes h
                 JOIN commandes c ON h.commande_id = c.id
                 JOIN clients cl ON c.client_id = cl.id
                 JOIN couturiers co ON h.couturier_id = co.id
-                LEFT JOIN salons s ON co.salon_id = s.salon_id
+                LEFT JOIN salons s ON COALESCE(co.salon_id, c.salon_id) = s.salon_id
                 WHERE {where_sql}
                 ORDER BY h.date_creation DESC
             """
@@ -2388,6 +2470,7 @@ class CommandeModel:
         if not commande_ids:
             return {}
         try:
+            self._ensure_historique_demandes_schema()
             cursor = self.db.get_connection().cursor()
             placeholders = ", ".join(["%s"] * len(commande_ids))
             query = f"""
@@ -2423,6 +2506,7 @@ class CommandeModel:
         Retourne le total des demandes et le dernier statut pour une commande.
         """
         try:
+            self._ensure_historique_demandes_schema()
             cursor = self.db.get_connection().cursor()
             cursor.execute(
                 """
