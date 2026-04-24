@@ -17,6 +17,7 @@ class CommandeController:
         self.db_connection = db_connection
         self.client_model = ClientModel(db_connection)
         self.commande_model = CommandeModel(db_connection)
+        self.last_detail_error: Optional[str] = None
     
     def initialiser_tables(self) -> bool:
         """Initialise les tables clients et commandes"""
@@ -145,17 +146,23 @@ class CommandeController:
     
     def obtenir_details_commande(self, commande_id: int, couturier_id: Optional[int] = None) -> Optional[Dict]:
         """Récupère les détails complets d'une commande (avec fallback robuste)."""
+        self.last_detail_error = None
         try:
             commande_id = int(commande_id)
         except Exception:
+            self.last_detail_error = "commande_id invalide"
             return None
 
         # 1) Chemin standard via le modèle
-        details = self.commande_model.obtenir_commande(commande_id)
-        if details:
-            if couturier_id is not None and str(details.get("couturier_id")) != str(couturier_id):
-                return None
-            return details
+        try:
+            details = self.commande_model.obtenir_commande(commande_id)
+            if details:
+                if couturier_id is not None and str(details.get("couturier_id")) != str(couturier_id):
+                    self.last_detail_error = "commande hors périmètre couturier"
+                    return None
+                return details
+        except Exception as e:
+            self.last_detail_error = f"échec modèle: {e}"
 
         # 2) Fallback controller: utile quand le schéma réel diffère et bloque
         # certaines requêtes dynamiques du modèle.
@@ -189,7 +196,78 @@ class CommandeController:
             row = cursor.fetchone()
             cursor.close()
 
+            if row:
+                mesures_data = row[6]
+                if isinstance(mesures_data, str):
+                    try:
+                        mesures_data = json.loads(mesures_data)
+                    except Exception:
+                        mesures_data = {}
+                elif mesures_data is None:
+                    mesures_data = {}
+
+                return {
+                    "id": row[0],
+                    "client_id": row[1],
+                    "couturier_id": row[2],
+                    "categorie": row[3],
+                    "sexe": row[4],
+                    "modele": row[5],
+                    "mesures": mesures_data,
+                    "prix_total": float(row[7] or 0),
+                    "avance": float(row[8] or 0),
+                    "reste": float(row[9] or 0),
+                    "date_livraison": row[10],
+                    "statut": row[11],
+                    "date_creation": row[12],
+                    "client_nom": row[13],
+                    "client_prenom": row[14],
+                    "client_telephone": row[15],
+                    "client_email": row[16],
+                    "couturier_nom": row[17],
+                    "couturier_prenom": row[18],
+                    "couturier_code": row[19],
+                    "fabric_image_path": None,
+                    "fabric_image": None,
+                    "fabric_image_name": None,
+                    "model_type": None,
+                    "model_image_path": None,
+                    "model_image": None,
+                    "model_image_name": None,
+                    "salon_id": None,
+                    "pdf_data": None,
+                    "pdf_name": None,
+                    "pdf_path": None,
+                }
+        except Exception as e:
+            self.last_detail_error = f"fallback jointures: {e}"
+
+        # 3) Fallback ultime: table commandes seule (sans jointures)
+        try:
+            conn = self.db_connection.get_connection()
+            try:
+                conn.rollback()
+            except Exception:
+                pass
+
+            cursor = conn.cursor()
+            query_min = """
+                SELECT
+                    id, client_id, couturier_id, categorie, sexe, modele, mesures,
+                    prix_total, avance, reste, date_livraison, statut, date_creation
+                FROM commandes
+                WHERE id = %s
+            """
+            params_min: List = [commande_id]
+            if couturier_id is not None:
+                query_min += " AND couturier_id = %s"
+                params_min.append(couturier_id)
+
+            cursor.execute(query_min, tuple(params_min))
+            row = cursor.fetchone()
+            cursor.close()
             if not row:
+                self.last_detail_error = self.last_detail_error or "aucune ligne trouvée"
                 return None
 
             mesures_data = row[6]
@@ -215,13 +293,13 @@ class CommandeController:
                 "date_livraison": row[10],
                 "statut": row[11],
                 "date_creation": row[12],
-                "client_nom": row[13],
-                "client_prenom": row[14],
-                "client_telephone": row[15],
-                "client_email": row[16],
-                "couturier_nom": row[17],
-                "couturier_prenom": row[18],
-                "couturier_code": row[19],
+                "client_nom": None,
+                "client_prenom": None,
+                "client_telephone": None,
+                "client_email": None,
+                "couturier_nom": None,
+                "couturier_prenom": None,
+                "couturier_code": None,
                 "fabric_image_path": None,
                 "fabric_image": None,
                 "fabric_image_name": None,
@@ -234,7 +312,8 @@ class CommandeController:
                 "pdf_name": None,
                 "pdf_path": None,
             }
-        except Exception:
+        except Exception as e:
+            self.last_detail_error = f"fallback commandes seule: {e}"
             return None
     
     def lister_commandes_couturier(self, couturier_id: int) -> List[Dict]:

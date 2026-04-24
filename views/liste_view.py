@@ -454,6 +454,9 @@ def afficher_page_liste_commandes():
                             "Impossible de charger les détails de cette commande "
                             "(données indisponibles ou erreur de lecture). Essayez « Actualiser »."
                         )
+                        debug_detail = getattr(commande_controller, "last_detail_error", None)
+                        if debug_detail:
+                            st.caption(f"Info technique: {debug_detail}")
                     else:
                         mesures_dict = _mesures_pour_affichage(details.get("mesures"))
                         categorie_txt = str(details.get("categorie") or "—").strip() or "—"
