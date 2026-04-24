@@ -21,6 +21,7 @@ from datetime import datetime, timedelta
 import pandas as pd
 import matplotlib.pyplot as plt
 from controllers.email_controller import EmailController
+from models.database import CouturierModel
 from models.salon_model import SalonModel
 from utils.role_utils import obtenir_salon_id_resolu, est_admin
 
@@ -57,6 +58,31 @@ def afficher_page_comptabilite():
             "⚠️ Aucun salon trouvé pour votre compte admin. "
             "Affichage basculé sur vos propres commandes uniquement."
         )
+    couturier_filtre_id = couturier_id
+    if is_admin_user and salon_id_user:
+        try:
+            couturier_model = CouturierModel(st.session_state.db_connection)
+            couturiers_salon = couturier_model.lister_tous_couturiers(salon_id=salon_id_user)
+        except Exception:
+            couturiers_salon = []
+
+        options_couturiers = {"Tous les couturiers du salon": None}
+        for c in couturiers_salon:
+            cid = c.get("id")
+            if cid is None:
+                continue
+            label = f"{c.get('code_couturier', 'N/A')} - {c.get('prenom', '')} {c.get('nom', '')}".strip()
+            options_couturiers[label] = cid
+
+        selected_label = st.selectbox(
+            "Filtrer par couturier",
+            options=list(options_couturiers.keys()),
+            index=0,
+            help="Permet de comparer les performances de chaque couturier du salon",
+        )
+        couturier_filtre_id = options_couturiers.get(selected_label)
+
+    salon_filtre_id = salon_id_user if is_admin_user else None
     
     # Contrôleur (créé une seule fois)
     try:
@@ -100,10 +126,10 @@ def afficher_page_comptabilite():
     # ========================================================================
     try:
         modeles_disponibles = compta_controller.lister_modeles_par_periode(
-            couturier_id if not is_admin_user else None,
+            couturier_filtre_id,
             date_debut_filtre,
             date_fin_filtre,
-            salon_id=salon_id_user
+            salon_id=salon_filtre_id
         )
     except Exception:
         modeles_disponibles = []
@@ -123,10 +149,10 @@ def afficher_page_comptabilite():
     try:
         # Récupérer les statistiques
         stats = compta_controller.obtenir_statistiques(
-            couturier_id if not is_admin_user else None,
+            couturier_filtre_id,
             date_debut_filtre, 
             date_fin_filtre,
-            salon_id=salon_id_user
+            salon_id=salon_filtre_id
         ) or {}
         
         # ====================================================================
@@ -173,6 +199,52 @@ def afficher_page_comptabilite():
                 value=nb_commandes,
                 help="Nombre total de commandes"
             )
+
+        if is_admin_user and salon_filtre_id:
+            st.markdown("### 🏆 Efficacité des couturiers")
+            classement = compta_controller.classement_efficacite_couturiers(
+                salon_id=salon_filtre_id,
+                date_debut=date_debut_filtre,
+                date_fin=date_fin_filtre,
+            )
+            if classement:
+                df_ranking = pd.DataFrame(classement)
+                df_ranking["Couturier"] = (
+                    df_ranking["code_couturier"].fillna("N/A")
+                    + " - "
+                    + df_ranking["prenom"].fillna("")
+                    + " "
+                    + df_ranking["nom"].fillna("")
+                ).str.strip()
+                df_ranking = df_ranking.sort_values(
+                    by=["ca_total", "nb_commandes", "taux_avance"],
+                    ascending=[False, False, False],
+                ).reset_index(drop=True)
+                df_ranking["Rang"] = df_ranking.index + 1
+                top = df_ranking.iloc[0]
+                st.success(
+                    f"Leader période: {top['Couturier']} | "
+                    f"CA {top['ca_total']:,.0f} FCFA | "
+                    f"{int(top['nb_commandes'])} commandes"
+                )
+                df_display_rank = df_ranking[
+                    ["Rang", "Couturier", "nb_commandes", "ca_total", "avances_total", "reste_total", "taux_avance"]
+                ].copy()
+                df_display_rank.columns = [
+                    "Rang",
+                    "Couturier",
+                    "Commandes",
+                    "CA (FCFA)",
+                    "Avances (FCFA)",
+                    "Reste (FCFA)",
+                    "Taux avance (%)",
+                ]
+                for col in ["CA (FCFA)", "Avances (FCFA)", "Reste (FCFA)"]:
+                    df_display_rank[col] = df_display_rank[col].apply(lambda x: f"{x:,.0f}")
+                df_display_rank["Taux avance (%)"] = df_display_rank["Taux avance (%)"].apply(lambda x: f"{x:.1f}")
+                st.dataframe(df_display_rank, use_container_width=True, hide_index=True)
+            else:
+                st.info("Aucune donnée de classement disponible pour la période.")
         
         st.markdown("---")
         
@@ -209,12 +281,12 @@ def afficher_page_comptabilite():
         with col1:
             st.markdown("#### Modèles les plus populaires")
             top_modeles = compta_controller.top_modeles(
-                couturier_id if not is_admin_user else None,
+                couturier_filtre_id,
                 statut=None,
                 date_debut=date_debut_filtre,
                 date_fin=date_fin_filtre,
                 limit=10,
-                salon_id=salon_id_user
+                salon_id=salon_filtre_id
             )
             if top_modeles:
                 labels = [m for m, _ in top_modeles]
@@ -254,11 +326,11 @@ def afficher_page_comptabilite():
         with col2:
             st.markdown("#### Répartition de l'argent reçu par modèle")
             repartition = compta_controller.repartition_argent_par_modele(
-                couturier_id if not is_admin_user else None,
+                couturier_filtre_id,
                 date_debut=date_debut_filtre,
                 date_fin=date_fin_filtre,
                 limit=10,
-                salon_id=salon_id_user
+                salon_id=salon_filtre_id
             )
             if repartition:
                 labels_r = [m for m, _ in repartition]
@@ -301,11 +373,11 @@ def afficher_page_comptabilite():
         with col_cat1:
             st.markdown("#### Montants perçus par modèle")
             repartition_cat = compta_controller.repartition_argent_par_modele(
-                couturier_id if not is_admin_user else None,
+                couturier_filtre_id,
                 date_debut=date_debut_filtre,
                 date_fin=date_fin_filtre,
                 limit=10,
-                salon_id=salon_id_user
+                salon_id=salon_filtre_id
             )
             if repartition_cat:
                 labels_c = [c for c, _ in repartition_cat]
@@ -344,11 +416,11 @@ def afficher_page_comptabilite():
         with col_cat2:
             st.markdown("#### Reste à percevoir par modèle")
             reste_cat = compta_controller.reste_par_modele(
-                couturier_id if not is_admin_user else None,
+                couturier_filtre_id,
                 date_debut=date_debut_filtre,
                 date_fin=date_fin_filtre,
                 limit=10,
-                salon_id=salon_id_user
+                salon_id=salon_filtre_id
             )
             if reste_cat:
                 labels_rc = [c for c, _, _ in reste_cat]
@@ -394,8 +466,8 @@ def afficher_page_comptabilite():
         
         # Récupérer la liste des clients
         clients = compta_controller.obtenir_liste_clients(
-            couturier_id if not is_admin_user else None,
-            salon_id=salon_id_user
+            couturier_filtre_id,
+            salon_id=salon_filtre_id
         )
         
         if clients:
@@ -452,8 +524,8 @@ def afficher_page_comptabilite():
         
         # Récupérer les commandes avec reste à payer
         commandes_relance = compta_controller.obtenir_commandes_a_relancer(
-            couturier_id if not is_admin_user else None,
-            salon_id=salon_id_user
+            couturier_filtre_id,
+            salon_id=salon_filtre_id
         )
         
         if commandes_relance:

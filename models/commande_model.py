@@ -382,6 +382,25 @@ class CommandeModel:
                     WHERE c.id = %s
                     """,
                 ),
+                (
+                    "minimal_legacy",
+                    """
+                    SELECT
+                        c.id, c.client_id, c.couturier_id,
+                        c.categorie, c.sexe, c.modele, c.mesures,
+                        c.prix_total, c.avance, c.reste,
+                        c.date_livraison, c.statut,
+                        c.date_creation,
+                        cl.nom as client_nom, cl.prenom as client_prenom,
+                        cl.telephone as client_telephone, cl.email as client_email,
+                        co.nom as couturier_nom, co.prenom as couturier_prenom,
+                        co.code_couturier as couturier_code
+                    FROM commandes c
+                    LEFT JOIN clients cl ON c.client_id = cl.id
+                    LEFT JOIN couturiers co ON c.couturier_id = co.id
+                    WHERE c.id = %s
+                    """,
+                ),
             ]
 
             result = None
@@ -452,17 +471,36 @@ class CommandeModel:
                     data['couturier_prenom'] = result[26] if num_cols > 26 else None
                     data['couturier_code'] = result[27] if num_cols > 27 else None
                 else:
-                    # legacy: sans salon_id ni PDF
+                    # legacy/minimal_legacy: sans salon_id ni PDF (+ potentiellement sans images)
                     data['pdf_data'] = None
                     data['pdf_name'] = None
                     data['pdf_path'] = None
-                    data['client_nom'] = result[20] if num_cols > 20 else None
-                    data['client_prenom'] = result[21] if num_cols > 21 else None
-                    data['client_telephone'] = result[22] if num_cols > 22 else None
-                    data['client_email'] = result[23] if num_cols > 23 else None
-                    data['couturier_nom'] = result[24] if num_cols > 24 else None
-                    data['couturier_prenom'] = result[25] if num_cols > 25 else None
-                    data['couturier_code'] = result[26] if num_cols > 26 else None
+                    if query_mode == "minimal_legacy":
+                        # Mapping dédié pour schémas très anciens:
+                        # pas de colonnes images/salon/pdf.
+                        data['fabric_image_path'] = None
+                        data['fabric_image'] = None
+                        data['fabric_image_name'] = None
+                        data['model_type'] = None
+                        data['model_image_path'] = None
+                        data['model_image'] = None
+                        data['model_image_name'] = None
+                        data['date_creation'] = result[12] if num_cols > 12 else None
+                        data['client_nom'] = result[13] if num_cols > 13 else None
+                        data['client_prenom'] = result[14] if num_cols > 14 else None
+                        data['client_telephone'] = result[15] if num_cols > 15 else None
+                        data['client_email'] = result[16] if num_cols > 16 else None
+                        data['couturier_nom'] = result[17] if num_cols > 17 else None
+                        data['couturier_prenom'] = result[18] if num_cols > 18 else None
+                        data['couturier_code'] = result[19] if num_cols > 19 else None
+                    else:
+                        data['client_nom'] = result[20] if num_cols > 20 else None
+                        data['client_prenom'] = result[21] if num_cols > 21 else None
+                        data['client_telephone'] = result[22] if num_cols > 22 else None
+                        data['client_email'] = result[23] if num_cols > 23 else None
+                        data['couturier_nom'] = result[24] if num_cols > 24 else None
+                        data['couturier_prenom'] = result[25] if num_cols > 25 else None
+                        data['couturier_code'] = result[26] if num_cols > 26 else None
                 # Normaliser le champ mesures: parser JSON si MySQL retourne une string
                 try:
                     import json as _json

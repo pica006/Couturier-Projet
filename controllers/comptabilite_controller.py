@@ -14,6 +14,8 @@ class ComptabiliteController:
         salon_id: Optional[str] = None,
     ) -> tuple[list[str], list]:
         """Construit un filtre de portée robuste (couturier ou salon)."""
+        if couturier_id is not None and salon_id is not None:
+            return (["couturier_id = %s", "salon_id = %s"], [couturier_id, salon_id])
         if couturier_id is not None:
             return (["couturier_id = %s"], [couturier_id])
         if salon_id is not None:
@@ -89,7 +91,20 @@ class ComptabiliteController:
         """Récupère la liste des clients avec leurs stats (par couturier ou par salon)."""
         try:
             cursor = self.db.get_connection().cursor()
-            if salon_id is not None:
+            if salon_id is not None and couturier_id is not None:
+                query = """
+                    SELECT c.nom, c.prenom, c.telephone,
+                           COUNT(cmd.id) as nb_commandes,
+                           COALESCE(SUM(cmd.prix_total), 0) as ca_total,
+                           COALESCE(SUM(cmd.reste), 0) as reste_total
+                    FROM clients c
+                    LEFT JOIN commandes cmd ON c.id = cmd.client_id
+                    WHERE c.salon_id = %s AND c.couturier_id = %s
+                    GROUP BY c.id, c.nom, c.prenom, c.telephone
+                    ORDER BY ca_total DESC
+                """
+                cursor.execute(query, (salon_id, couturier_id))
+            elif salon_id is not None:
                 query = """
                     SELECT c.nom, c.prenom, c.telephone, 
                            COUNT(cmd.id) as nb_commandes,
@@ -129,7 +144,26 @@ class ComptabiliteController:
         """
         try:
             cursor = self.db.get_connection().cursor()
-            if salon_id is not None:
+            if salon_id is not None and couturier_id is not None:
+                query = """
+                    SELECT cmd.id,
+                           cmd.modele,
+                           cmd.prix_total,
+                           cmd.avance,
+                           cmd.reste,
+                           cmd.date_creation,
+                           c.nom   AS client_nom,
+                           c.prenom AS client_prenom,
+                           c.telephone AS client_telephone,
+                           c.email AS client_email,
+                           cmd.pdf_path
+                    FROM commandes cmd
+                    JOIN clients c ON cmd.client_id = c.id
+                    WHERE cmd.salon_id = %s AND cmd.couturier_id = %s AND cmd.reste > 0
+                    ORDER BY cmd.date_creation DESC
+                """
+                cursor.execute(query, (salon_id, couturier_id))
+            elif salon_id is not None:
                 query = """
                     SELECT cmd.id,
                            cmd.modele,
@@ -188,6 +222,70 @@ class ComptabiliteController:
             return commandes
         except Exception as e:
             print(f"Erreur commandes relance: {e}")
+            return []
+
+    def classement_efficacite_couturiers(
+        self,
+        salon_id: str,
+        date_debut: Optional[datetime] = None,
+        date_fin: Optional[datetime] = None,
+    ) -> List[Dict]:
+        """Retourne un classement des couturiers d'un salon sur la période."""
+        try:
+            cursor = self.db.get_connection().cursor()
+            join_filters = []
+            join_params: list = []
+            if date_debut:
+                join_filters.append("cmd.date_creation >= %s")
+                join_params.append(date_debut)
+            if date_fin:
+                join_filters.append("cmd.date_creation <= %s")
+                join_params.append(date_fin)
+            join_clause = " AND " + " AND ".join(join_filters) if join_filters else ""
+
+            query = f"""
+                SELECT co.id,
+                       co.code_couturier,
+                       co.nom,
+                       co.prenom,
+                       COUNT(cmd.id) AS nb_commandes,
+                       COALESCE(SUM(cmd.prix_total), 0) AS ca_total,
+                       COALESCE(SUM(cmd.avance), 0) AS avances_total,
+                       COALESCE(SUM(cmd.reste), 0) AS reste_total
+                FROM couturiers co
+                LEFT JOIN commandes cmd
+                    ON cmd.couturier_id = co.id
+                    AND cmd.salon_id = co.salon_id
+                    {join_clause}
+                WHERE co.salon_id = %s
+                GROUP BY co.id, co.code_couturier, co.nom, co.prenom
+                ORDER BY ca_total DESC, nb_commandes DESC
+            """
+            cursor.execute(query, tuple(join_params + [salon_id]))
+            rows = cursor.fetchall()
+            cursor.close()
+
+            classement = []
+            for row in rows:
+                ca = float(row[5] or 0)
+                avances = float(row[6] or 0)
+                taux_avance = (avances / ca * 100) if ca > 0 else 0.0
+                classement.append(
+                    {
+                        "couturier_id": row[0],
+                        "code_couturier": row[1],
+                        "nom": row[2],
+                        "prenom": row[3],
+                        "nb_commandes": int(row[4] or 0),
+                        "ca_total": ca,
+                        "avances_total": avances,
+                        "reste_total": float(row[7] or 0),
+                        "taux_avance": taux_avance,
+                    }
+                )
+            return classement
+        except Exception as e:
+            print(f"Erreur classement efficacité couturiers: {e}")
             return []
 
     def top_modeles(
