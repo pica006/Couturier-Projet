@@ -134,44 +134,14 @@ def afficher_page_comptabilite():
         modeles_disponibles = []
 
     options_modeles = ["Tous"] + modeles_disponibles
-    col_modele, col_tri_clients, col_tri_relances = st.columns(3)
-    with col_modele:
-        modele_selectionne = st.selectbox(
-            "Rechercher un modèle (filtré par dates)",
-            options=options_modeles,
-            index=0,
-            help="Liste des modèles présents sur la période choisie"
-        )
-    tri_clients_labels = {
-        "CA décroissant": "ca_desc",
-        "CA croissant": "ca_asc",
-        "Reste à payer décroissant": "reste_desc",
-        "Reste à payer croissant": "reste_asc",
-        "Nombre de commandes décroissant": "nb_desc",
-        "Nombre de commandes croissant": "nb_asc",
-        "Nom A-Z": "nom_asc",
-        "Nom Z-A": "nom_desc",
-    }
-    with col_tri_clients:
-        tri_clients_selection = st.selectbox(
-            "Tri des clients",
-            options=list(tri_clients_labels.keys()),
-            index=0,
-        )
-    tri_relances_labels = {
-        "Date récente": "date_desc",
-        "Date ancienne": "date_asc",
-        "Reste décroissant": "reste_desc",
-        "Reste croissant": "reste_asc",
-        "Nom client A-Z": "nom_asc",
-        "Nom client Z-A": "nom_desc",
-    }
-    with col_tri_relances:
-        tri_relances_selection = st.selectbox(
-            "Tri des relances",
-            options=list(tri_relances_labels.keys()),
-            index=0,
-        )
+    modele_selectionne = st.selectbox(
+        "Rechercher un modèle (filtré par dates)",
+        options=options_modeles,
+        index=0,
+        help="Liste des modèles présents sur la période choisie",
+        key="compta_modele_filtre",
+    )
+    modele_filtre = None if modele_selectionne == "Tous" else modele_selectionne
     
     # ========================================================================
     # RÉCUPÉRATION DES DONNÉES
@@ -314,6 +284,7 @@ def afficher_page_comptabilite():
             top_modeles = compta_controller.top_modeles(
                 couturier_filtre_id,
                 statut=None,
+                modele=modele_filtre,
                 date_debut=date_debut_filtre,
                 date_fin=date_fin_filtre,
                 limit=10,
@@ -322,13 +293,6 @@ def afficher_page_comptabilite():
             if top_modeles:
                 labels = [m for m, _ in top_modeles]
                 counts = [c for _, c in top_modeles]
-                # Filtre éventuel par modèle sélectionné
-                if modele_selectionne != "Tous":
-                    filt = [(l, c) for l, c in zip(labels, counts) if l == modele_selectionne]
-                    if filt:
-                        labels, counts = [filt[0][0]], [filt[0][1]]
-                    else:
-                        labels, counts = [], []
                 if counts and sum(counts) > 0:
                     colors = plt.cm.Pastel1(range(len(labels)))
                     fig1, ax1 = plt.subplots()
@@ -361,17 +325,12 @@ def afficher_page_comptabilite():
                 date_debut=date_debut_filtre,
                 date_fin=date_fin_filtre,
                 limit=10,
-                salon_id=salon_filtre_id
+                salon_id=salon_filtre_id,
+                modele=modele_filtre,
             )
             if repartition:
                 labels_r = [m for m, _ in repartition]
                 montants = [float(s) for _, s in repartition]
-                if modele_selectionne != "Tous":
-                    filt = [(l, m) for l, m in zip(labels_r, montants) if l == modele_selectionne]
-                    if filt:
-                        labels_r, montants = [filt[0][0]], [filt[0][1]]
-                    else:
-                        labels_r, montants = [], []
                 if montants and sum(montants) > 0:
                     colors2 = plt.cm.Pastel2(range(len(labels_r)))
                     fig2, ax2 = plt.subplots()
@@ -408,17 +367,12 @@ def afficher_page_comptabilite():
                 date_debut=date_debut_filtre,
                 date_fin=date_fin_filtre,
                 limit=10,
-                salon_id=salon_filtre_id
+                salon_id=salon_filtre_id,
+                modele=modele_filtre,
             )
             if repartition_cat:
                 labels_c = [c for c, _ in repartition_cat]
                 montants_c = [float(s) for _, s in repartition_cat]
-                if modele_selectionne != "Tous":
-                    filt = [(l, m) for l, m in zip(labels_c, montants_c) if l == modele_selectionne]
-                    if filt:
-                        labels_c, montants_c = [filt[0][0]], [filt[0][1]]
-                    else:
-                        labels_c, montants_c = [], []
                 if montants_c and sum(montants_c) > 0:
                     colors3 = plt.cm.Set3(range(len(labels_c)))
                     fig3, ax3 = plt.subplots()
@@ -451,18 +405,13 @@ def afficher_page_comptabilite():
                 date_debut=date_debut_filtre,
                 date_fin=date_fin_filtre,
                 limit=10,
-                salon_id=salon_filtre_id
+                salon_id=salon_filtre_id,
+                modele=modele_filtre,
             )
             if reste_cat:
                 labels_rc = [c for c, _, _ in reste_cat]
                 montants_rc = [float(s) for _, s, _ in reste_cat]
                 counts_rc = [int(n) for _, _, n in reste_cat]
-                if modele_selectionne != "Tous":
-                    filt = [(l, m, n) for l, m, n in zip(labels_rc, montants_rc, counts_rc) if l == modele_selectionne]
-                    if filt:
-                        labels_rc, montants_rc, counts_rc = [filt[0][0]], [filt[0][1]], [filt[0][2]]
-                    else:
-                        labels_rc, montants_rc, counts_rc = [], [], []
                 if montants_rc and sum(montants_rc) > 0:
                     colors4 = plt.cm.Set2(range(len(labels_rc)))
                     fig4, ax4 = plt.subplots()
@@ -494,12 +443,37 @@ def afficher_page_comptabilite():
         # ====================================================================
         
         st.markdown("### 👥 Clients")
+        tri_client_label = st.selectbox(
+            "Trier les clients par",
+            options=[
+                "CA decroissant",
+                "CA croissant",
+                "Reste a payer decroissant",
+                "Reste a payer croissant",
+                "Nombre de commandes decroissant",
+                "Nombre de commandes croissant",
+                "Nom A-Z",
+                "Nom Z-A",
+            ],
+            index=0,
+            key="compta_tri_clients",
+        )
+        tri_client_map = {
+            "CA decroissant": "ca_desc",
+            "CA croissant": "ca_asc",
+            "Reste a payer decroissant": "reste_desc",
+            "Reste a payer croissant": "reste_asc",
+            "Nombre de commandes decroissant": "nb_desc",
+            "Nombre de commandes croissant": "nb_asc",
+            "Nom A-Z": "nom_asc",
+            "Nom Z-A": "nom_desc",
+        }
         
         # Récupérer la liste des clients (tri géré côté contrôleur)
         clients = compta_controller.obtenir_liste_clients_triee(
             couturier_id=couturier_filtre_id,
             salon_id=salon_filtre_id,
-            tri=tri_clients_labels[tri_clients_selection],
+            tri=tri_client_map[tri_client_label],
         )
         
         if clients:
@@ -540,6 +514,27 @@ def afficher_page_comptabilite():
         # ====================================================================
         
         st.markdown("### 🔔 Commandes à relancer")
+        tri_relance_label = st.selectbox(
+            "Trier les relances par",
+            options=[
+                "Date recente",
+                "Date ancienne",
+                "Reste decroissant",
+                "Reste croissant",
+                "Nom client A-Z",
+                "Nom client Z-A",
+            ],
+            index=0,
+            key="compta_tri_relances",
+        )
+        tri_relance_map = {
+            "Date recente": "date_desc",
+            "Date ancienne": "date_asc",
+            "Reste decroissant": "reste_desc",
+            "Reste croissant": "reste_asc",
+            "Nom client A-Z": "nom_asc",
+            "Nom client Z-A": "nom_desc",
+        }
         # Configurer l'email pour le salon courant
         db = st.session_state.db_connection
         smtp_config = None
@@ -556,12 +551,16 @@ def afficher_page_comptabilite():
         commandes_relance = compta_controller.obtenir_commandes_a_relancer(
             couturier_id=couturier_filtre_id,
             salon_id=salon_filtre_id,
-            tri=tri_relances_labels[tri_relances_selection],
+            tri=tri_relance_map[tri_relance_label],
         )
         
         if commandes_relance:
-            for cmd in commandes_relance:
-                with st.expander(f"📦 Commande #{cmd['id']} - {cmd['client_nom']} {cmd['client_prenom']}"):
+            for idx, cmd in enumerate(commandes_relance):
+                expander_label = (
+                    f"📦 Commande #{cmd['id']} - {cmd['client_nom']} {cmd['client_prenom']} "
+                    f"(#{idx + 1})"
+                )
+                with st.expander(expander_label):
                     col1, col2 = st.columns(2)
                     
                     with col1:
@@ -578,7 +577,7 @@ def afficher_page_comptabilite():
                     st.markdown("---")
                     if st.button(
                         "📧 Envoyer un rappel par email",
-                        key=f"relance_email_{cmd['id']}",
+                        key=f"relance_email_{cmd['id']}_{idx}",
                         use_container_width=True
                     ):
                         client_email = cmd.get('client_email')

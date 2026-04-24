@@ -362,6 +362,7 @@ class ComptabiliteController:
         self,
         couturier_id: Optional[int] = None,
         statut: Optional[str] = None,
+        modele: Optional[str] = None,
         date_debut: Optional[datetime] = None,
         date_fin: Optional[datetime] = None,
         limit: int = 10,
@@ -376,6 +377,9 @@ class ComptabiliteController:
             if statut:
                 where.append("statut = %s")
                 params.append(statut)
+            if modele:
+                where.append("COALESCE(NULLIF(TRIM(modele), ''), 'Non renseigné') = %s")
+                params.append(modele)
             if date_debut:
                 where.append("date_creation >= %s")
                 params.append(date_debut)
@@ -401,7 +405,8 @@ class ComptabiliteController:
                                       date_debut: Optional[datetime] = None,
                                       date_fin: Optional[datetime] = None,
                                       limit: int = 10,
-                                      salon_id: Optional[str] = None):
+                                      salon_id: Optional[str] = None,
+                                      modele: Optional[str] = None):
         """Retourne la somme des avances reçues par modèle, triée décroissante.
 
         Args:
@@ -418,6 +423,9 @@ class ComptabiliteController:
             where, params = self._build_scope_where(couturier_id=couturier_id, salon_id=salon_id)
             if not where:
                 return []
+            if modele:
+                where.append("COALESCE(NULLIF(TRIM(modele), ''), 'Non renseigné') = %s")
+                params.append(modele)
             if date_debut:
                 where.append("date_creation >= %s")
                 params.append(date_debut)
@@ -549,7 +557,8 @@ class ComptabiliteController:
                           date_debut: Optional[datetime] = None,
                           date_fin: Optional[datetime] = None,
                           limit: Optional[int] = None,
-                          salon_id: Optional[str] = None):
+                          salon_id: Optional[str] = None,
+                          modele: Optional[str] = None):
         """Retourne la somme du reste à percevoir par modèle, avec le nombre de vêtements.
 
         Returns:
@@ -560,6 +569,9 @@ class ComptabiliteController:
             where, params = self._build_scope_where(couturier_id=couturier_id, salon_id=salon_id)
             if not where:
                 return []
+            if modele:
+                where.append("COALESCE(NULLIF(TRIM(modele), ''), 'Non renseigné') = %s")
+                params.append(modele)
             if date_debut:
                 where.append("date_creation >= %s")
                 params.append(date_debut)
