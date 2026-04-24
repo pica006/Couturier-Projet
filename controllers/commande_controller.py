@@ -179,7 +179,6 @@ class CommandeController:
                 LEFT JOIN clients cl ON c.client_id = cl.id
                 LEFT JOIN couturiers co ON c.couturier_id = co.id
                 WHERE c.id = %s
-                  AND COALESCE(c.est_supprime, FALSE) = FALSE
             """
             params: List = [commande_id]
             if couturier_id is not None:

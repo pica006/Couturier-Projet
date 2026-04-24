@@ -431,11 +431,15 @@ def afficher_page_liste_commandes():
             if not commande_ids:
                 afficher_info_minimale("Sélectionnez des filtres pour voir les commandes")
             else:
+                def _on_commande_change():
+                    st.rerun()
+
                 commande_selectionnee = st.selectbox(
                     "Sélectionnez une commande",
                     options=commande_ids,
                     format_func=lambda x: f"Commande #{x} - {next((c['client_prenom'] + ' ' + c['client_nom'] for c in commandes_filtrees if c['id'] == x), 'N/A')}",
                     key="select_commande_details",
+                    on_change=_on_commande_change,
                 )
                 
                 if commande_selectionnee:
