@@ -7,6 +7,25 @@ from models.database import DatabaseConnection
 class ComptabiliteController:
     def __init__(self, db_connection: DatabaseConnection):
         self.db = db_connection
+
+    def _build_scope_where(
+        self,
+        couturier_id: Optional[int] = None,
+        salon_id: Optional[str] = None,
+    ) -> tuple[list[str], list]:
+        """Construit un filtre de portée robuste (couturier ou salon)."""
+        if couturier_id is not None:
+            return (["couturier_id = %s"], [couturier_id])
+        if salon_id is not None:
+            # Priorité à la colonne commandes.salon_id.
+            # Fallback via couturiers pour compatibilité des anciennes données.
+            return (
+                [
+                    "(salon_id = %s OR couturier_id IN (SELECT id FROM couturiers WHERE salon_id = %s))"
+                ],
+                [salon_id, salon_id],
+            )
+        return ([], [])
     
     def obtenir_statistiques(
         self,
@@ -18,21 +37,17 @@ class ComptabiliteController:
         """Calcule les statistiques financières (par couturier ou par salon)."""
         try:
             cursor = self.db.get_connection().cursor()
-            if couturier_id is not None:
-                where_clause = "WHERE couturier_id = %s"
-                params: list = [couturier_id]
-            elif salon_id is not None:
-                where_clause = "WHERE couturier_id IN (SELECT id FROM couturiers WHERE salon_id = %s)"
-                params = [salon_id]
-            else:
+            where, params = self._build_scope_where(couturier_id=couturier_id, salon_id=salon_id)
+            if not where:
                 return {'nb_commandes': 0, 'ca_total': 0, 'avances_total': 0, 'reste_total': 0, 'taux_avance': 0, 'commandes_par_statut': {}, 'top_modeles': []}
 
             if date_debut:
-                where_clause += " AND date_creation >= %s"
+                where.append("date_creation >= %s")
                 params.append(date_debut)
             if date_fin:
-                where_clause += " AND date_creation <= %s"
+                where.append("date_creation <= %s")
                 params.append(date_fin)
+            where_clause = "WHERE " + " AND ".join(where)
 
             # Stats financières
             query = f"SELECT COUNT(*), COALESCE(SUM(prix_total), 0), COALESCE(SUM(avance), 0), COALESCE(SUM(reste), 0) FROM commandes {where_clause}"
@@ -187,13 +202,8 @@ class ComptabiliteController:
         """Retourne le top des modèles (par couturier ou par salon)."""
         try:
             cursor = self.db.get_connection().cursor()
-            if couturier_id is not None:
-                where = ["couturier_id = %s"]
-                params: list = [couturier_id]
-            elif salon_id is not None:
-                where = ["couturier_id IN (SELECT id FROM couturiers WHERE salon_id = %s)"]
-                params = [salon_id]
-            else:
+            where, params = self._build_scope_where(couturier_id=couturier_id, salon_id=salon_id)
+            if not where:
                 return []
             if statut:
                 where.append("statut = %s")
@@ -206,8 +216,9 @@ class ComptabiliteController:
                 params.append(date_fin)
             where_clause = " WHERE " + " AND ".join(where)
             query = (
-                f"SELECT modele, COUNT(*) FROM commandes{where_clause} "
-                "GROUP BY modele ORDER BY COUNT(*) DESC LIMIT %s"
+                "SELECT COALESCE(NULLIF(TRIM(modele), ''), 'Non renseigné') as modele_label, COUNT(*) "
+                f"FROM commandes{where_clause} "
+                "GROUP BY modele_label ORDER BY COUNT(*) DESC LIMIT %s"
             )
             params.append(limit)
             cursor.execute(query, tuple(params))
@@ -236,12 +247,9 @@ class ComptabiliteController:
         """
         try:
             cursor = self.db.get_connection().cursor()
-            if salon_id is not None:
-                where = ["couturier_id IN (SELECT id FROM couturiers WHERE salon_id = %s)"]
-                params: list = [salon_id]
-            else:
-                where = ["couturier_id = %s"]
-                params = [couturier_id]
+            where, params = self._build_scope_where(couturier_id=couturier_id, salon_id=salon_id)
+            if not where:
+                return []
             if date_debut:
                 where.append("date_creation >= %s")
                 params.append(date_debut)
@@ -250,8 +258,10 @@ class ComptabiliteController:
                 params.append(date_fin)
             where_clause = " WHERE " + " AND ".join(where)
             query = (
-                f"SELECT modele, COALESCE(SUM(avance), 0) as somme_avances FROM commandes{where_clause} "
-                "GROUP BY modele ORDER BY somme_avances DESC LIMIT %s"
+                "SELECT COALESCE(NULLIF(TRIM(modele), ''), 'Non renseigné') as modele_label, "
+                "COALESCE(SUM(avance), 0) as somme_avances "
+                f"FROM commandes{where_clause} "
+                "GROUP BY modele_label ORDER BY somme_avances DESC LIMIT %s"
             )
             params.append(limit)
             cursor.execute(query, tuple(params))
@@ -310,12 +320,9 @@ class ComptabiliteController:
         """Liste les modèles existants dans la période, triés par fréquence décroissante."""
         try:
             cursor = self.db.get_connection().cursor()
-            if salon_id is not None:
-                where = ["couturier_id IN (SELECT id FROM couturiers WHERE salon_id = %s)"]
-                params: list = [salon_id]
-            else:
-                where = ["couturier_id = %s"]
-                params = [couturier_id]
+            where, params = self._build_scope_where(couturier_id=couturier_id, salon_id=salon_id)
+            if not where:
+                return []
             if date_debut:
                 where.append("date_creation >= %s")
                 params.append(date_debut)
@@ -324,7 +331,8 @@ class ComptabiliteController:
                 params.append(date_fin)
             where_clause = " WHERE " + " AND ".join(where)
             query = (
-                f"SELECT modele, COUNT(*) as n FROM commandes{where_clause} GROUP BY modele ORDER BY n DESC"
+                "SELECT COALESCE(NULLIF(TRIM(modele), ''), 'Non renseigné') as modele_label, COUNT(*) as n "
+                f"FROM commandes{where_clause} GROUP BY modele_label ORDER BY n DESC"
             )
             cursor.execute(query, tuple(params))
             rows = cursor.fetchall()
@@ -381,12 +389,9 @@ class ComptabiliteController:
         """
         try:
             cursor = self.db.get_connection().cursor()
-            if salon_id is not None:
-                where = ["couturier_id IN (SELECT id FROM couturiers WHERE salon_id = %s)"]
-                params: list = [salon_id]
-            else:
-                where = ["couturier_id = %s"]
-                params = [couturier_id]
+            where, params = self._build_scope_where(couturier_id=couturier_id, salon_id=salon_id)
+            if not where:
+                return []
             if date_debut:
                 where.append("date_creation >= %s")
                 params.append(date_debut)
@@ -395,8 +400,9 @@ class ComptabiliteController:
                 params.append(date_fin)
             where_clause = " WHERE " + " AND ".join(where)
             query = (
-                f"SELECT modele, COALESCE(SUM(reste), 0) as somme_reste, COUNT(*) as nb_items FROM commandes{where_clause} "
-                "GROUP BY modele ORDER BY somme_reste DESC"
+                "SELECT COALESCE(NULLIF(TRIM(modele), ''), 'Non renseigné') as modele_label, "
+                f"COALESCE(SUM(reste), 0) as somme_reste, COUNT(*) as nb_items FROM commandes{where_clause} "
+                "GROUP BY modele_label ORDER BY somme_reste DESC"
             )
             if limit is not None:
                 query += " LIMIT %s"

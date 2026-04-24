@@ -52,6 +52,11 @@ def afficher_page_comptabilite():
         if is_admin_user
         else None
     )
+    if is_admin_user and not salon_id_user:
+        st.warning(
+            "⚠️ Aucun salon trouvé pour votre compte admin. "
+            "Affichage basculé sur vos propres commandes uniquement."
+        )
     
     # Contrôleur (créé une seule fois)
     try:
@@ -95,7 +100,7 @@ def afficher_page_comptabilite():
     # ========================================================================
     try:
         modeles_disponibles = compta_controller.lister_modeles_par_periode(
-            couturier_id,
+            couturier_id if not is_admin_user else None,
             date_debut_filtre,
             date_fin_filtre,
             salon_id=salon_id_user
@@ -305,6 +310,12 @@ def afficher_page_comptabilite():
             if repartition_cat:
                 labels_c = [c for c, _ in repartition_cat]
                 montants_c = [float(s) for _, s in repartition_cat]
+                if modele_selectionne != "Tous":
+                    filt = [(l, m) for l, m in zip(labels_c, montants_c) if l == modele_selectionne]
+                    if filt:
+                        labels_c, montants_c = [filt[0][0]], [filt[0][1]]
+                    else:
+                        labels_c, montants_c = [], []
                 if montants_c and sum(montants_c) > 0:
                     colors3 = plt.cm.Set3(range(len(labels_c)))
                     fig3, ax3 = plt.subplots()
@@ -343,6 +354,12 @@ def afficher_page_comptabilite():
                 labels_rc = [c for c, _, _ in reste_cat]
                 montants_rc = [float(s) for _, s, _ in reste_cat]
                 counts_rc = [int(n) for _, _, n in reste_cat]
+                if modele_selectionne != "Tous":
+                    filt = [(l, m, n) for l, m, n in zip(labels_rc, montants_rc, counts_rc) if l == modele_selectionne]
+                    if filt:
+                        labels_rc, montants_rc, counts_rc = [filt[0][0]], [filt[0][1]], [filt[0][2]]
+                    else:
+                        labels_rc, montants_rc, counts_rc = [], [], []
                 if montants_rc and sum(montants_rc) > 0:
                     colors4 = plt.cm.Set2(range(len(labels_rc)))
                     fig4, ax4 = plt.subplots()
