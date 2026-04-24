@@ -20,7 +20,6 @@ import streamlit as st
 from datetime import datetime, timedelta
 import pandas as pd
 import matplotlib.pyplot as plt
-from controllers.email_controller import EmailController
 from models.database import CouturierModel
 from models.salon_model import SalonModel
 from utils.role_utils import obtenir_salon_id_resolu, est_admin
@@ -122,7 +121,7 @@ def afficher_page_comptabilite():
     st.markdown("---")
 
     # ========================================================================
-    # RECHERCHE PAR MODÈLE (dynamique selon l'intervalle)
+    # RECHERCHE PAR MODÈLE + TRIS (dynamique selon l'intervalle)
     # ========================================================================
     try:
         modeles_disponibles = compta_controller.lister_modeles_par_periode(
@@ -135,12 +134,44 @@ def afficher_page_comptabilite():
         modeles_disponibles = []
 
     options_modeles = ["Tous"] + modeles_disponibles
-    modele_selectionne = st.selectbox(
-        "Rechercher un modèle (filtré par dates)",
-        options=options_modeles,
-        index=0,
-        help="Liste des modèles présents sur la période choisie"
-    )
+    col_modele, col_tri_clients, col_tri_relances = st.columns(3)
+    with col_modele:
+        modele_selectionne = st.selectbox(
+            "Rechercher un modèle (filtré par dates)",
+            options=options_modeles,
+            index=0,
+            help="Liste des modèles présents sur la période choisie"
+        )
+    tri_clients_labels = {
+        "CA décroissant": "ca_desc",
+        "CA croissant": "ca_asc",
+        "Reste à payer décroissant": "reste_desc",
+        "Reste à payer croissant": "reste_asc",
+        "Nombre de commandes décroissant": "nb_desc",
+        "Nombre de commandes croissant": "nb_asc",
+        "Nom A-Z": "nom_asc",
+        "Nom Z-A": "nom_desc",
+    }
+    with col_tri_clients:
+        tri_clients_selection = st.selectbox(
+            "Tri des clients",
+            options=list(tri_clients_labels.keys()),
+            index=0,
+        )
+    tri_relances_labels = {
+        "Date récente": "date_desc",
+        "Date ancienne": "date_asc",
+        "Reste décroissant": "reste_desc",
+        "Reste croissant": "reste_asc",
+        "Nom client A-Z": "nom_asc",
+        "Nom client Z-A": "nom_desc",
+    }
+    with col_tri_relances:
+        tri_relances_selection = st.selectbox(
+            "Tri des relances",
+            options=list(tri_relances_labels.keys()),
+            index=0,
+        )
     
     # ========================================================================
     # RÉCUPÉRATION DES DONNÉES
@@ -464,10 +495,11 @@ def afficher_page_comptabilite():
         
         st.markdown("### 👥 Clients")
         
-        # Récupérer la liste des clients
-        clients = compta_controller.obtenir_liste_clients(
-            couturier_filtre_id,
-            salon_id=salon_filtre_id
+        # Récupérer la liste des clients (tri géré côté contrôleur)
+        clients = compta_controller.obtenir_liste_clients_triee(
+            couturier_id=couturier_filtre_id,
+            salon_id=salon_filtre_id,
+            tri=tri_clients_labels[tri_clients_selection],
         )
         
         if clients:
@@ -520,12 +552,11 @@ def afficher_page_comptabilite():
         except Exception:
             smtp_config = None
 
-        email_controller = EmailController(smtp_config=smtp_config)
-        
-        # Récupérer les commandes avec reste à payer
+        # Récupérer les commandes avec reste à payer (tri géré côté contrôleur)
         commandes_relance = compta_controller.obtenir_commandes_a_relancer(
-            couturier_filtre_id,
-            salon_id=salon_filtre_id
+            couturier_id=couturier_filtre_id,
+            salon_id=salon_filtre_id,
+            tri=tri_relances_labels[tri_relances_selection],
         )
         
         if commandes_relance:
@@ -554,27 +585,10 @@ def afficher_page_comptabilite():
                         if not client_email:
                             st.error("❌ Email de rappel non envoyé : adresse email du client manquante.")
                         else:
-                            subject = f"Rappel de paiement - Commande #{cmd['id']}"
-                            body = (
-                                f"Bonjour {cmd.get('client_prenom', '')} {cmd.get('client_nom', '')},\n\n"
-                                f"Nous vous rappelons le solde de votre commande.\n\n"
-                                f"Commande: #{cmd['id']}\n"
-                                f"Modèle: {cmd.get('modele', 'N/A')}\n"
-                                f"Prix total: {cmd.get('prix_total', 0):,.0f} FCFA\n"
-                                f"Avance: {cmd.get('avance', 0):,.0f} FCFA\n"
-                                f"Reste à payer: {cmd.get('reste', 0):,.0f} FCFA\n\n"
-                                "Vous trouverez en pièce jointe votre fiche de commande (PDF), "
-                                "si elle a été générée lors de l'enregistrement.\n\n"
-                                "Merci pour votre confiance."
-                            )
-                            pdf_path = cmd.get('pdf_path')
-                            attachments = [pdf_path] if pdf_path else None
                             with st.spinner("📧 Envoi du rappel par email..."):
-                                succes, message = email_controller.envoyer_email_avec_message(
-                                    client_email,
-                                    subject,
-                                    body,
-                                    attachments=attachments
+                                succes, message = compta_controller.envoyer_rappel_email_commande(
+                                    commande=cmd,
+                                    smtp_config=smtp_config,
                                 )
                             if succes:
                                 st.success(f"✅ {message}")

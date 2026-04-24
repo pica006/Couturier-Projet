@@ -1,10 +1,30 @@
 """Contrôleur pour la comptabilité"""
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 from datetime import datetime
 from models.database import DatabaseConnection
+from controllers.email_controller import EmailController
 
 
 class ComptabiliteController:
+    TRI_CLIENTS_ORDER_BY = {
+        "ca_desc": "ca_total DESC",
+        "ca_asc": "ca_total ASC",
+        "reste_desc": "reste_total DESC",
+        "reste_asc": "reste_total ASC",
+        "nb_desc": "nb_commandes DESC",
+        "nb_asc": "nb_commandes ASC",
+        "nom_asc": "c.nom ASC, c.prenom ASC",
+        "nom_desc": "c.nom DESC, c.prenom DESC",
+    }
+    TRI_RELANCES_ORDER_BY = {
+        "date_desc": "cmd.date_creation DESC",
+        "date_asc": "cmd.date_creation ASC",
+        "reste_desc": "cmd.reste DESC",
+        "reste_asc": "cmd.reste ASC",
+        "nom_asc": "c.nom ASC, c.prenom ASC",
+        "nom_desc": "c.nom DESC, c.prenom DESC",
+    }
+
     def __init__(self, db_connection: DatabaseConnection):
         self.db = db_connection
 
@@ -87,10 +107,16 @@ class ComptabiliteController:
             print(f"Erreur stats: {e}")
             return {'nb_commandes': 0, 'ca_total': 0, 'avances_total': 0, 'reste_total': 0, 'taux_avance': 0, 'commandes_par_statut': {}, 'top_modeles': []}
     
-    def obtenir_liste_clients(self, couturier_id: Optional[int] = None, salon_id: Optional[str] = None) -> List:
-        """Récupère la liste des clients avec leurs stats (par couturier ou par salon)."""
+    def obtenir_liste_clients_triee(
+        self,
+        couturier_id: Optional[int] = None,
+        salon_id: Optional[str] = None,
+        tri: str = "ca_desc",
+    ) -> List:
+        """Récupère la liste des clients avec tri SQL contrôlé."""
         try:
             cursor = self.db.get_connection().cursor()
+            order_by = self.TRI_CLIENTS_ORDER_BY.get(tri, self.TRI_CLIENTS_ORDER_BY["ca_desc"])
             if salon_id is not None and couturier_id is not None:
                 query = """
                     SELECT c.nom, c.prenom, c.telephone,
@@ -101,7 +127,7 @@ class ComptabiliteController:
                     LEFT JOIN commandes cmd ON c.id = cmd.client_id
                     WHERE c.salon_id = %s AND c.couturier_id = %s
                     GROUP BY c.id, c.nom, c.prenom, c.telephone
-                    ORDER BY ca_total DESC
+                    ORDER BY """ + order_by
                 """
                 cursor.execute(query, (salon_id, couturier_id))
             elif salon_id is not None:
@@ -114,7 +140,7 @@ class ComptabiliteController:
                     LEFT JOIN commandes cmd ON c.id = cmd.client_id
                     WHERE c.salon_id = %s
                     GROUP BY c.id, c.nom, c.prenom, c.telephone
-                    ORDER BY ca_total DESC
+                    ORDER BY """ + order_by
                 """
                 cursor.execute(query, (salon_id,))
             else:
@@ -127,7 +153,7 @@ class ComptabiliteController:
                     LEFT JOIN commandes cmd ON c.id = cmd.client_id
                     WHERE c.couturier_id = %s
                     GROUP BY c.id, c.nom, c.prenom, c.telephone
-                    ORDER BY ca_total DESC
+                    ORDER BY """ + order_by
                 """
                 cursor.execute(query, (couturier_id,))
             clients = cursor.fetchall()
@@ -136,14 +162,24 @@ class ComptabiliteController:
         except Exception as e:
             print(f"Erreur clients: {e}")
             return []
+
+    def obtenir_liste_clients(self, couturier_id: Optional[int] = None, salon_id: Optional[str] = None) -> List:
+        """Compatibilité: conserve la méthode historique avec tri par CA décroissant."""
+        return self.obtenir_liste_clients_triee(couturier_id=couturier_id, salon_id=salon_id, tri="ca_desc")
     
-    def obtenir_commandes_a_relancer(self, couturier_id: Optional[int] = None, salon_id: Optional[str] = None) -> List[Dict]:
+    def obtenir_commandes_a_relancer(
+        self,
+        couturier_id: Optional[int] = None,
+        salon_id: Optional[str] = None,
+        tri: str = "date_desc",
+    ) -> List[Dict]:
         """Récupère les commandes avec reste à payer (pour relance client).
         
         Inclut le chemin PDF si disponible pour pouvoir l'ajouter en pièce jointe.
         """
         try:
             cursor = self.db.get_connection().cursor()
+            order_by = self.TRI_RELANCES_ORDER_BY.get(tri, self.TRI_RELANCES_ORDER_BY["date_desc"])
             if salon_id is not None and couturier_id is not None:
                 query = """
                     SELECT cmd.id,
@@ -160,7 +196,7 @@ class ComptabiliteController:
                     FROM commandes cmd
                     JOIN clients c ON cmd.client_id = c.id
                     WHERE cmd.salon_id = %s AND cmd.couturier_id = %s AND cmd.reste > 0
-                    ORDER BY cmd.date_creation DESC
+                    ORDER BY """ + order_by
                 """
                 cursor.execute(query, (salon_id, couturier_id))
             elif salon_id is not None:
@@ -179,7 +215,7 @@ class ComptabiliteController:
                     FROM commandes cmd
                     JOIN clients c ON cmd.client_id = c.id
                     WHERE cmd.salon_id = %s AND cmd.reste > 0
-                    ORDER BY cmd.date_creation DESC
+                    ORDER BY """ + order_by
                 """
                 cursor.execute(query, (salon_id,))
             else:
@@ -198,7 +234,7 @@ class ComptabiliteController:
                     FROM commandes cmd
                     JOIN clients c ON cmd.client_id = c.id
                     WHERE cmd.couturier_id = %s AND cmd.reste > 0
-                    ORDER BY cmd.date_creation DESC
+                    ORDER BY """ + order_by
                 """
                 cursor.execute(query, (couturier_id,))
             results = cursor.fetchall()
@@ -223,6 +259,40 @@ class ComptabiliteController:
         except Exception as e:
             print(f"Erreur commandes relance: {e}")
             return []
+
+    def envoyer_rappel_email_commande(
+        self,
+        commande: Dict,
+        smtp_config: Optional[Dict] = None,
+    ) -> Tuple[bool, str]:
+        """Envoie un rappel email pour une commande donnée."""
+        client_email = commande.get("client_email")
+        if not client_email:
+            return False, "Adresse email du client manquante."
+
+        subject = f"Rappel de paiement - Commande #{commande.get('id')}"
+        body = (
+            f"Bonjour {commande.get('client_prenom', '')} {commande.get('client_nom', '')},\n\n"
+            "Nous vous rappelons le solde de votre commande.\n\n"
+            f"Commande: #{commande.get('id')}\n"
+            f"Modèle: {commande.get('modele', 'N/A')}\n"
+            f"Prix total: {float(commande.get('prix_total', 0) or 0):,.0f} FCFA\n"
+            f"Avance: {float(commande.get('avance', 0) or 0):,.0f} FCFA\n"
+            f"Reste à payer: {float(commande.get('reste', 0) or 0):,.0f} FCFA\n\n"
+            "Vous trouverez en pièce jointe votre fiche de commande (PDF), "
+            "si elle a été générée lors de l'enregistrement.\n\n"
+            "Merci pour votre confiance."
+        )
+        attachment_path = commande.get("pdf_path")
+        attachments = [attachment_path] if attachment_path else None
+
+        email_controller = EmailController(smtp_config=smtp_config)
+        return email_controller.envoyer_email_avec_message(
+            client_email,
+            subject,
+            body,
+            attachments=attachments,
+        )
 
     def classement_efficacite_couturiers(
         self,
