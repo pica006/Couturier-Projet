@@ -113,49 +113,66 @@ class ComptabiliteController:
         salon_id: Optional[str] = None,
         tri: str = "ca_desc",
     ) -> List:
-        """Récupère la liste des clients avec tri SQL contrôlé."""
+        """Récupère la liste des clients avec tri SQL contrôlé.
+
+        Portée alignée sur le reste de l'app :
+        - employé : clients du couturier + commandes de ce couturier uniquement ;
+        - admin salon : clients rattachés au salon via ``couturiers.salon_id`` (comme
+          ``compter_clients_distincts_salon``) + commandes du salon (salon_id ou
+          couturier du salon).
+        """
         try:
             cursor = self.db.get_connection().cursor()
             order_by = self.TRI_CLIENTS_ORDER_BY.get(tri, self.TRI_CLIENTS_ORDER_BY["ca_desc"])
             if salon_id is not None and couturier_id is not None:
                 query = f"""
                     SELECT c.nom, c.prenom, c.telephone,
-                           COUNT(cmd.id) as nb_commandes,
-                           COALESCE(SUM(cmd.prix_total), 0) as ca_total,
-                           COALESCE(SUM(cmd.reste), 0) as reste_total
+                           COUNT(cmd.id) AS nb_commandes,
+                           COALESCE(SUM(cmd.prix_total), 0) AS ca_total,
+                           COALESCE(SUM(cmd.reste), 0) AS reste_total
                     FROM clients c
+                    INNER JOIN couturiers ct ON c.couturier_id = ct.id
                     LEFT JOIN commandes cmd ON c.id = cmd.client_id
-                    WHERE c.salon_id = %s AND c.couturier_id = %s
+                        AND cmd.couturier_id = %s
+                    WHERE ct.salon_id = %s AND c.couturier_id = %s
                     GROUP BY c.id, c.nom, c.prenom, c.telephone
                     ORDER BY {order_by}
                 """
-                cursor.execute(query, (salon_id, couturier_id))
+                cursor.execute(query, (couturier_id, salon_id, couturier_id))
             elif salon_id is not None:
                 query = f"""
-                    SELECT c.nom, c.prenom, c.telephone, 
-                           COUNT(cmd.id) as nb_commandes,
-                           COALESCE(SUM(cmd.prix_total), 0) as ca_total,
-                           COALESCE(SUM(cmd.reste), 0) as reste_total
+                    SELECT c.nom, c.prenom, c.telephone,
+                           COUNT(cmd.id) AS nb_commandes,
+                           COALESCE(SUM(cmd.prix_total), 0) AS ca_total,
+                           COALESCE(SUM(cmd.reste), 0) AS reste_total
                     FROM clients c
+                    INNER JOIN couturiers ct ON c.couturier_id = ct.id
                     LEFT JOIN commandes cmd ON c.id = cmd.client_id
-                    WHERE c.salon_id = %s
+                        AND (
+                            cmd.salon_id = %s
+                            OR cmd.couturier_id IN (
+                                SELECT id FROM couturiers WHERE salon_id = %s
+                            )
+                        )
+                    WHERE ct.salon_id = %s
                     GROUP BY c.id, c.nom, c.prenom, c.telephone
                     ORDER BY {order_by}
                 """
-                cursor.execute(query, (salon_id,))
+                cursor.execute(query, (salon_id, salon_id, salon_id))
             else:
                 query = f"""
-                    SELECT c.nom, c.prenom, c.telephone, 
-                           COUNT(cmd.id) as nb_commandes,
-                           COALESCE(SUM(cmd.prix_total), 0) as ca_total,
-                           COALESCE(SUM(cmd.reste), 0) as reste_total
+                    SELECT c.nom, c.prenom, c.telephone,
+                           COUNT(cmd.id) AS nb_commandes,
+                           COALESCE(SUM(cmd.prix_total), 0) AS ca_total,
+                           COALESCE(SUM(cmd.reste), 0) AS reste_total
                     FROM clients c
                     LEFT JOIN commandes cmd ON c.id = cmd.client_id
+                        AND cmd.couturier_id = %s
                     WHERE c.couturier_id = %s
                     GROUP BY c.id, c.nom, c.prenom, c.telephone
                     ORDER BY {order_by}
                 """
-                cursor.execute(query, (couturier_id,))
+                cursor.execute(query, (couturier_id, couturier_id))
             clients = cursor.fetchall()
             cursor.close()
             return clients

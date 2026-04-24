@@ -19,6 +19,9 @@ FONCTIONNALITÉS :
 import streamlit as st
 from datetime import datetime, timedelta
 import pandas as pd
+import matplotlib
+
+matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from models.database import CouturierModel
 from models.salon_model import SalonModel
@@ -203,6 +206,23 @@ def afficher_page_comptabilite():
 
         if is_admin_user and salon_filtre_id:
             st.markdown("### 🏆 Efficacité des couturiers")
+            tri_classement = st.selectbox(
+                "Trier le classement par",
+                options=[
+                    "CA décroissant",
+                    "CA croissant",
+                    "Nombre de commandes décroissant",
+                    "Nombre de commandes croissant",
+                    "Taux d'avance décroissant",
+                    "Taux d'avance croissant",
+                    "Reste à percevoir décroissant",
+                    "Reste à percevoir croissant",
+                    "Nom du couturier A-Z",
+                    "Nom du couturier Z-A",
+                ],
+                index=0,
+                key="compta_tri_classement_salon",
+            )
             classement = compta_controller.classement_efficacite_couturiers(
                 salon_id=salon_filtre_id,
                 date_debut=date_debut_filtre,
@@ -217,10 +237,23 @@ def afficher_page_comptabilite():
                     + " "
                     + df_ranking["nom"].fillna("")
                 ).str.strip()
-                df_ranking = df_ranking.sort_values(
-                    by=["ca_total", "nb_commandes", "taux_avance"],
-                    ascending=[False, False, False],
-                ).reset_index(drop=True)
+                nom_tri = (df_ranking["nom"].fillna("") + " " + df_ranking["prenom"].fillna("")).str.strip()
+                sort_map = {
+                    "CA décroissant": (["ca_total"], [False]),
+                    "CA croissant": (["ca_total"], [True]),
+                    "Nombre de commandes décroissant": (["nb_commandes"], [False]),
+                    "Nombre de commandes croissant": (["nb_commandes"], [True]),
+                    "Taux d'avance décroissant": (["taux_avance"], [False]),
+                    "Taux d'avance croissant": (["taux_avance"], [True]),
+                    "Reste à percevoir décroissant": (["reste_total"], [False]),
+                    "Reste à percevoir croissant": (["reste_total"], [True]),
+                    "Nom du couturier A-Z": (["nom_tri"], [True]),
+                    "Nom du couturier Z-A": (["nom_tri"], [False]),
+                }
+                cols, asc = sort_map.get(tri_classement, (["ca_total"], [False]))
+                if "nom_tri" in cols:
+                    df_ranking = df_ranking.assign(nom_tri=nom_tri)
+                df_ranking = df_ranking.sort_values(by=cols, ascending=asc).reset_index(drop=True)
                 df_ranking["Rang"] = df_ranking.index + 1
                 top = df_ranking.iloc[0]
                 st.success(
@@ -276,20 +309,29 @@ def afficher_page_comptabilite():
                 return f"{pct:.1f}%\n{int(round(val))}"
             return _autopct
 
+        top_modeles = compta_controller.top_modeles(
+            couturier_filtre_id,
+            statut=None,
+            modele=modele_filtre,
+            date_debut=date_debut_filtre,
+            date_fin=date_fin_filtre,
+            limit=10,
+            salon_id=salon_filtre_id,
+        )
+        repartition = compta_controller.repartition_argent_par_modele(
+            couturier_filtre_id,
+            date_debut=date_debut_filtre,
+            date_fin=date_fin_filtre,
+            limit=10,
+            salon_id=salon_filtre_id,
+            modele=modele_filtre,
+        )
+
         col1, col2 = st.columns(2)
         
         # Graphique 1 : Modèles les plus populaires (camembert par nombre de commandes)
         with col1:
             st.markdown("#### Modèles les plus populaires")
-            top_modeles = compta_controller.top_modeles(
-                couturier_filtre_id,
-                statut=None,
-                modele=modele_filtre,
-                date_debut=date_debut_filtre,
-                date_fin=date_fin_filtre,
-                limit=10,
-                salon_id=salon_filtre_id
-            )
             if top_modeles:
                 labels = [m for m, _ in top_modeles]
                 counts = [c for _, c in top_modeles]
@@ -320,14 +362,6 @@ def afficher_page_comptabilite():
         # Graphique 2 : Répartition de l'argent reçu par modèle (camembert somme des avances)
         with col2:
             st.markdown("#### Répartition de l'argent reçu par modèle")
-            repartition = compta_controller.repartition_argent_par_modele(
-                couturier_filtre_id,
-                date_debut=date_debut_filtre,
-                date_fin=date_fin_filtre,
-                limit=10,
-                salon_id=salon_filtre_id,
-                modele=modele_filtre,
-            )
             if repartition:
                 labels_r = [m for m, _ in repartition]
                 montants = [float(s) for _, s in repartition]
@@ -355,6 +389,22 @@ def afficher_page_comptabilite():
             else:
                 st.info("Aucune donnée disponible")
 
+        st.markdown("#### Schéma en barres (aperçu rapide)")
+        bar_left, bar_right = st.columns(2)
+        with bar_left:
+            if top_modeles:
+                df_bar_vol = pd.DataFrame(top_modeles, columns=["Modèle", "Commandes"])
+                st.bar_chart(df_bar_vol.set_index("Modèle"), use_container_width=True)
+            else:
+                st.caption("Pas de données pour le volume par modèle.")
+        with bar_right:
+            if repartition:
+                df_bar_av = pd.DataFrame(repartition, columns=["Modèle", "Avances (FCFA)"])
+                df_bar_av["Avances (FCFA)"] = df_bar_av["Avances (FCFA)"].astype(float)
+                st.bar_chart(df_bar_av.set_index("Modèle"), use_container_width=True)
+            else:
+                st.caption("Pas de données pour les avances par modèle.")
+
         # Graphiques modèles (3 et 4 côte à côte)
         st.markdown("### 👗 Modèles (détaillé)")
         col_cat1, col_cat2 = st.columns(2)
@@ -362,14 +412,7 @@ def afficher_page_comptabilite():
         # Graphique 3 : Répartition de l'argent reçu par modèle (camembert)
         with col_cat1:
             st.markdown("#### Montants perçus par modèle")
-            repartition_cat = compta_controller.repartition_argent_par_modele(
-                couturier_filtre_id,
-                date_debut=date_debut_filtre,
-                date_fin=date_fin_filtre,
-                limit=10,
-                salon_id=salon_filtre_id,
-                modele=modele_filtre,
-            )
+            repartition_cat = repartition
             if repartition_cat:
                 labels_c = [c for c, _ in repartition_cat]
                 montants_c = [float(s) for _, s in repartition_cat]
