@@ -440,7 +440,10 @@ def afficher_page_liste_commandes():
                 
                 if commande_selectionnee:
                     # Récupérer les détails complets (toujours récupérer les données fraîches)
-                    details = commande_controller.obtenir_details_commande(commande_selectionnee)
+                    details = commande_controller.obtenir_details_commande(
+                        commande_selectionnee,
+                        couturier_id=cid_liste,
+                    )
                     
                     if not details:
                         st.warning(

@@ -5,6 +5,7 @@ from typing import Optional, Dict, List, Tuple
 from models.database import DatabaseConnection, ClientModel
 from models.commande_model import CommandeModel
 from datetime import datetime
+import json
 import os
 from config import PDF_STORAGE_PATH, IS_RENDER
 
@@ -142,9 +143,100 @@ class CommandeController:
         except Exception as e:
             return False, None, f"Erreur: {str(e)}"
     
-    def obtenir_details_commande(self, commande_id: int) -> Optional[Dict]:
-        """Récupère les détails complets d'une commande"""
-        return self.commande_model.obtenir_commande(commande_id)
+    def obtenir_details_commande(self, commande_id: int, couturier_id: Optional[int] = None) -> Optional[Dict]:
+        """Récupère les détails complets d'une commande (avec fallback robuste)."""
+        try:
+            commande_id = int(commande_id)
+        except Exception:
+            return None
+
+        # 1) Chemin standard via le modèle
+        details = self.commande_model.obtenir_commande(commande_id)
+        if details:
+            if couturier_id is not None and str(details.get("couturier_id")) != str(couturier_id):
+                return None
+            return details
+
+        # 2) Fallback controller: utile quand le schéma réel diffère et bloque
+        # certaines requêtes dynamiques du modèle.
+        try:
+            conn = self.db_connection.get_connection()
+            try:
+                conn.rollback()
+            except Exception:
+                pass
+
+            cursor = conn.cursor()
+            query = """
+                SELECT
+                    c.id, c.client_id, c.couturier_id,
+                    c.categorie, c.sexe, c.modele, c.mesures,
+                    c.prix_total, c.avance, c.reste,
+                    c.date_livraison, c.statut, c.date_creation,
+                    cl.nom, cl.prenom, cl.telephone, cl.email,
+                    co.nom, co.prenom, co.code_couturier
+                FROM commandes c
+                LEFT JOIN clients cl ON c.client_id = cl.id
+                LEFT JOIN couturiers co ON c.couturier_id = co.id
+                WHERE c.id = %s
+                  AND COALESCE(c.est_supprime, FALSE) = FALSE
+            """
+            params: List = [commande_id]
+            if couturier_id is not None:
+                query += " AND c.couturier_id = %s"
+                params.append(couturier_id)
+
+            cursor.execute(query, tuple(params))
+            row = cursor.fetchone()
+            cursor.close()
+
+            if not row:
+                return None
+
+            mesures_data = row[6]
+            if isinstance(mesures_data, str):
+                try:
+                    mesures_data = json.loads(mesures_data)
+                except Exception:
+                    mesures_data = {}
+            elif mesures_data is None:
+                mesures_data = {}
+
+            return {
+                "id": row[0],
+                "client_id": row[1],
+                "couturier_id": row[2],
+                "categorie": row[3],
+                "sexe": row[4],
+                "modele": row[5],
+                "mesures": mesures_data,
+                "prix_total": float(row[7] or 0),
+                "avance": float(row[8] or 0),
+                "reste": float(row[9] or 0),
+                "date_livraison": row[10],
+                "statut": row[11],
+                "date_creation": row[12],
+                "client_nom": row[13],
+                "client_prenom": row[14],
+                "client_telephone": row[15],
+                "client_email": row[16],
+                "couturier_nom": row[17],
+                "couturier_prenom": row[18],
+                "couturier_code": row[19],
+                "fabric_image_path": None,
+                "fabric_image": None,
+                "fabric_image_name": None,
+                "model_type": None,
+                "model_image_path": None,
+                "model_image": None,
+                "model_image_name": None,
+                "salon_id": None,
+                "pdf_data": None,
+                "pdf_name": None,
+                "pdf_path": None,
+            }
+        except Exception:
+            return None
     
     def lister_commandes_couturier(self, couturier_id: int) -> List[Dict]:
         """Liste toutes les commandes d'un couturier"""

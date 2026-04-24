@@ -395,8 +395,3 @@ class AdminController:
             }
         except Exception as e:
             return {"ok": False, "flash_error": f"❌ {e}", "rerun": True}
-isation du mot de passe",
-                "rerun": True,
-            }
-        except Exception as e:
-            return {"ok": False, "flash_error": f"❌ {e}", "rerun": True}
