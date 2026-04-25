@@ -53,7 +53,7 @@ class SuperAdminController:
                         role,
                         COUNT(*) as nb
                     FROM couturiers 
-                    WHERE role != 'SUPER_ADMIN'
+                    WHERE LOWER(role) != 'super_admin'
                     GROUP BY role
                 """)
                 users_by_role = {row[0]: row[1] for row in cursor.fetchall()}
@@ -95,7 +95,7 @@ class SuperAdminController:
                         role,
                         COUNT(*) as nb
                     FROM couturiers 
-                    WHERE role != 'SUPER_ADMIN'
+                    WHERE LOWER(role) != 'super_admin'
                     GROUP BY role
                 """)
                 users_by_role = {row[0]: row[1] for row in cursor.fetchall()}
@@ -125,6 +125,10 @@ class SuperAdminController:
             }
         except Exception as e:
             print(f"Erreur statistiques globales: {e}")
+            try:
+                self.db.get_connection().rollback()
+            except Exception:
+                pass
             return {}
     
     def obtenir_statistiques_par_salon(
@@ -143,6 +147,11 @@ class SuperAdminController:
             cursor = self.db.get_connection().cursor()
 
             # 1) Infos de base sur les salons + nb_employés + nb_clients (non filtrés par date)
+            order_by_clause = "ORDER BY s.date_creation DESC NULLS LAST"
+            if self.db.db_type == "mysql":
+                # MySQL ne supporte pas "NULLS LAST"
+                order_by_clause = "ORDER BY (s.date_creation IS NULL) ASC, s.date_creation DESC"
+
             query_salons = """
                 SELECT 
                     s.salon_id,
@@ -161,8 +170,7 @@ class SuperAdminController:
                 LEFT JOIN clients cl ON cl.salon_id = s.salon_id
                 WHERE s.actif = TRUE OR s.actif IS NULL
                 GROUP BY s.salon_id, s.nom, s.quartier, s.responsable, s.telephone, s.email, s.code_admin, s.actif, s.date_creation
-                ORDER BY s.date_creation DESC NULLS LAST
-            """
+            """ + order_by_clause
 
             cursor.execute(query_salons)
             rows_salons = cursor.fetchall()
@@ -277,6 +285,10 @@ class SuperAdminController:
             return salons
         except Exception as e:
             print(f"Erreur statistiques par salon: {e}")
+            try:
+                self.db.get_connection().rollback()
+            except Exception:
+                pass
             import traceback
             traceback.print_exc()
             return []
@@ -399,9 +411,9 @@ class SuperAdminController:
             
             # Filtrer les SUPER_ADMIN et ajouter la clause WHERE si nécessaire
             if salon_id:
-                where_clause = "WHERE salon_id = %s AND role != 'SUPER_ADMIN'"
+                where_clause = "WHERE salon_id = %s AND LOWER(role) != 'super_admin'"
             else:
-                where_clause = "WHERE role != 'SUPER_ADMIN'"
+                where_clause = "WHERE LOWER(role) != 'super_admin'"
             
             query = f"""
                 SELECT 
@@ -433,6 +445,10 @@ class SuperAdminController:
             ]
         except Exception as e:
             print(f"Erreur liste utilisateurs: {e}")
+            try:
+                self.db.get_connection().rollback()
+            except Exception:
+                pass
             return []
     
     def obtenir_toutes_commandes(
@@ -525,6 +541,10 @@ class SuperAdminController:
             ]
         except Exception as e:
             print(f"Erreur liste commandes: {e}")
+            try:
+                self.db.get_connection().rollback()
+            except Exception:
+                pass
             return []
     
     def generer_rapport_complet(self, salon_id: Optional[str] = None) -> Dict:
