@@ -18,6 +18,11 @@ class SuperAdminController:
         self.couturier_model = _CouturierModel(db_connection)
         self.commande_model = _CommandeModel(db_connection)
 
+    @staticmethod
+    def _norm_salon_id(value) -> str:
+        """Normalise un salon_id pour matching robuste (casse/espaces)."""
+        return str(value or "").strip().lower()
+
     def diagnostiquer_salons(self) -> Dict:
         """
         Retourne un diagnostic technique de la table salons.
@@ -176,9 +181,11 @@ class SuperAdminController:
 
             # Construire un dict de base par salon
             salons_map: Dict[str, Dict] = {}
+            salons_key_map: Dict[str, str] = {}
             for row in rows_salons:
-                salons_map[row[0]] = {
-                    'salon_id': row[0],
+                raw_salon_id = row[0]
+                salons_map[raw_salon_id] = {
+                    'salon_id': raw_salon_id,
                     'nom_salon': row[1],
                     'quartier': row[2],
                     'responsable': row[3],
@@ -198,6 +205,7 @@ class SuperAdminController:
                     'benefice': 0.0,
                     'taux_encaissement': 0.0,
                 }
+                salons_key_map[self._norm_salon_id(raw_salon_id)] = raw_salon_id
 
             # Préparer les filtres de période pour commandes & charges
             cmd_where = []
@@ -239,6 +247,9 @@ class SuperAdminController:
 
             for row in rows_cmd:
                 salon_id = row[0]
+                salon_id_key = salons_key_map.get(self._norm_salon_id(salon_id))
+                if salon_id_key:
+                    salon_id = salon_id_key
                 if salon_id in salons_map:
                     salons_map[salon_id]['nb_commandes'] = row[1] or 0
                     salons_map[salon_id]['ca_total'] = float(row[2] or 0.0)
@@ -264,6 +275,9 @@ class SuperAdminController:
 
             for row in rows_ch:
                 salon_id = row[0]
+                salon_id_key = salons_key_map.get(self._norm_salon_id(salon_id))
+                if salon_id_key:
+                    salon_id = salon_id_key
                 if salon_id in salons_map:
                     salons_map[salon_id]['charges'] = float(row[1] or 0.0)
 
@@ -294,6 +308,133 @@ class SuperAdminController:
             import traceback
             traceback.print_exc()
             return []
+
+    def diagnostiquer_kpi_salon(
+        self,
+        salon_id: str,
+        date_debut: Optional[datetime] = None,
+        date_fin: Optional[datetime] = None,
+    ) -> Dict:
+        """
+        Diagnostic rapide des sources de données KPI pour un salon donné.
+        Permet de voir si le rattachement se fait via cmd.salon_id, couturier ou client.
+        """
+        diagnostic = {
+            "salon_id": salon_id,
+            "periode": {"debut": date_debut, "fin": date_fin},
+            "cmd_direct": 0,
+            "cmd_via_couturier": 0,
+            "cmd_via_client": 0,
+            "charges_direct": 0,
+            "charges_via_couturier": 0,
+            "error": None,
+        }
+        try:
+            sid = str(salon_id or "").strip()
+            if not sid:
+                return diagnostic
+            cursor = self.db.get_connection().cursor()
+
+            filters = []
+            params: List = []
+            if date_debut:
+                filters.append("cmd.date_creation >= %s")
+                params.append(date_debut)
+            if date_fin:
+                filters.append("cmd.date_creation <= %s")
+                params.append(date_fin)
+            where_period_cmd = f" AND {' AND '.join(filters)}" if filters else ""
+
+            # Commandes rattachées directement au salon
+            cursor.execute(
+                f"""
+                SELECT COUNT(*)
+                FROM commandes cmd
+                WHERE COALESCE(cmd.est_supprime, FALSE) = FALSE
+                  AND cmd.salon_id = %s
+                  {where_period_cmd}
+                """,
+                tuple([sid] + params),
+            )
+            diagnostic["cmd_direct"] = int(cursor.fetchone()[0] or 0)
+
+            # Commandes rattachées via couturier.salon_id
+            cursor.execute(
+                f"""
+                SELECT COUNT(*)
+                FROM commandes cmd
+                JOIN couturiers co ON co.id = cmd.couturier_id
+                WHERE COALESCE(cmd.est_supprime, FALSE) = FALSE
+                  AND COALESCE(cmd.salon_id, '') <> %s
+                  AND co.salon_id = %s
+                  {where_period_cmd}
+                """,
+                tuple([sid, sid] + params),
+            )
+            diagnostic["cmd_via_couturier"] = int(cursor.fetchone()[0] or 0)
+
+            # Commandes rattachées via client.salon_id
+            cursor.execute(
+                f"""
+                SELECT COUNT(*)
+                FROM commandes cmd
+                JOIN clients cl ON cl.id = cmd.client_id
+                LEFT JOIN couturiers co ON co.id = cmd.couturier_id
+                WHERE COALESCE(cmd.est_supprime, FALSE) = FALSE
+                  AND COALESCE(cmd.salon_id, '') <> %s
+                  AND COALESCE(co.salon_id, '') <> %s
+                  AND cl.salon_id = %s
+                  {where_period_cmd}
+                """,
+                tuple([sid, sid, sid] + params),
+            )
+            diagnostic["cmd_via_client"] = int(cursor.fetchone()[0] or 0)
+
+            filters_ch = []
+            params_ch: List = []
+            if date_debut:
+                filters_ch.append("ch.date_charge >= %s")
+                params_ch.append(date_debut)
+            if date_fin:
+                filters_ch.append("ch.date_charge <= %s")
+                params_ch.append(date_fin)
+            where_period_ch = f" AND {' AND '.join(filters_ch)}" if filters_ch else ""
+
+            # Charges directes
+            cursor.execute(
+                f"""
+                SELECT COUNT(*)
+                FROM charges ch
+                WHERE ch.salon_id = %s
+                {where_period_ch}
+                """,
+                tuple([sid] + params_ch),
+            )
+            diagnostic["charges_direct"] = int(cursor.fetchone()[0] or 0)
+
+            # Charges via couturier
+            cursor.execute(
+                f"""
+                SELECT COUNT(*)
+                FROM charges ch
+                JOIN couturiers co ON co.id = ch.couturier_id
+                WHERE COALESCE(ch.salon_id, '') <> %s
+                  AND co.salon_id = %s
+                  {where_period_ch}
+                """,
+                tuple([sid, sid] + params_ch),
+            )
+            diagnostic["charges_via_couturier"] = int(cursor.fetchone()[0] or 0)
+
+            cursor.close()
+            return diagnostic
+        except Exception as e:
+            diagnostic["error"] = str(e)
+            try:
+                self.db.get_connection().rollback()
+            except Exception:
+                pass
+            return diagnostic
     
     def obtenir_top_salons(self, critere: str = 'ca', limit: int = 5) -> List[Dict]:
         """

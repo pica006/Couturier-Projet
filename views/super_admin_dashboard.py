@@ -340,6 +340,28 @@ def afficher_vue_ensemble(super_admin_ctrl, salon_model):
                 st.markdown(f"**Reste à encaisser** : {salon_stats['reste']:,.0f} FCFA")
                 if salon_stats.get('date_creation'):
                     st.markdown(f"**Date de création** : {salon_stats['date_creation']}")
+
+            with st.expander("🔎 Diagnostic KPI salon (debug)"):
+                diag = super_admin_ctrl.diagnostiquer_kpi_salon(
+                    salon_id=salon_id_selected,
+                    date_debut=date_debut_dt,
+                    date_fin=date_fin_dt,
+                )
+                if diag.get("error"):
+                    st.error(f"Erreur diagnostic: {diag['error']}")
+                else:
+                    st.write(f"Salon: {diag.get('salon_id')}")
+                    st.write(
+                        "Commandes -> "
+                        f"direct: {diag.get('cmd_direct', 0)} | "
+                        f"via couturier: {diag.get('cmd_via_couturier', 0)} | "
+                        f"via client: {diag.get('cmd_via_client', 0)}"
+                    )
+                    st.write(
+                        "Charges -> "
+                        f"direct: {diag.get('charges_direct', 0)} | "
+                        f"via couturier: {diag.get('charges_via_couturier', 0)}"
+                    )
     
     else:
         # Vue globale (tous les salons)
