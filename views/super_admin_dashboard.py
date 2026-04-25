@@ -242,6 +242,35 @@ def afficher_vue_ensemble(super_admin_ctrl, salon_model):
         if not salon_stats:
             st.warning(f"⚠️ Aucune donnée disponible pour le salon {salon_id_selected}")
         else:
+            # Si la période sélectionnée est vide, tenter un fallback toutes périodes
+            # pour éviter d'afficher un faux "tout à 0" alors que le salon a de l'historique.
+            has_financial_activity = any([
+                float(salon_stats.get('ca_total', 0) or 0) > 0,
+                float(salon_stats.get('avances', 0) or 0) > 0,
+                float(salon_stats.get('charges', 0) or 0) > 0,
+                int(salon_stats.get('nb_commandes', 0) or 0) > 0,
+            ])
+            if not has_financial_activity:
+                stats_all_time = super_admin_ctrl.obtenir_statistiques_par_salon()
+                salon_stats_all_time = next(
+                    (
+                        s for s in stats_all_time
+                        if _norm_salon_id(s.get('salon_id')) == _norm_salon_id(salon_id_selected)
+                    ),
+                    None
+                )
+                if salon_stats_all_time and any([
+                    float(salon_stats_all_time.get('ca_total', 0) or 0) > 0,
+                    float(salon_stats_all_time.get('avances', 0) or 0) > 0,
+                    float(salon_stats_all_time.get('charges', 0) or 0) > 0,
+                    int(salon_stats_all_time.get('nb_commandes', 0) or 0) > 0,
+                ]):
+                    st.info(
+                        "ℹ️ Aucune activité sur la période sélectionnée. "
+                        "Affichage des KPI du salon en toutes périodes."
+                    )
+                    salon_stats = salon_stats_all_time
+
             # Afficher le nom du salon
             st.markdown(f"### 🏢 {salon_stats['nom_salon']} ({salon_id_selected})")
             
