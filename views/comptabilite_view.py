@@ -90,19 +90,18 @@ def afficher_page_comptabilite():
 
     with g1:
         st.markdown("#### Top modeles")
+        filtre_modele = None if modele_selectionne == "Tous" else modele_selectionne
+        top_limit = 10 if filtre_modele is None else 1
         top = controller.top_modeles(
             couturier_id=couturier_id,
             date_debut=date_debut_filtre,
             date_fin=date_fin_filtre,
-            limit=10,
+            limit=top_limit,
+            modele=filtre_modele,
         )
         if top:
             labels = [r[0] for r in top]
             counts = [int(r[1]) for r in top]
-            if modele_selectionne != "Tous":
-                filt = [(l, c) for l, c in zip(labels, counts) if l == modele_selectionne]
-                labels = [filt[0][0]] if filt else []
-                counts = [filt[0][1]] if filt else []
             if counts and sum(counts) > 0:
                 fig1, ax1 = plt.subplots()
                 wedges, _, _ = ax1.pie(
@@ -123,19 +122,17 @@ def afficher_page_comptabilite():
 
     with g2:
         st.markdown("#### Repartition des avances par modele")
+        rep_limit = 10 if filtre_modele is None else 1
         rep = controller.repartition_argent_par_modele(
             couturier_id=couturier_id,
             date_debut=date_debut_filtre,
             date_fin=date_fin_filtre,
-            limit=10,
+            limit=rep_limit,
+            modele=filtre_modele,
         )
         if rep:
             labels = [r[0] for r in rep]
             montants = [float(r[1] or 0) for r in rep]
-            if modele_selectionne != "Tous":
-                filt = [(l, m) for l, m in zip(labels, montants) if l == modele_selectionne]
-                labels = [filt[0][0]] if filt else []
-                montants = [filt[0][1]] if filt else []
             if montants and sum(montants) > 0:
                 fig2, ax2 = plt.subplots()
                 wedges, _, _ = ax2.pie(
