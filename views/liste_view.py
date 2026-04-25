@@ -10,6 +10,8 @@ from datetime import datetime
 from typing import Any, Dict
 from controllers.commande_controller import CommandeController
 from controllers.pdf_controller import PDFController
+from controllers.email_controller import EmailController
+from models.salon_model import SalonModel
 from utils.ui import (
     ajouter_espace_vertical,
     appliquer_style_pages_critiques,
@@ -92,6 +94,46 @@ def _generer_nom_fichier_pdf(details):
     return f"{nom_complet}_{commande_id}_{date_str}.pdf"
 
 
+def _construire_message_client(details: Dict[str, Any]) -> tuple[str, str]:
+    """Construit le sujet et le corps selon l'état du paiement."""
+    client_nom = str(details.get("client_nom") or "").strip()
+    client_prenom = str(details.get("client_prenom") or "").strip()
+    nom_complet = f"{client_prenom} {client_nom}".strip() or "Client"
+    modele = str(details.get("modele") or "N/A")
+    prix_total = float(details.get("prix_total") or 0)
+    avance = float(details.get("avance") or 0)
+    reste = max(0.0, float(details.get("reste") or 0))
+
+    if reste > 0:
+        subject = f"Rappel de paiement - Commande #{details.get('id')}"
+        body = (
+            f"Bonjour {nom_complet},\n\n"
+            "Nous vous envoyons un rappel concernant votre commande.\n\n"
+            f"Commande: #{details.get('id')}\n"
+            f"Modele: {modele}\n"
+            f"Prix total: {prix_total:,.0f} FCFA\n"
+            f"Avance: {avance:,.0f} FCFA\n"
+            f"Reste a payer: {reste:,.0f} FCFA\n\n"
+            "Votre fiche de commande est jointe a cet email en PDF.\n\n"
+            "Merci pour votre confiance."
+        )
+        return subject, body
+
+    subject = f"Confirmation de paiement - Commande #{details.get('id')}"
+    body = (
+        f"Bonjour {nom_complet},\n\n"
+        "Nous confirmons que votre commande est entierement reglee.\n\n"
+        f"Commande: #{details.get('id')}\n"
+        f"Modele: {modele}\n"
+        f"Prix total: {prix_total:,.0f} FCFA\n"
+        f"Avance: {avance:,.0f} FCFA\n"
+        f"Reste a payer: {reste:,.0f} FCFA\n\n"
+        "Votre fiche de commande est jointe a cet email en PDF.\n\n"
+        "Merci pour votre confiance."
+    )
+    return subject, body
+
+
 def afficher_page_liste_commandes():
     """Affiche la liste des commandes du couturier"""
     appliquer_style_pages_critiques()
@@ -119,6 +161,13 @@ def afficher_page_liste_commandes():
             return
         salon_id = obtenir_salon_id(couturier_data)
         code_couturier = couturier_data.get('code_couturier') if couturier_data else None
+        smtp_config = None
+        try:
+            if salon_id:
+                smtp_config = SalonModel(st.session_state.db_connection).obtenir_config_email_salon(salon_id)
+        except Exception:
+            smtp_config = None
+        email_controller = EmailController(smtp_config=smtp_config)
         
         # Récupérer les commandes (avec cache pour éviter les rechargements)
         if 'commandes_liste' not in st.session_state:
@@ -546,7 +595,7 @@ def afficher_page_liste_commandes():
                         # Actions avec style amélioré
                         afficher_titre_section("⚡ Actions", niveau=4)
                         # Première ligne de boutons
-                        col1, col2 = st.columns(2)
+                        col1, col2, col3 = st.columns(3)
                         
                         with col1:
                             if st.button("📄 Générer PDF", use_container_width=True, type="primary", key=f"btn_gen_pdf_{commande_selectionnee}"):
@@ -577,6 +626,33 @@ def afficher_page_liste_commandes():
                                         st.error("❌ Erreur lors de la génération du PDF")
                         
                         with col2:
+                            if st.button("📧 Relancer par email", use_container_width=True, key=f"btn_relance_email_{commande_selectionnee}"):
+                                client_email = details.get("client_email")
+                                if not client_email:
+                                    st.error("❌ Adresse email du client manquante.")
+                                else:
+                                    with etat_chargement("Préparation du PDF..."):
+                                        pdf_path_email = details.get("pdf_path")
+                                        if not pdf_path_email or not os.path.exists(pdf_path_email):
+                                            pdf_path_email = pdf_controller.generer_pdf_commande(details)
+
+                                    if not pdf_path_email or not os.path.exists(pdf_path_email):
+                                        st.error("❌ Impossible de joindre le PDF. Génération échouée.")
+                                    else:
+                                        subject_email, body_email = _construire_message_client(details)
+                                        with st.spinner("📤 Envoi de l'email au client..."):
+                                            succes_email, message_email = email_controller.envoyer_email_avec_message(
+                                                client_email,
+                                                subject_email,
+                                                body_email,
+                                                attachments=[pdf_path_email],
+                                            )
+                                        if succes_email:
+                                            st.success(f"✅ {message_email}")
+                                        else:
+                                            st.error(f"❌ {message_email}")
+
+                        with col3:
                             if st.button("🔄 Actualiser", use_container_width=True, key=f"btn_actualiser_details_{commande_selectionnee}"):
                                 if 'commandes_liste' in st.session_state:
                                     del st.session_state.commandes_liste
