@@ -495,6 +495,8 @@ class SalonModel:
             # D'abord, vérifier si la table salons existe et sa structure
             # Essayer une requête simple d'abord
             try:
+                # Requete de base volontairement minimale pour rester compatible
+                # avec des schemas anciens (avant ajout des colonnes SMTP).
                 simple_query = """
                     SELECT salon_id,
                            nom,
@@ -504,13 +506,7 @@ class SalonModel:
                            email,
                            code_admin,
                            actif,
-                           date_creation,
-                           smtp_host,
-                           smtp_port,
-                           smtp_user,
-                           smtp_from,
-                           smtp_use_tls,
-                           smtp_use_ssl
+                           date_creation
                     FROM salons
                     ORDER BY salon_id
                 """
@@ -597,13 +593,13 @@ class SalonModel:
                         'nb_clients': int(nb_clients),
                         'nb_commandes': int(nb_commandes),
                         'ca_total': ca_total,
-                        # Infos SMTP (pour debug / future UI)
-                        'smtp_host': row[9] if len(row) > 9 else None,
-                        'smtp_port': row[10] if len(row) > 10 else None,
-                        'smtp_user': row[11] if len(row) > 11 else None,
-                        'smtp_from': row[12] if len(row) > 12 else None,
-                        'smtp_use_tls': row[13] if len(row) > 13 else None,
-                        'smtp_use_ssl': row[14] if len(row) > 14 else None,
+                        # Infos SMTP : non bloquantes si colonnes absentes (base legacy)
+                        'smtp_host': None,
+                        'smtp_port': None,
+                        'smtp_user': None,
+                        'smtp_from': None,
+                        'smtp_use_tls': None,
+                        'smtp_use_ssl': None,
                     })
                 
                 cursor.close()

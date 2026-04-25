@@ -102,6 +102,14 @@ def _appliquer_migrations_schema(db_connection) -> None:
             "ALTER TABLE salons ADD COLUMN IF NOT EXISTS max_habits_par_jour INTEGER DEFAULT NULL",
             "ALTER TABLE salons ADD COLUMN IF NOT EXISTS delais_par_modele TEXT DEFAULT NULL",
             "ALTER TABLE salons ADD COLUMN IF NOT EXISTS pdf_theme_color VARCHAR(7) DEFAULT NULL",
+            # SMTP multi-tenant (retrocompatibilite des bases anciennes)
+            "ALTER TABLE salons ADD COLUMN IF NOT EXISTS smtp_host VARCHAR(200) DEFAULT 'smtp.gmail.com'",
+            "ALTER TABLE salons ADD COLUMN IF NOT EXISTS smtp_port INTEGER DEFAULT 587",
+            "ALTER TABLE salons ADD COLUMN IF NOT EXISTS smtp_user VARCHAR(200)",
+            "ALTER TABLE salons ADD COLUMN IF NOT EXISTS smtp_password VARCHAR(200)",
+            "ALTER TABLE salons ADD COLUMN IF NOT EXISTS smtp_from VARCHAR(200)",
+            "ALTER TABLE salons ADD COLUMN IF NOT EXISTS smtp_use_tls BOOLEAN DEFAULT TRUE",
+            "ALTER TABLE salons ADD COLUMN IF NOT EXISTS smtp_use_ssl BOOLEAN DEFAULT FALSE",
         ]:
             try:
                 cursor.execute(ddl)
