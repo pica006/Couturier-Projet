@@ -114,7 +114,7 @@ def afficher_page_comptabilite():
                 )
                 ax1.axis("equal")
                 _place_legend(ax1, wedges, [f"{l} ({c})" for l, c in zip(labels, counts)], "Modeles")
-                st.pyplot(fig1, width="stretch")
+                st.pyplot(fig1, use_container_width=True)
                 plt.close(fig1)
             else:
                 st.info("Aucune donnee disponible.")
@@ -144,7 +144,7 @@ def afficher_page_comptabilite():
                 )
                 ax2.axis("equal")
                 _place_legend(ax2, wedges, [f"{l} ({m:,.0f})" for l, m in zip(labels, montants)], "Modeles")
-                st.pyplot(fig2, width="stretch")
+                st.pyplot(fig2, use_container_width=True)
                 plt.close(fig2)
             else:
                 st.info("Aucune donnee disponible.")
