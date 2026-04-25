@@ -115,7 +115,12 @@ def _safe_visual_css() -> str:
     """
 
 
-_apply_rich_theme = bool(st.session_state.get("authentifie", False))
+# IMPORTANT:
+# Eviter tout acces a st.session_state au niveau module.
+# Sur certains cycles Streamlit (cold start / websocket fragile),
+# SessionInfo peut ne pas etre pret et provoquer:
+# "Tried to use SessionInfo before it was initialized".
+_apply_rich_theme = False
 
 if VISUAL_SAFE_MODE:
     st.markdown(_safe_visual_css(), unsafe_allow_html=True)

@@ -134,6 +134,11 @@ def connect_and_initialize(config: Dict) -> Tuple[bool, Optional["DatabaseConnec
         if not db_connection.connect():
             return False, None, str(db_connection.last_error or "Erreur inconnue de connexion PostgreSQL")
 
+        # Eviter de rejouer toutes les initialisations si cette instance
+        # est deja prete dans la session courante.
+        if getattr(db_connection, "_app_initialized", False):
+            return True, db_connection, ""
+
         auth_controller = AuthController(db_connection)
         auth_controller.initialiser_tables()
 
@@ -145,6 +150,9 @@ def connect_and_initialize(config: Dict) -> Tuple[bool, Optional["DatabaseConnec
 
         # Migrations incrementales (Points D et F) — non bloquantes
         _appliquer_migrations_schema(db_connection)
+
+        # Marqueur memoire pour fluidifier les reconnexions.
+        db_connection._app_initialized = True
 
         return True, db_connection, ""
     except Exception as e:
