@@ -57,7 +57,6 @@ class ComptabiliteController:
         salon_id: Optional[str] = None,
     ) -> Dict:
         """Calcule les statistiques financières (par couturier ou par salon)."""
-        cursor = None
         try:
             cursor = self.db.get_connection().cursor()
             where, params = self._build_scope_where(couturier_id=couturier_id, salon_id=salon_id)
@@ -107,12 +106,6 @@ class ComptabiliteController:
         except Exception as e:
             print(f"Erreur stats: {e}")
             return {'nb_commandes': 0, 'ca_total': 0, 'avances_total': 0, 'reste_total': 0, 'taux_avance': 0, 'commandes_par_statut': {}, 'top_modeles': []}
-        finally:
-            if cursor is not None:
-                try:
-                    cursor.close()
-                except Exception:
-                    pass
     
     def obtenir_liste_clients_triee(
         self,
@@ -201,7 +194,6 @@ class ComptabiliteController:
         
         Inclut le chemin PDF si disponible pour pouvoir l'ajouter en pièce jointe.
         """
-        cursor = None
         try:
             cursor = self.db.get_connection().cursor()
             order_by = self.TRI_RELANCES_ORDER_BY.get(tri, self.TRI_RELANCES_ORDER_BY["date_desc"])
@@ -263,19 +255,20 @@ class ComptabiliteController:
                 """
                 cursor.execute(query, (couturier_id,))
             results = cursor.fetchall()
+            cursor.close()
             
             commandes = []
             for row in results:
                 commandes.append({
                     'id': row[0],
-                    'modele': row[1] if row[1] else "Non renseigné",
-                    'prix_total': float(row[2] or 0),
-                    'avance': float(row[3] or 0),
-                    'reste': float(row[4] or 0),
+                    'modele': row[1],
+                    'prix_total': float(row[2]),
+                    'avance': float(row[3]),
+                    'reste': float(row[4]),
                     'date_creation': row[5],
-                    'client_nom': row[6] or "",
-                    'client_prenom': row[7] or "",
-                    'client_telephone': row[8] or "",
+                    'client_nom': row[6],
+                    'client_prenom': row[7],
+                    'client_telephone': row[8],
                     'client_email': row[9],
                     'pdf_path': row[10] if len(row) > 10 else None,
                 })
@@ -283,12 +276,6 @@ class ComptabiliteController:
         except Exception as e:
             print(f"Erreur commandes relance: {e}")
             return []
-        finally:
-            if cursor is not None:
-                try:
-                    cursor.close()
-                except Exception:
-                    pass
 
     def envoyer_rappel_email_commande(
         self,

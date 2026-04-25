@@ -25,7 +25,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from models.database import CouturierModel
 from models.salon_model import SalonModel
-from utils.role_utils import obtenir_salon_id, obtenir_salon_id_resolu, est_admin
+from utils.role_utils import obtenir_salon_id_resolu, est_admin
 
 
 def afficher_page_comptabilite():
@@ -589,9 +589,7 @@ def afficher_page_comptabilite():
         smtp_config = None
         try:
             if st.session_state.get("couturier_data"):
-                salon_id = obtenir_salon_id(st.session_state.couturier_data)
-                if not salon_id:
-                    salon_id = obtenir_salon_id_resolu(st.session_state.couturier_data, db)
+                salon_id = obtenir_salon_id_resolu(st.session_state.couturier_data, db)
                 if salon_id:
                     salon_model = SalonModel(db)
                     smtp_config = salon_model.obtenir_config_email_salon(salon_id)
@@ -627,7 +625,7 @@ def afficher_page_comptabilite():
                     
                     st.markdown("---")
                     if st.button(
-                        "Envoyer un rappel par email",
+                        "📧 Envoyer un rappel par email",
                         key=f"relance_email_{cmd['id']}_{idx}",
                         use_container_width=True
                     ):
@@ -641,9 +639,9 @@ def afficher_page_comptabilite():
                                     smtp_config=smtp_config,
                                 )
                             if succes:
-                                st.success(message)
+                                st.success(f"✅ {message}")
                             else:
-                                st.error(message)
+                                st.error(f"❌ Email de rappel non envoyé : {message}")
                     
         else:
             st.success("✅ Aucune commande à relancer - Tous les paiements sont à jour !")
