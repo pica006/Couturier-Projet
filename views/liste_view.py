@@ -134,6 +134,15 @@ def _construire_message_client(details: Dict[str, Any]) -> tuple[str, str]:
     return subject, body
 
 
+def _message_email_affichable(message: str) -> str:
+    """Nettoie les messages techniques non utiles pour l'utilisateur."""
+    raw = str(message or "").strip()
+    lower = raw.lower()
+    if "sessioninfo" in lower or "bad message format" in lower:
+        return "Envoi impossible pour le moment. Veuillez reessayer dans quelques instants."
+    return raw or "Envoi impossible. Veuillez verifier la configuration email."
+
+
 def afficher_page_liste_commandes():
     """Affiche la liste des commandes du couturier"""
     appliquer_style_pages_critiques()
@@ -650,7 +659,7 @@ def afficher_page_liste_commandes():
                                         if succes_email:
                                             st.success(f"✅ {message_email}")
                                         else:
-                                            st.error(f"❌ {message_email}")
+                                            st.error(f"❌ {_message_email_affichable(message_email)}")
 
                         with col3:
                             if st.button("🔄 Actualiser", use_container_width=True, key=f"btn_actualiser_details_{commande_selectionnee}"):
@@ -658,46 +667,3 @@ def afficher_page_liste_commandes():
                                     del st.session_state.commandes_liste
                                 st.rerun()
 
-                        st.markdown("---")
-                        st.markdown("#### 🗑️ Supprimer cette commande (employé)")
-                        st.warning(
-                            "Suppression logique stricte : uniquement vos propres commandes. "
-                            "La commande reste visible chez l'admin/superadmin comme supprimée et n'est plus comptabilisée."
-                        )
-                        with st.form(f"form_supprimer_commande_employe_{commande_selectionnee}", clear_on_submit=True):
-                            motif_suppression = st.text_area(
-                                "Motif de suppression *",
-                                placeholder="Ex: erreur de saisie / doublon",
-                                height=80,
-                            )
-                            confirmer_suppression = st.checkbox(
-                                "Je confirme la suppression de cette commande.",
-                                key=f"confirm_delete_emp_{commande_selectionnee}",
-                            )
-                            submit_delete = st.form_submit_button("🗑️ Supprimer la commande")
-
-                            if submit_delete:
-                                if not motif_suppression or len(motif_suppression.strip()) < 3:
-                                    st.error("❌ Veuillez renseigner un motif de suppression (au moins 3 caractères).")
-                                elif not confirmer_suppression:
-                                    st.error("❌ Veuillez confirmer la suppression.")
-                                else:
-                                    try:
-                                        employe_id = st.session_state.couturier_data.get("id")
-                                        ok = commande_controller.supprimer_commande_employe(
-                                            commande_id=commande_selectionnee,
-                                            employe_id=employe_id,
-                                            salon_id_employe=salon_id,
-                                            motif=motif_suppression.strip(),
-                                        )
-                                        if ok:
-                                            st.success("✅ Commande supprimée avec succès.")
-                                            if 'commandes_liste' in st.session_state:
-                                                del st.session_state.commandes_liste
-                                            st.rerun()
-                                        else:
-                                            st.error(
-                                                "❌ Suppression refusée : vous ne pouvez supprimer que vos propres commandes."
-                                            )
-                                    except Exception as e:
-                                        st.error(f"❌ Erreur pendant la suppression : {e}")
