@@ -59,9 +59,9 @@ def afficher_page_comptabilite():
     default_fin = datetime.now().date()
 
     with col_d1:
-        date_debut = st.date_input("Date debut", value=default_debut, key="compta_date_debut")
+        date_debut = st.date_input("Date debut", value=default_debut, key="airan_date_debut")
     with col_d2:
-        date_fin = st.date_input("Date fin", value=default_fin, key="compta_date_fin")
+        date_fin = st.date_input("Date fin", value=default_fin, key="airan_date_fin")
 
     date_debut_filtre = datetime.combine(date_debut, datetime.min.time()) if date_debut else None
     date_fin_filtre = datetime.combine(date_fin, datetime.max.time()) if date_fin else None
@@ -69,8 +69,7 @@ def afficher_page_comptabilite():
         date_debut_filtre, date_fin_filtre = date_fin_filtre, date_debut_filtre
 
     modeles = controller.lister_modeles_par_periode(couturier_id, date_debut_filtre, date_fin_filtre)
-    modele_selectionne = st.selectbox("Filtrer par modele", ["Tous"] + modeles, key="compta_modele")
-    modele_filtre = None if modele_selectionne == "Tous" else modele_selectionne
+    modele_selectionne = st.selectbox("Filtrer par modele", ["Tous"] + modeles, key="airan_modele")
 
     stats = controller.obtenir_statistiques(couturier_id, date_debut_filtre, date_fin_filtre) or {}
     c1, c2, c3, c4 = st.columns(4)
@@ -98,11 +97,14 @@ def afficher_page_comptabilite():
             date_debut=date_debut_filtre,
             date_fin=date_fin_filtre,
             limit=10,
-            modele=modele_filtre,
         )
         if top:
             labels = [r[0] for r in top]
             counts = [int(r[1]) for r in top]
+            if modele_selectionne != "Tous":
+                filt = [(l, c) for l, c in zip(labels, counts) if l == modele_selectionne]
+                labels = [filt[0][0]] if filt else []
+                counts = [filt[0][1]] if filt else []
             if counts and sum(counts) > 0:
                 fig1, ax1 = plt.subplots()
                 wedges, _, _ = ax1.pie(
@@ -128,11 +130,14 @@ def afficher_page_comptabilite():
             date_debut=date_debut_filtre,
             date_fin=date_fin_filtre,
             limit=10,
-            modele=modele_filtre,
         )
         if rep:
             labels = [r[0] for r in rep]
             montants = [float(r[1] or 0) for r in rep]
+            if modele_selectionne != "Tous":
+                filt = [(l, m) for l, m in zip(labels, montants) if l == modele_selectionne]
+                labels = [filt[0][0]] if filt else []
+                montants = [filt[0][1]] if filt else []
             if montants and sum(montants) > 0:
                 fig2, ax2 = plt.subplots()
                 wedges, _, _ = ax2.pie(
@@ -166,7 +171,7 @@ def afficher_page_comptabilite():
             "Nom Z-A",
         ],
         index=0,
-        key="compta_tri_clients",
+        key="airan_tri_clients",
     )
     tri_client_map = {
         "CA decroissant": "ca_desc",
@@ -183,7 +188,7 @@ def afficher_page_comptabilite():
         df = pd.DataFrame(clients, columns=["Nom", "Prenom", "Telephone", "Nb Commandes", "CA Total", "Reste a payer"])
         df["CA Total"] = df["CA Total"].apply(lambda x: f"{float(x or 0):,.0f} FCFA")
         df["Reste a payer"] = df["Reste a payer"].apply(lambda x: f"{float(x or 0):,.0f} FCFA")
-        st.dataframe(df, hide_index=True, width="stretch")
+        st.dataframe(df, hide_index=True, use_container_width=True)
         st.download_button(
             "Exporter clients CSV",
             df.to_csv(index=False).encode("utf-8"),
@@ -206,7 +211,7 @@ def afficher_page_comptabilite():
             "Nom client Z-A",
         ],
         index=0,
-        key="compta_tri_relances",
+        key="airan_tri_relances",
     )
     tri_relance_map = {
         "Date recente": "date_desc",
@@ -228,7 +233,7 @@ def afficher_page_comptabilite():
         smtp_config = None
 
     if commandes_relance:
-        for idx, cmd in enumerate(commandes_relance):
+        for cmd in commandes_relance:
             title = f"Commande #{cmd['id']} - {cmd['client_nom']} {cmd['client_prenom']}"
             with st.expander(title):
                 col1, col2 = st.columns(2)
@@ -242,7 +247,7 @@ def afficher_page_comptabilite():
                     st.write(f"**Email :** {cmd.get('client_email') or 'Non renseigne'}")
                     st.write(f"**Date :** {cmd.get('date_creation')}")
 
-                if st.button("Envoyer un rappel par email", key=f"compta_relance_email_{cmd['id']}_{idx}", width="stretch"):
+                if st.button("Envoyer un rappel par email", key=f"airan_relance_email_{cmd['id']}", use_container_width=True):
                     client_email = cmd.get("client_email")
                     if not client_email:
                         st.error("Email du client manquant.")
