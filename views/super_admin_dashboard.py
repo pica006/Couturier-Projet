@@ -187,6 +187,9 @@ def afficher_vue_ensemble(super_admin_ctrl, salon_model):
     salon_id_selected = None
     if selected_salon != "[Tous les salons]":
         salon_id_selected = selected_salon.split(" - ")[0]
+
+    def _norm_salon_id(value):
+        return str(value or "").strip().lower()
     
     st.markdown("---")
     
@@ -198,8 +201,43 @@ def afficher_vue_ensemble(super_admin_ctrl, salon_model):
             date_fin=date_fin_dt,
         )
         
-        # Filtrer pour le salon sélectionné
-        salon_stats = next((s for s in stats_par_salon if s['salon_id'] == salon_id_selected), None)
+        # Filtrer pour le salon sélectionné (comparaison robuste)
+        salon_stats = next(
+            (
+                s for s in stats_par_salon
+                if _norm_salon_id(s.get('salon_id')) == _norm_salon_id(salon_id_selected)
+            ),
+            None
+        )
+
+        # Fallback: afficher un tableau KPI à 0 plutôt qu'un vide total
+        if not salon_stats:
+            salon_base = next(
+                (
+                    s for s in salons
+                    if _norm_salon_id(s.get('salon_id')) == _norm_salon_id(salon_id_selected)
+                ),
+                None
+            )
+            if salon_base:
+                salon_stats = {
+                    'salon_id': salon_base.get('salon_id'),
+                    'nom_salon': salon_base.get('nom_salon', f"Salon {salon_id_selected}"),
+                    'quartier': salon_base.get('quartier', 'N/A'),
+                    'responsable': salon_base.get('responsable', 'N/A'),
+                    'telephone': salon_base.get('telephone', 'N/A'),
+                    'code_admin': salon_base.get('code_admin', 'N/A'),
+                    'date_creation': salon_base.get('date_creation'),
+                    'nb_employes': int(salon_base.get('nb_employes', 0) or 0),
+                    'nb_clients': int(salon_base.get('nb_clients', 0) or 0),
+                    'nb_commandes': 0,
+                    'ca_total': 0.0,
+                    'avances': 0.0,
+                    'reste': 0.0,
+                    'charges': 0.0,
+                    'benefice': 0.0,
+                    'taux_encaissement': 0.0,
+                }
         
         if not salon_stats:
             st.warning(f"⚠️ Aucune donnée disponible pour le salon {salon_id_selected}")
@@ -1228,6 +1266,9 @@ def afficher_toutes_commandes(super_admin_ctrl, salon_model):
     salon_id_filter = None
     if selected_filter != "[Tous les salons]":
         salon_id_filter = selected_filter.split(" - ")[0]
+
+    def _norm_salon_id(value):
+        return str(value or "").strip().lower()
     
     # Récupérer les statistiques réelles du salon (sans limite)
     if salon_id_filter:
@@ -1242,7 +1283,13 @@ def afficher_toutes_commandes(super_admin_ctrl, salon_model):
         # st.write(f"DEBUG: Recherche du salon_id: {salon_id_filter}")
         # st.write(f"DEBUG: Salons disponibles: {[s['salon_id'] for s in stats_par_salon]}")
         
-        salon_stats = next((s for s in stats_par_salon if s['salon_id'] == salon_id_filter), None)
+        salon_stats = next(
+            (
+                s for s in stats_par_salon
+                if _norm_salon_id(s.get('salon_id')) == _norm_salon_id(salon_id_filter)
+            ),
+            None
+        )
         
         if salon_stats:
             st.markdown(f"### 🏢 Salon : {salon_stats['nom_salon']} ({salon_id_filter})")
