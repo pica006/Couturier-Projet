@@ -13,8 +13,6 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
 from controllers.comptabilite_controller import ComptabiliteController
-from models.salon_model import SalonModel
-from utils.role_utils import obtenir_salon_id
 
 
 def _make_autopct(values, formatter=None):
@@ -198,50 +196,5 @@ def afficher_page_comptabilite():
     else:
         st.info("Aucun client enregistre.")
 
-    st.markdown("---")
-    st.markdown("### Clients a relancer")
-    st.caption("Tri applique: Date recente")
-    commandes_relance = controller.obtenir_commandes_a_relancer(couturier_id=couturier_id, tri="date_desc")
-
-    smtp_config = None
-    try:
-        salon_id = obtenir_salon_id(couturier_data)
-        if salon_id:
-            salon_model = SalonModel(st.session_state.db_connection)
-            smtp_config = salon_model.obtenir_config_email_salon(salon_id)
-    except Exception:
-        smtp_config = None
-
-    if commandes_relance:
-        for cmd in commandes_relance:
-            title = f"Commande #{cmd['id']} - {cmd['client_nom']} {cmd['client_prenom']}"
-            with st.expander(title):
-                col1, col2 = st.columns(2)
-                with col1:
-                    st.write(f"**Modele :** {cmd.get('modele', '')}")
-                    st.write(f"**Prix total :** {float(cmd.get('prix_total', 0) or 0):,.0f} FCFA")
-                    st.write(f"**Avance :** {float(cmd.get('avance', 0) or 0):,.0f} FCFA")
-                with col2:
-                    st.write(f"**Reste :** {float(cmd.get('reste', 0) or 0):,.0f} FCFA")
-                    st.write(f"**Telephone :** {cmd.get('client_telephone') or ''}")
-                    st.write(f"**Email :** {cmd.get('client_email') or 'Non renseigne'}")
-                    st.write(f"**Date :** {cmd.get('date_creation')}")
-
-                if st.button("Envoyer un rappel par email", key=f"airan_relance_email_{cmd['id']}", use_container_width=True):
-                    client_email = cmd.get("client_email")
-                    if not client_email:
-                        st.error("Email du client manquant.")
-                    else:
-                        with st.spinner("Envoi du rappel en cours..."):
-                            success, message = controller.envoyer_rappel_email_commande(
-                                commande=cmd,
-                                smtp_config=smtp_config,
-                            )
-                        if success:
-                            st.success(message)
-                        else:
-                            st.error(message)
-    else:
-        st.success("Aucune commande a relancer. Tous les paiements sont a jour.")
 
 
