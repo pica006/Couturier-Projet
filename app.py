@@ -1037,7 +1037,18 @@ def afficher_sidebar():
             # Informations du couturier connecté
             st.success(f"**Connecté:** {st.session_state.couturier_data['prenom']} {st.session_state.couturier_data['nom']}")
             role_display = st.session_state.couturier_data.get('role', 'employe')
-            st.info(f"**Code:** {st.session_state.couturier_data['code_couturier']} | **Rôle:** {role_display}")
+            db_type = st.session_state.get('db_type', 'inconnue')
+            db_label = (
+                "Render (production)"
+                if db_type == 'render_production'
+                else "PostgreSQL local"
+                if db_type == 'postgresql_local'
+                else str(db_type)
+            )
+            st.info(
+                f"**Code:** {st.session_state.couturier_data['code_couturier']} | "
+                f"**Rôle:** {role_display} | **Base:** {db_label}"
+            )
             st.markdown("---")
             
             # Menu SUPER ADMINISTRATION (uniquement pour SUPER_ADMIN) - EN PREMIER
