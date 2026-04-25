@@ -110,10 +110,39 @@ def afficher_page_salons():
                     st.write(f"**Email** : {salon['email']}")
                 
                 with col_b:
+                    slogan_affiche = salon.get('pdf_slogan') or "L'Elegance Sur Mesure"
                     st.write("**👤 Administrateur**")
                     st.write(f"**Code** : {salon['code_admin']}")
                     st.write(f"**Nom** : {salon['admin_nom']} {salon['admin_prenom']}")
                     st.write(f"**Date de création** : {salon['date_creation']}")
+                    st.write(f"**Slogan PDF** : {slogan_affiche}")
+                    st.write(f"**Couleur PDF** : {salon.get('pdf_theme_color') or '#9B8AB5'}")
+
+                st.markdown("### ✏️ Éditer branding PDF du salon")
+                with st.form(f"form_edit_pdf_branding_{salon['salon_id']}"):
+                    edit_slogan = st.text_input(
+                        "Slogan PDF",
+                        value=salon.get('pdf_slogan') or "L'Elegance Sur Mesure",
+                        key=f"edit_slogan_{salon['salon_id']}",
+                    )
+                    edit_color = st.color_picker(
+                        "Couleur PDF",
+                        value=salon.get('pdf_theme_color') or "#9B8AB5",
+                        key=f"edit_color_{salon['salon_id']}",
+                    )
+                    submit_edit_branding = st.form_submit_button("💾 Enregistrer branding PDF")
+
+                if submit_edit_branding:
+                    ok = salon_model.modifier_salon(
+                        salon_id=salon['salon_id'],
+                        pdf_slogan=edit_slogan,
+                        pdf_theme_color=edit_color,
+                    )
+                    if ok:
+                        st.success("✅ Branding PDF du salon mis à jour.")
+                        st.rerun()
+                    else:
+                        st.error("❌ Impossible de mettre à jour le branding PDF du salon.")
     
     # ========================================================================
     # ONGLET 2 : CRÉER UN SALON
@@ -197,6 +226,22 @@ def afficher_page_salons():
                     "Adresse From (optionnel)",
                     placeholder="Laisser vide pour utiliser l'adresse d'envoi",
                 )
+
+            st.markdown("---")
+            st.markdown("### 🎨 Branding PDF du salon")
+            col_pdf1, col_pdf2 = st.columns(2)
+            with col_pdf1:
+                pdf_slogan = st.text_input(
+                    "Slogan PDF",
+                    value="L'Elegance Sur Mesure",
+                    help="Texte affiche dans l'en-tete et le pied des PDF du salon.",
+                )
+            with col_pdf2:
+                pdf_theme_color = st.color_picker(
+                    "Couleur principale PDF",
+                    value="#9B8AB5",
+                    help="Couleur de theme appliquee aux bandeaux PDF de ce salon.",
+                )
             
             st.markdown("---")
             st.markdown("### 👤 Administrateur du salon")
@@ -265,6 +310,8 @@ def afficher_page_salons():
                             smtp_from=smtp_from or None,
                             smtp_use_tls=smtp_use_tls,
                             smtp_use_ssl=smtp_use_ssl,
+                            pdf_slogan=pdf_slogan,
+                            pdf_theme_color=pdf_theme_color,
                         )
                     
                     if result:

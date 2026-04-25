@@ -449,7 +449,7 @@ def _pdf_dessiner_decor_commande(
     nom = (
         (salon_row or {}).get("nom_salon") or "Salon de couture"
     ).strip()
-    slogan = "L'Élégance Sur Mesure"
+    slogan = ((salon_row or {}).get("pdf_slogan") or "L'Elegance Sur Mesure").strip()
     adresse = ((salon_row or {}).get("quartier") or "—") or "—"
     if isinstance(adresse, str):
         adresse = adresse.strip() or "—"
@@ -589,7 +589,13 @@ class PDFController:
             return None
         try:
             from models.salon_model import SalonModel
-            return SalonModel(self.db_connection).obtenir_salon_by_id(str(salon_id))
+            model = SalonModel(self.db_connection)
+            salon = model.obtenir_salon_by_id(str(salon_id)) or {}
+            # Completer le branding PDF depuis la configuration metier du salon.
+            cfg = model.obtenir_config_salon(str(salon_id))
+            salon["pdf_theme_color"] = cfg.get("pdf_theme_color", salon.get("pdf_theme_color"))
+            salon["pdf_slogan"] = cfg.get("pdf_slogan", salon.get("pdf_slogan"))
+            return salon
         except Exception as e:
             print(f"Erreur chargement salon PDF {salon_id}: {e}")
             return None
@@ -602,11 +608,12 @@ class PDFController:
             return None
         try:
             nom = (salon.get('nom_salon') or '').strip() or 'Salon de couture'
+            slogan = (salon.get('pdf_slogan') or '').strip() or "L'Elegance Sur Mesure"
             responsable = (salon.get('responsable') or '').strip()
             telephone = (salon.get('telephone') or '').strip()
             email = (salon.get('email') or '').strip()
 
-            segments = [nom]
+            segments = [f"{nom} - {slogan}"]
             if responsable:
                 segments.append(f"Resp.: {responsable}")
             if telephone:
@@ -1362,6 +1369,9 @@ class PDFController:
 
             salon_row = self._charger_salon(salon_id)
             footer_lines = self._build_footer_lines(salon_row)
+            theme_hex = (salon_row.get("pdf_theme_color") if salon_row else "") or "#9B8AB5"
+            if not re.match(r"^#[0-9A-Fa-f]{6}$", str(theme_hex)):
+                theme_hex = "#9B8AB5"
 
             # Filigrane
             def dessiner_filigrane(canvas_obj, doc_obj):
@@ -1388,9 +1398,9 @@ class PDFController:
                     canvas_obj.saveState()
                     page_width, _ = doc_obj.pagesize
                     footer_height = 2.2 * cm
-                    canvas_obj.setFillColor(colors.HexColor('#EEF2F7'))
+                    canvas_obj.setFillColor(colors.HexColor(theme_hex))
                     canvas_obj.rect(0, 0, page_width, footer_height, fill=1, stroke=0)
-                    canvas_obj.setStrokeColor(colors.HexColor('#CBD5E1'))
+                    canvas_obj.setStrokeColor(colors.HexColor('#E2E8F0'))
                     canvas_obj.setLineWidth(0.8)
                     canvas_obj.line(0, footer_height, page_width, footer_height)
 
@@ -1402,7 +1412,7 @@ class PDFController:
                         while text and canvas_obj.stringWidth(text, font_name, fs) > max_w and fs > 6:
                             fs -= 1
                         canvas_obj.setFont(font_name, fs)
-                        canvas_obj.setFillColor(colors.HexColor('#334155'))
+                        canvas_obj.setFillColor(colors.white)
                         text_width = canvas_obj.stringWidth(text, font_name, fs)
                         x = max(0.6 * cm, (page_width - text_width) / 2)
                         base_y = 0.55 * cm
@@ -1430,7 +1440,7 @@ class PDFController:
                 'CustomTitle',
                 parent=styles['Heading1'],
                 fontSize=22,
-                textColor=colors.HexColor('#0F766E'),
+                textColor=colors.HexColor(theme_hex),
                 alignment=1,
                 spaceAfter=10
             )
@@ -1439,7 +1449,7 @@ class PDFController:
                 'CustomHeading',
                 parent=styles['Heading2'],
                 fontSize=13,
-                textColor=colors.HexColor('#0D9488'),
+                textColor=colors.HexColor(theme_hex),
                 spaceAfter=10
             )
 
@@ -1458,14 +1468,15 @@ class PDFController:
                     'LivraisonSalon',
                     parent=styles['Normal'],
                     fontSize=14,
-                    textColor=colors.HexColor('#115E59'),
+                    textColor=colors.HexColor(theme_hex),
                     alignment=1,
                     spaceAfter=4,
                     fontName='Helvetica-Bold',
                 )
                 elements.append(Paragraph((salon_row.get('nom_salon') or '').strip(), sn))
+            slogan_pdf = (salon_row.get("pdf_slogan") if salon_row else "") or "L'Elegance Sur Mesure"
             elements.append(Paragraph(
-                "Salon de couture · bon de livraison officiel",
+                f"{slogan_pdf} · bon de livraison officiel",
                 salon_tagline_style
             ))
             # Titre

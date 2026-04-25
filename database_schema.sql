@@ -28,6 +28,8 @@ CREATE TABLE IF NOT EXISTS salons (
     smtp_from      VARCHAR(200),
     smtp_use_tls   BOOLEAN      DEFAULT TRUE,
     smtp_use_ssl   BOOLEAN      DEFAULT FALSE,
+    pdf_slogan     VARCHAR(255),
+    pdf_theme_color VARCHAR(7),
     date_creation  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 

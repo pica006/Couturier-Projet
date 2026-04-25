@@ -101,6 +101,7 @@ def _appliquer_migrations_schema(db_connection) -> None:
         for ddl in [
             "ALTER TABLE salons ADD COLUMN IF NOT EXISTS max_habits_par_jour INTEGER DEFAULT NULL",
             "ALTER TABLE salons ADD COLUMN IF NOT EXISTS delais_par_modele TEXT DEFAULT NULL",
+            "ALTER TABLE salons ADD COLUMN IF NOT EXISTS pdf_slogan VARCHAR(255) DEFAULT NULL",
             "ALTER TABLE salons ADD COLUMN IF NOT EXISTS pdf_theme_color VARCHAR(7) DEFAULT NULL",
             # SMTP multi-tenant (retrocompatibilite des bases anciennes)
             "ALTER TABLE salons ADD COLUMN IF NOT EXISTS smtp_host VARCHAR(200) DEFAULT 'smtp.gmail.com'",

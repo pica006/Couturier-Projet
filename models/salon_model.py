@@ -66,6 +66,8 @@ class SalonModel:
         smtp_from: Optional[str] = None,
         smtp_use_tls: Optional[bool] = None,
         smtp_use_ssl: Optional[bool] = None,
+        pdf_slogan: Optional[str] = None,
+        pdf_theme_color: Optional[str] = None,
         salon_id_force: Optional[str] = None,
     ) -> Optional[Dict]:
         """
@@ -112,6 +114,8 @@ class SalonModel:
                 smtp_from=smtp_from,
                 smtp_use_tls=smtp_use_tls,
                 smtp_use_ssl=smtp_use_ssl,
+                pdf_slogan=pdf_slogan,
+                pdf_theme_color=pdf_theme_color,
                 salon_id_force=salon_id_force,
             )
         
@@ -163,6 +167,8 @@ class SalonModel:
                         smtp_from=smtp_from,
                         smtp_use_tls=smtp_use_tls,
                         smtp_use_ssl=smtp_use_ssl,
+                        pdf_slogan=pdf_slogan,
+                        pdf_theme_color=pdf_theme_color,
                     )
             else:
                 # PostgreSQL : passer directement à la méthode manuelle
@@ -185,6 +191,8 @@ class SalonModel:
                     smtp_from=smtp_from,
                     smtp_use_tls=smtp_use_tls,
                     smtp_use_ssl=smtp_use_ssl,
+                    pdf_slogan=pdf_slogan,
+                    pdf_theme_color=pdf_theme_color,
                 )
             
             return None
@@ -209,6 +217,8 @@ class SalonModel:
                 smtp_from=smtp_from,
                 smtp_use_tls=smtp_use_tls,
                 smtp_use_ssl=smtp_use_ssl,
+                pdf_slogan=pdf_slogan,
+                pdf_theme_color=pdf_theme_color,
             )
     
     def creer_salon_manuel(
@@ -229,6 +239,8 @@ class SalonModel:
         smtp_from: Optional[str] = None,
         smtp_use_tls: Optional[bool] = None,
         smtp_use_ssl: Optional[bool] = None,
+        pdf_slogan: Optional[str] = None,
+        pdf_theme_color: Optional[str] = None,
         salon_id_force: Optional[str] = None,
     ) -> Optional[Dict]:
         """
@@ -275,15 +287,17 @@ class SalonModel:
             smtp_from_final = smtp_from or smtp_user_final
             smtp_use_tls_final = smtp_use_tls if smtp_use_tls is not None else True
             smtp_use_ssl_final = smtp_use_ssl if smtp_use_ssl is not None else False
+            pdf_slogan_final = (pdf_slogan or "").strip() or "L'Elegance Sur Mesure"
+            pdf_theme_color_final = (pdf_theme_color or "").strip() or "#9B8AB5"
 
             # ÉTAPE 1 : Créer le salon avec l'ID personnalisé
             query_salon = """
                 INSERT INTO salons (
                     salon_id, nom, quartier, responsable, telephone, email,
                     code_admin, smtp_host, smtp_port, smtp_user, smtp_password,
-                    smtp_from, smtp_use_tls, smtp_use_ssl
+                    smtp_from, smtp_use_tls, smtp_use_ssl, pdf_slogan, pdf_theme_color
                 )
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """
             # En cas de collision (preview obsolète/concurrence), on retente avec le prochain ID.
             for attempt in range(3):
@@ -305,6 +319,8 @@ class SalonModel:
                             smtp_from_final,
                             smtp_use_tls_final,
                             smtp_use_ssl_final,
+                            pdf_slogan_final,
+                            pdf_theme_color_final,
                         ),
                     )
                     break
@@ -600,7 +616,15 @@ class SalonModel:
                         'smtp_from': None,
                         'smtp_use_tls': None,
                         'smtp_use_ssl': None,
+                        'pdf_slogan': None,
+                        'pdf_theme_color': None,
                     })
+                    try:
+                        cfg = self.obtenir_config_salon(salon_id)
+                        salons[-1]['pdf_slogan'] = cfg.get('pdf_slogan')
+                        salons[-1]['pdf_theme_color'] = cfg.get('pdf_theme_color')
+                    except Exception:
+                        pass
                 
                 cursor.close()
                 return salons
@@ -739,7 +763,9 @@ class SalonModel:
                     s.smtp_password,
                     s.smtp_from,
                     s.smtp_use_tls,
-                    s.smtp_use_ssl
+                    s.smtp_use_ssl,
+                    s.pdf_slogan,
+                    s.pdf_theme_color
                 FROM salons s
                 LEFT JOIN (
                     SELECT salon_id, nom, prenom
@@ -772,6 +798,8 @@ class SalonModel:
                     'smtp_from': row[15],
                     'smtp_use_tls': row[16],
                     'smtp_use_ssl': row[17],
+                    'pdf_slogan': row[18] if len(row) > 18 else None,
+                    'pdf_theme_color': row[19] if len(row) > 19 else None,
                 }
             return None
             
@@ -847,7 +875,9 @@ class SalonModel:
                        smtp_password: Optional[str] = None,
                        smtp_from: Optional[str] = None,
                        smtp_use_tls: Optional[bool] = None,
-                       smtp_use_ssl: Optional[bool] = None) -> bool:
+                       smtp_use_ssl: Optional[bool] = None,
+                       pdf_slogan: Optional[str] = None,
+                       pdf_theme_color: Optional[str] = None) -> bool:
         """
         Modifie les informations d'un salon
         
@@ -910,6 +940,12 @@ class SalonModel:
             if smtp_use_ssl is not None:
                 updates.append("smtp_use_ssl = %s")
                 params.append(smtp_use_ssl)
+            if pdf_slogan is not None:
+                updates.append("pdf_slogan = %s")
+                params.append(str(pdf_slogan).strip() or "L'Elegance Sur Mesure")
+            if pdf_theme_color is not None:
+                updates.append("pdf_theme_color = %s")
+                params.append(str(pdf_theme_color).strip() or "#9B8AB5")
             
             if not updates:
                 cursor.close()
@@ -948,6 +984,7 @@ class SalonModel:
         defaults = {
             'max_habits_par_jour': None,
             'delais_par_modele': {},
+            'pdf_slogan': "L'Elegance Sur Mesure",
             'pdf_theme_color': '#9B8AB5',
         }
         try:
@@ -956,7 +993,7 @@ class SalonModel:
                 return defaults.copy()
             cursor = self.db.get_connection().cursor()
             cursor.execute(
-                "SELECT max_habits_par_jour, delais_par_modele, pdf_theme_color FROM salons WHERE salon_id = %s",
+                "SELECT max_habits_par_jour, delais_par_modele, pdf_slogan, pdf_theme_color FROM salons WHERE salon_id = %s",
                 (sid,)
             )
             row = cursor.fetchone()
@@ -978,9 +1015,12 @@ class SalonModel:
                         result['delais_par_modele'] = {str(k): int(v) for k, v in parsed.items()}
                 except Exception:
                     pass
+            # pdf_slogan
+            if row[2]:
+                result['pdf_slogan'] = str(row[2]).strip() or "L'Elegance Sur Mesure"
             # pdf_theme_color (valider format hex)
-            if row[2] and _re.match(r'^#[0-9A-Fa-f]{6}$', str(row[2]).strip()):
-                result['pdf_theme_color'] = str(row[2]).strip()
+            if row[3] and _re.match(r'^#[0-9A-Fa-f]{6}$', str(row[3]).strip()):
+                result['pdf_theme_color'] = str(row[3]).strip()
         except Exception as e:
             print(f"obtenir_config_salon ({salon_id}): {e} — fallback defaults")
             return defaults.copy()
@@ -991,6 +1031,7 @@ class SalonModel:
         salon_id: str,
         max_habits_par_jour: Optional[int] = None,
         delais_par_modele: Optional[Dict] = None,
+        pdf_slogan: Optional[str] = None,
         pdf_theme_color: Optional[str] = None,
     ) -> bool:
         """
@@ -1008,6 +1049,9 @@ class SalonModel:
             if delais_par_modele is not None:
                 updates.append("delais_par_modele = %s")
                 params.append(_json.dumps({str(k): int(v) for k, v in delais_par_modele.items()}))
+            if pdf_slogan is not None:
+                updates.append("pdf_slogan = %s")
+                params.append(str(pdf_slogan).strip() or "L'Elegance Sur Mesure")
             if pdf_theme_color is not None:
                 color = str(pdf_theme_color).strip()
                 if not _re.match(r'^#[0-9A-Fa-f]{6}$', color):

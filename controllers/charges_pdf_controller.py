@@ -52,8 +52,9 @@ def _get_footer_lines(salon_id: Optional[str], db_connection: Optional[DatabaseC
                 responsable = salon.get('responsable') or ''
                 telephone = salon.get('telephone') or ''
                 email = salon.get('email') or ''
+                slogan = salon.get('pdf_slogan') or "L'Elegance Sur Mesure"
 
-                line1 = f"{nom} ({salon_id})"
+                line1 = f"{nom} - {slogan}"
                 parts = []
                 if quartier:
                     parts.append(quartier)
@@ -71,6 +72,23 @@ def _get_footer_lines(salon_id: Optional[str], db_connection: Optional[DatabaseC
     except Exception as e:
         print(f"Erreur construction pied de page PDF: {e}")
     return None
+
+
+def _get_pdf_branding(salon_id: Optional[str], db_connection: Optional[DatabaseConnection]) -> Dict[str, str]:
+    """Récupère le slogan et la couleur PDF par salon avec fallback sûr."""
+    branding = {"pdf_slogan": "L'Elegance Sur Mesure", "pdf_theme_color": "#9B8AB5"}
+    try:
+        if salon_id and db_connection:
+            cfg = SalonModel(db_connection).obtenir_config_salon(salon_id)
+            slogan = str(cfg.get("pdf_slogan") or "").strip()
+            color = str(cfg.get("pdf_theme_color") or "").strip()
+            if slogan:
+                branding["pdf_slogan"] = slogan
+            if re.match(r"^#[0-9A-Fa-f]{6}$", color):
+                branding["pdf_theme_color"] = color
+    except Exception as e:
+        print(f"Erreur branding PDF salon: {e}")
+    return branding
 
 
 def generer_pdf_impots(
@@ -100,6 +118,7 @@ def generer_pdf_impots(
 
         logo_filigrane_data = _get_logo_bytes(salon_id, db_connection)
         footer_lines = _get_footer_lines(salon_id, db_connection)
+        branding = _get_pdf_branding(salon_id, db_connection)
 
         def dessiner_filigrane(canvas_obj, doc_obj):
             if not logo_filigrane_data:
@@ -130,7 +149,7 @@ def generer_pdf_impots(
                 canvas_obj.saveState()
                 page_width, _ = doc_obj.pagesize
                 footer_height = 2 * cm
-                canvas_obj.setFillColor(colors.HexColor('#17BEBB'))
+                canvas_obj.setFillColor(colors.HexColor(branding["pdf_theme_color"]))
                 canvas_obj.rect(0, 0, page_width, footer_height, fill=1, stroke=0)
                 font_name = "Helvetica"
                 font_size = 8
@@ -298,6 +317,7 @@ def generer_pdf_analyse_charges(
 
         logo_filigrane_data = _get_logo_bytes(salon_id, db_connection)
         footer_lines = _get_footer_lines(salon_id, db_connection)
+        branding = _get_pdf_branding(salon_id, db_connection)
 
         def dessiner_filigrane(canvas_obj, doc_obj):
             if not logo_filigrane_data:
@@ -328,7 +348,7 @@ def generer_pdf_analyse_charges(
                 canvas_obj.saveState()
                 page_width, _ = doc_obj.pagesize
                 footer_height = 2 * cm
-                canvas_obj.setFillColor(colors.HexColor('#857CF6'))
+                canvas_obj.setFillColor(colors.HexColor(branding["pdf_theme_color"]))
                 canvas_obj.rect(0, 0, page_width, footer_height, fill=1, stroke=0)
                 font_name = "Helvetica"
                 font_size = 8

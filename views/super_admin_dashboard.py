@@ -733,6 +733,22 @@ def afficher_gestion_salons(salon_model):
                     "Adresse From (optionnel)",
                     placeholder="Laisser vide pour utiliser l'adresse d'envoi",
                 )
+
+            st.markdown("---")
+            st.markdown("#### 🎨 Branding PDF du salon")
+            col_pdf1, col_pdf2 = st.columns(2)
+            with col_pdf1:
+                pdf_slogan = st.text_input(
+                    "Slogan PDF",
+                    value="L'Elegance Sur Mesure",
+                    help="Texte affiche dans les PDF de ce salon.",
+                )
+            with col_pdf2:
+                pdf_theme_color = st.color_picker(
+                    "Couleur principale PDF",
+                    value="#9B8AB5",
+                    help="Couleur appliquee aux bandeaux PDF du salon.",
+                )
             
             st.markdown("---")
             st.markdown("#### 👤 Administrateur du salon")
@@ -789,6 +805,8 @@ def afficher_gestion_salons(salon_model):
                             smtp_from=smtp_from or None,
                             smtp_use_tls=smtp_use_tls,
                             smtp_use_ssl=smtp_use_ssl,
+                            pdf_slogan=pdf_slogan,
+                            pdf_theme_color=pdf_theme_color,
                             salon_id_force=next_id_preview
                         )
                         
@@ -895,6 +913,21 @@ def afficher_gestion_salons(salon_model):
                             value=salon.get('actif', True),
                             help="Cocher pour activer, décocher pour désactiver le salon"
                         )
+
+                    st.markdown("#### 🎨 Branding PDF")
+                    brand_col1, brand_col2 = st.columns(2)
+                    with brand_col1:
+                        nouveau_pdf_slogan = st.text_input(
+                            "Slogan PDF",
+                            value=salon.get('pdf_slogan') or "L'Elegance Sur Mesure",
+                            help="Texte affiche dans les PDF du salon.",
+                        )
+                    with brand_col2:
+                        nouveau_pdf_theme_color = st.color_picker(
+                            "Couleur PDF",
+                            value=salon.get('pdf_theme_color') or "#9B8AB5",
+                            help="Couleur principale appliquee aux PDF du salon.",
+                        )
                     
                     st.markdown("---")
                     
@@ -914,7 +947,9 @@ def afficher_gestion_salons(salon_model):
                             nouveau_responsable == salon.get('responsable') and
                             nouveau_telephone == salon.get('telephone') and
                             nouveau_email == salon.get('email') and
-                            statut_actif == salon.get('actif', True)):
+                            statut_actif == salon.get('actif', True) and
+                            nouveau_pdf_slogan == (salon.get('pdf_slogan') or "L'Elegance Sur Mesure") and
+                            nouveau_pdf_theme_color == (salon.get('pdf_theme_color') or "#9B8AB5")):
                             st.info("ℹ️ Aucune modification détectée")
                         else:
                             # Appeler la méthode de modification
@@ -925,7 +960,9 @@ def afficher_gestion_salons(salon_model):
                                 responsable=nouveau_responsable if nouveau_responsable != salon.get('responsable') else None,
                                 telephone=nouveau_telephone if nouveau_telephone != salon.get('telephone') else None,
                                 email=nouveau_email if nouveau_email != salon.get('email') else None,
-                                actif=statut_actif if statut_actif != salon.get('actif', True) else None
+                                actif=statut_actif if statut_actif != salon.get('actif', True) else None,
+                                pdf_slogan=nouveau_pdf_slogan if nouveau_pdf_slogan != (salon.get('pdf_slogan') or "L'Elegance Sur Mesure") else None,
+                                pdf_theme_color=nouveau_pdf_theme_color if nouveau_pdf_theme_color != (salon.get('pdf_theme_color') or "#9B8AB5") else None
                             )
                             
                             if success:
