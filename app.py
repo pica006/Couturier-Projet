@@ -39,6 +39,12 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+# Première initialisation de la session juste après set_page_config, avant tout autre st.* lourd
+# (CSS, etc.). Sinon Streamlit peut lever « Tried to use SessionInfo before it was initialized »
+# (en français : erreur sur SessionInfo / format de message selon le client).
+initialize_session_state()
+sanitize_session_state()
+
 # CSS personnalisé - Palette: Violet clair | Bleu turquoise | Beige (60% dominante)
 # NOTE: L'erreur 'removeChild' est un bug connu de Streamlit
 # Elle est bénigne et n'affecte pas le fonctionnement de l'application
@@ -115,11 +121,8 @@ def _safe_visual_css() -> str:
     """
 
 
-# IMPORTANT:
-# Eviter tout acces a st.session_state au niveau module.
-# Sur certains cycles Streamlit (cold start / websocket fragile),
-# SessionInfo peut ne pas etre pret et provoquer:
-# "Tried to use SessionInfo before it was initialized".
+# IMPORTANT: ne pas lire/écrire st.session_state au chargement du module en dehors du bootstrap
+# juste au-dessus (initialize + sanitize). Le thème riche est désactivé ici.
 _apply_rich_theme = False
 
 if VISUAL_SAFE_MODE:
@@ -770,7 +773,8 @@ def initialiser_session_state():
     """
     POURQUOI ? Pour initialiser toutes les variables de session Streamlit
     COMMENT ? On vérifie si chaque variable existe, sinon on la crée
-    UTILISÉ OÙ ? Appelé au début de main() pour préparer l'application
+    UTILISÉ OÙ ? Appelé une première fois juste après st.set_page_config, puis idempotent
+    si rappelé (ex. tests). Le démarrage effectif de l'app ne doit pas dépendre uniquement de main().
     
     EXPLICATION DES VARIABLES :
     - db_connection : Stocke la connexion active à la base de données
@@ -1142,9 +1146,7 @@ def afficher_header_principal():
 
 
 def main():
-    """Fonction principale de l'application"""
-    initialiser_session_state()
-    
+    """Fonction principale de l'application (session déjà initialisée après set_page_config)."""
     # Sidebar : thème SpiritStitch (Premium / Ultra Minimal) en mode safe, sinon image nav ou plain
     sidebar_bg_css = (
         theme_sidebar_bg_css()
