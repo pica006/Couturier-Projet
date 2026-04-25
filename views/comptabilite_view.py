@@ -85,6 +85,12 @@ def afficher_page_comptabilite():
         couturier_filtre_id = options_couturiers.get(selected_label)
 
     salon_filtre_id = salon_id_user if is_admin_user else None
+    # En production, certaines commandes historiques n'ont pas salon_id.
+    # Si un couturier précis est sélectionné, on aligne le comportement Airan:
+    # scope principal par couturier_id uniquement.
+    salon_scope_pour_requetes = (
+        salon_filtre_id if (not is_admin_user or couturier_filtre_id is None) else None
+    )
     
     # Contrôleur (créé une seule fois)
     try:
@@ -131,7 +137,7 @@ def afficher_page_comptabilite():
             couturier_filtre_id,
             date_debut_filtre,
             date_fin_filtre,
-            salon_id=salon_filtre_id
+            salon_id=salon_scope_pour_requetes
         )
     except Exception:
         modeles_disponibles = []
@@ -156,7 +162,7 @@ def afficher_page_comptabilite():
             couturier_filtre_id,
             date_debut_filtre, 
             date_fin_filtre,
-            salon_id=salon_filtre_id
+            salon_id=salon_scope_pour_requetes
         ) or {}
         
         # ====================================================================
@@ -316,14 +322,14 @@ def afficher_page_comptabilite():
             date_debut=date_debut_filtre,
             date_fin=date_fin_filtre,
             limit=10,
-            salon_id=salon_filtre_id,
+            salon_id=salon_scope_pour_requetes,
         )
         repartition = compta_controller.repartition_argent_par_modele(
             couturier_filtre_id,
             date_debut=date_debut_filtre,
             date_fin=date_fin_filtre,
             limit=10,
-            salon_id=salon_filtre_id,
+            salon_id=salon_scope_pour_requetes,
             modele=modele_filtre,
         )
 
@@ -448,7 +454,7 @@ def afficher_page_comptabilite():
                 date_debut=date_debut_filtre,
                 date_fin=date_fin_filtre,
                 limit=10,
-                salon_id=salon_filtre_id,
+                salon_id=salon_scope_pour_requetes,
                 modele=modele_filtre,
             )
             if reste_cat:
@@ -515,7 +521,7 @@ def afficher_page_comptabilite():
         # Récupérer la liste des clients (tri géré côté contrôleur)
         clients = compta_controller.obtenir_liste_clients_triee(
             couturier_id=couturier_filtre_id,
-            salon_id=salon_filtre_id,
+            salon_id=salon_scope_pour_requetes,
             tri=tri_client_map[tri_client_label],
         )
         
@@ -593,7 +599,7 @@ def afficher_page_comptabilite():
         # Récupérer les commandes avec reste à payer (tri géré côté contrôleur)
         commandes_relance = compta_controller.obtenir_commandes_a_relancer(
             couturier_id=couturier_filtre_id,
-            salon_id=salon_filtre_id,
+            salon_id=salon_scope_pour_requetes,
             tri=tri_relance_map[tri_relance_label],
         )
         
