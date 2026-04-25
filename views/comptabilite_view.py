@@ -199,29 +199,9 @@ def afficher_page_comptabilite():
         st.info("Aucun client enregistre.")
 
     st.markdown("---")
-    st.markdown("### Commandes a relancer")
-    tri_relance = st.selectbox(
-        "Trier les relances par",
-        options=[
-            "Date recente",
-            "Date ancienne",
-            "Reste decroissant",
-            "Reste croissant",
-            "Nom client A-Z",
-            "Nom client Z-A",
-        ],
-        index=0,
-        key="airan_tri_relances",
-    )
-    tri_relance_map = {
-        "Date recente": "date_desc",
-        "Date ancienne": "date_asc",
-        "Reste decroissant": "reste_desc",
-        "Reste croissant": "reste_asc",
-        "Nom client A-Z": "nom_asc",
-        "Nom client Z-A": "nom_desc",
-    }
-    commandes_relance = controller.obtenir_commandes_a_relancer(couturier_id=couturier_id, tri=tri_relance_map[tri_relance])
+    st.markdown("### Clients a relancer")
+    st.caption("Tri applique: Date recente")
+    commandes_relance = controller.obtenir_commandes_a_relancer(couturier_id=couturier_id, tri="date_desc")
 
     smtp_config = None
     try:
