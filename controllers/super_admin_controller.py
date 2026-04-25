@@ -168,7 +168,6 @@ class SuperAdminController:
                 FROM salons s
                 LEFT JOIN couturiers co ON co.salon_id = s.salon_id
                 LEFT JOIN clients cl ON cl.salon_id = s.salon_id
-                WHERE s.actif = TRUE OR s.actif IS NULL
                 GROUP BY s.salon_id, s.nom, s.quartier, s.responsable, s.telephone, s.email, s.code_admin, s.actif, s.date_creation
             """ + order_by_clause
 
@@ -207,13 +206,13 @@ class SuperAdminController:
             ch_params: List = []
 
             if date_debut:
-                cmd_where.append("date_creation >= %s")
-                ch_where.append("date_charge >= %s")
+                cmd_where.append("cmd.date_creation >= %s")
+                ch_where.append("ch.date_charge >= %s")
                 cmd_params.append(date_debut)
                 ch_params.append(date_debut)
             if date_fin:
-                cmd_where.append("date_creation <= %s")
-                ch_where.append("date_charge <= %s")
+                cmd_where.append("cmd.date_creation <= %s")
+                ch_where.append("ch.date_charge <= %s")
                 cmd_params.append(date_fin)
                 ch_params.append(date_fin)
 
@@ -224,14 +223,16 @@ class SuperAdminController:
 
             query_cmd = f"""
                 SELECT 
-                    salon_id,
-                    COUNT(DISTINCT id) as nb_commandes,
-                    COALESCE(SUM(prix_total), 0) as ca_total,
-                    COALESCE(SUM(avance), 0) as avances,
-                    COALESCE(SUM(reste), 0) as reste
-                FROM commandes
-                {"WHERE COALESCE(est_supprime, FALSE) = FALSE AND " + " AND ".join(cmd_where) if cmd_where else "WHERE COALESCE(est_supprime, FALSE) = FALSE"}
-                GROUP BY salon_id
+                    COALESCE(cmd.salon_id, co.salon_id, cl.salon_id) as salon_id_effectif,
+                    COUNT(DISTINCT cmd.id) as nb_commandes,
+                    COALESCE(SUM(cmd.prix_total), 0) as ca_total,
+                    COALESCE(SUM(cmd.avance), 0) as avances,
+                    COALESCE(SUM(cmd.reste), 0) as reste
+                FROM commandes cmd
+                LEFT JOIN couturiers co ON co.id = cmd.couturier_id
+                LEFT JOIN clients cl ON cl.id = cmd.client_id
+                {"WHERE COALESCE(cmd.est_supprime, FALSE) = FALSE AND " + " AND ".join(cmd_where) if cmd_where else "WHERE COALESCE(cmd.est_supprime, FALSE) = FALSE"}
+                GROUP BY COALESCE(cmd.salon_id, co.salon_id, cl.salon_id)
             """
             cursor.execute(query_cmd, tuple(cmd_params))
             rows_cmd = cursor.fetchall()
@@ -251,11 +252,12 @@ class SuperAdminController:
 
             query_ch = f"""
                 SELECT 
-                    salon_id,
-                    COALESCE(SUM(montant), 0) as charges
-                FROM charges
+                    COALESCE(ch.salon_id, co.salon_id) as salon_id_effectif,
+                    COALESCE(SUM(ch.montant), 0) as charges
+                FROM charges ch
+                LEFT JOIN couturiers co ON co.id = ch.couturier_id
                 {where_ch_clause}
-                GROUP BY salon_id
+                GROUP BY COALESCE(ch.salon_id, co.salon_id)
             """
             cursor.execute(query_ch, tuple(ch_params))
             rows_ch = cursor.fetchall()
