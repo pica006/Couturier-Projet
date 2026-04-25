@@ -31,6 +31,136 @@ class SuperAdminController:
         salon_model = SalonModel(self.db)
         return salon_model.diagnostiquer_table_salons()
 
+    def obtenir_kpis_salon(
+        self,
+        salon_id: str,
+        date_debut: Optional[datetime] = None,
+        date_fin: Optional[datetime] = None,
+    ) -> Optional[Dict]:
+        """
+        Retourne les KPI d'un salon avec un scope robuste:
+        - rattachement direct via *.salon_id
+        - fallback via couturiers.salon_id et clients.salon_id
+        """
+        try:
+            sid = str(salon_id or "").strip()
+            if not sid:
+                return None
+
+            cursor = self.db.get_connection().cursor()
+
+            # Base salon + compteurs structurels (indépendants de la période)
+            cursor.execute(
+                """
+                SELECT
+                    s.salon_id,
+                    s.nom,
+                    s.quartier,
+                    s.responsable,
+                    s.telephone,
+                    s.email,
+                    s.code_admin,
+                    s.date_creation,
+                    COALESCE(COUNT(DISTINCT CASE WHEN co.role = 'employe' THEN co.id END), 0) AS nb_employes,
+                    COALESCE(COUNT(DISTINCT cl.id), 0) AS nb_clients
+                FROM salons s
+                LEFT JOIN couturiers co ON co.salon_id = s.salon_id
+                LEFT JOIN clients cl ON cl.salon_id = s.salon_id
+                WHERE s.salon_id = %s
+                GROUP BY s.salon_id, s.nom, s.quartier, s.responsable, s.telephone, s.email, s.code_admin, s.date_creation
+                """,
+                (sid,),
+            )
+            salon_row = cursor.fetchone()
+            if not salon_row:
+                cursor.close()
+                return None
+
+            cmd_filters = [
+                "COALESCE(cmd.est_supprime, FALSE) = FALSE",
+                "(cmd.salon_id = %s OR co.salon_id = %s OR cl.salon_id = %s)",
+            ]
+            cmd_params: List = [sid, sid, sid]
+            if date_debut:
+                cmd_filters.append("cmd.date_creation >= %s")
+                cmd_params.append(date_debut)
+            if date_fin:
+                cmd_filters.append("cmd.date_creation <= %s")
+                cmd_params.append(date_fin)
+
+            cursor.execute(
+                f"""
+                SELECT
+                    COALESCE(COUNT(cmd.id), 0) AS nb_commandes,
+                    COALESCE(SUM(cmd.prix_total), 0) AS ca_total,
+                    COALESCE(SUM(cmd.avance), 0) AS avances_total,
+                    COALESCE(SUM(cmd.reste), 0) AS reste_total
+                FROM commandes cmd
+                LEFT JOIN couturiers co ON co.id = cmd.couturier_id
+                LEFT JOIN clients cl ON cl.id = cmd.client_id
+                WHERE {' AND '.join(cmd_filters)}
+                """,
+                tuple(cmd_params),
+            )
+            cmd_row = cursor.fetchone()
+
+            ch_filters = [
+                "(ch.salon_id = %s OR co.salon_id = %s)",
+            ]
+            ch_params: List = [sid, sid]
+            if date_debut:
+                ch_filters.append("ch.date_charge >= %s")
+                ch_params.append(date_debut)
+            if date_fin:
+                ch_filters.append("ch.date_charge <= %s")
+                ch_params.append(date_fin)
+
+            cursor.execute(
+                f"""
+                SELECT COALESCE(SUM(ch.montant), 0) AS charges_total
+                FROM charges ch
+                LEFT JOIN couturiers co ON co.id = ch.couturier_id
+                WHERE {' AND '.join(ch_filters)}
+                """,
+                tuple(ch_params),
+            )
+            ch_row = cursor.fetchone()
+            cursor.close()
+
+            nb_commandes = int((cmd_row[0] if cmd_row else 0) or 0)
+            ca_total = float((cmd_row[1] if cmd_row else 0) or 0.0)
+            avances = float((cmd_row[2] if cmd_row else 0) or 0.0)
+            reste = float((cmd_row[3] if cmd_row else 0) or 0.0)
+            charges = float((ch_row[0] if ch_row else 0) or 0.0)
+            benefice = ca_total - charges
+
+            return {
+                "salon_id": salon_row[0],
+                "nom_salon": salon_row[1],
+                "quartier": salon_row[2],
+                "responsable": salon_row[3],
+                "telephone": salon_row[4],
+                "email": salon_row[5],
+                "code_admin": salon_row[6],
+                "date_creation": salon_row[7],
+                "nb_employes": int(salon_row[8] or 0),
+                "nb_clients": int(salon_row[9] or 0),
+                "nb_commandes": nb_commandes,
+                "ca_total": ca_total,
+                "avances": avances,
+                "reste": reste,
+                "charges": charges,
+                "benefice": benefice,
+                "taux_encaissement": (avances / ca_total * 100) if ca_total > 0 else 0.0,
+            }
+        except Exception as e:
+            print(f"Erreur obtenir_kpis_salon ({salon_id}): {e}")
+            try:
+                self.db.get_connection().rollback()
+            except Exception:
+                pass
+            return None
+
     def obtenir_statistiques_globales(
         self,
         date_debut: Optional[datetime] = None,

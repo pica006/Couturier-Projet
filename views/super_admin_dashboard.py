@@ -195,19 +195,11 @@ def afficher_vue_ensemble(super_admin_ctrl, salon_model):
     
     # Si un salon est sélectionné, afficher les stats de ce salon
     if salon_id_selected:
-        # Récupérer les statistiques de tous les salons (à chaque changement)
-        stats_par_salon = super_admin_ctrl.obtenir_statistiques_par_salon(
+        # KPI ciblés du salon sélectionné (logique métier dans le contrôleur MVC)
+        salon_stats = super_admin_ctrl.obtenir_kpis_salon(
+            salon_id=salon_id_selected,
             date_debut=date_debut_dt,
             date_fin=date_fin_dt,
-        )
-        
-        # Filtrer pour le salon sélectionné (comparaison robuste)
-        salon_stats = next(
-            (
-                s for s in stats_par_salon
-                if _norm_salon_id(s.get('salon_id')) == _norm_salon_id(salon_id_selected)
-            ),
-            None
         )
 
         # Fallback: afficher un tableau KPI à 0 plutôt qu'un vide total
@@ -251,13 +243,8 @@ def afficher_vue_ensemble(super_admin_ctrl, salon_model):
                 int(salon_stats.get('nb_commandes', 0) or 0) > 0,
             ])
             if not has_financial_activity:
-                stats_all_time = super_admin_ctrl.obtenir_statistiques_par_salon()
-                salon_stats_all_time = next(
-                    (
-                        s for s in stats_all_time
-                        if _norm_salon_id(s.get('salon_id')) == _norm_salon_id(salon_id_selected)
-                    ),
-                    None
+                salon_stats_all_time = super_admin_ctrl.obtenir_kpis_salon(
+                    salon_id=salon_id_selected
                 )
                 if salon_stats_all_time and any([
                     float(salon_stats_all_time.get('ca_total', 0) or 0) > 0,
@@ -1323,23 +1310,11 @@ def afficher_toutes_commandes(super_admin_ctrl, salon_model):
     
     # Récupérer les statistiques réelles du salon (sans limite)
     if salon_id_filter:
-        # Obtenir les vraies statistiques du salon sélectionné (à chaque changement)
-        # Forcer la récupération des données à chaque fois
-        stats_par_salon = super_admin_ctrl.obtenir_statistiques_par_salon(
+        # KPI ciblés du salon sélectionné (logique contrôleur)
+        salon_stats = super_admin_ctrl.obtenir_kpis_salon(
+            salon_id=salon_id_filter,
             date_debut=datetime.combine(date_debut, datetime.min.time()),
             date_fin=datetime.combine(date_fin, datetime.max.time()),
-        )
-        
-        # Debug : afficher le salon_id recherché
-        # st.write(f"DEBUG: Recherche du salon_id: {salon_id_filter}")
-        # st.write(f"DEBUG: Salons disponibles: {[s['salon_id'] for s in stats_par_salon]}")
-        
-        salon_stats = next(
-            (
-                s for s in stats_par_salon
-                if _norm_salon_id(s.get('salon_id')) == _norm_salon_id(salon_id_filter)
-            ),
-            None
         )
         
         if salon_stats:
